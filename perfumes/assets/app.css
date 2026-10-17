@@ -284,3 +284,8 @@ body.tray-on .fab{bottom:96px}
   .ccols .rh{font-size:9px;letter-spacing:.12em}
   .ccols .hd h3{font-size:16px}
 }
+
+/* back to Bagda Stores */
+.nav a.back{display:inline-block;text-decoration:none;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);padding:7px 12px;border:1px solid var(--line);border-radius:99px;margin-right:6px;transition:border-color .2s,color .2s;white-space:nowrap}
+.nav a.back:hover{border-color:var(--gold);color:var(--gold)}
+@media(max-width:480px){.nav a.back{font-size:10px;padding:6px 9px;letter-spacing:.08em}}
