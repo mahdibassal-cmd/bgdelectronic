@@ -183,7 +183,7 @@ function detail(p){
        (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar · Mercado Pago</a>':'')+'</div></div>';
   }
   h+='<div class="payline">PIX, dinheiro, débito ou crédito em até '+(X.installments.max||12)+'x'+(X.installments.noInterest?' sem juros':'')+'. Loja física no Brás · 08:00–17:30.</div>';
-  h+='<ul class="pdlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>Enviamos para todo o Brasil</b> · SEDEX</li></ul>';
+  h+='<ul class="pdlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>';
   if(!p.soldOut) h+=freteBox(p.id);
   if(hasNotes) h+='<div class="pyr"><h4>Pirâmide olfativa</h4>'+tier("t1","Notas de topo",p.notes.top)+tier("t2","Notas de coração",p.notes.heart)+tier("t3","Notas de fundo",p.notes.base)+'</div>';
   if(acc.length) h+='<div class="acc"><h4>Acordes principais</h4>'+acc.map(function(a){return '<div class="bar"><span>'+esc(a.name)+'</span><i style="--w:'+(a.w/100)+'"></i></div>'}).join("")+'</div>';
@@ -312,66 +312,33 @@ document.addEventListener("click",function(e){
   if(e.target.closest("[data-qreset]")){ QI=0; QA={}; quizRender(); return; }
 });
 
-/* ---------- entregas / calcular frete ---------- */
-var F=window.BAGDA_FRETE||null;
-var UFR=[[1000,19999,"SP"],[20000,28999,"RJ"],[29000,29999,"ES"],[30000,39999,"MG"],[40000,48999,"BA"],[49000,49999,"SE"],[50000,56999,"PE"],[57000,57999,"AL"],[58000,58999,"PB"],[59000,59999,"RN"],[60000,63999,"CE"],[64000,64999,"PI"],[65000,65999,"MA"],[66000,68899,"PA"],[68900,68999,"AP"],[69000,69299,"AM"],[69300,69399,"RR"],[69400,69899,"AM"],[69900,69999,"AC"],[70000,72799,"DF"],[72800,72999,"GO"],[73000,73699,"DF"],[73700,76799,"GO"],[76800,76999,"RO"],[77000,77999,"TO"],[78000,78899,"MT"],[79000,79999,"MS"],[80000,87999,"PR"],[88000,89999,"SC"],[90000,99999,"RS"]];
-function ufOf(c){ var n=parseInt(c.slice(0,5),10); for(var i=0;i<UFR.length;i++) if(n>=UFR[i][0]&&n<=UFR[i][1]) return UFR[i][2]; return null; }
-function spCity(c){ var n=parseInt(c.slice(0,5),10); return (n>=1000&&n<=5999)||(n>=8000&&n<=8499); }
+/* ---------- entregas / frete pelo WhatsApp ---------- */
 function fmtCep(c){ return c.slice(0,5)+"-"+c.slice(5); }
 function wa(t){ return "https://wa.me/"+WA+"?text="+encodeURIComponent(t); }
 function freteBox(pid){
-  return '<form class="frete" data-frete="'+(pid||'')+'" novalidate><label for="cep_'+(pid||'home')+'">Calcular frete</label><div class="frow">'+
-    '<input id="cep_'+(pid||'home')+'" class="cepin" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" maxlength="9" aria-describedby="cepmsg_'+(pid||'home')+'">'+
-    '<button class="btn gold sm" type="submit">Calcular</button></div><div class="fres" id="cepmsg_'+(pid||'home')+'" aria-live="polite"></div>'+
+  var k=pid||'home';
+  return '<form class="frete" data-frete="'+(pid||'')+'" novalidate><label for="cep_'+k+'">Calcular frete</label><div class="frow">'+
+    '<input id="cep_'+k+'" class="cepin" inputmode="numeric" autocomplete="postal-code" placeholder="Seu CEP · 00000-000" maxlength="9" aria-describedby="cepmsg_'+k+'">'+
+    '<button class="btn wa" type="submit">'+ICON.wa+'Calcular frete no WhatsApp</button></div><div class="fres" id="cepmsg_'+k+'" aria-live="polite"></div>'+
     '<a class="nocep" href="https://buscacepinter.correios.com.br/app/endereco/index.php" target="_blank" rel="noopener">Não sei meu CEP</a></form>';
 }
-function daysTxt(d){ return d+(d===1?" dia útil":" dias úteis"); }
-function freteResult(form,c,info){
-  var pid=form.dataset.frete, p=pid?byId(pid):null, uf=(info&&info.state)||ufOf(c), city=info&&info.city;
-  var isSP=spCity(c)&&(!city||norm(city)==="sao paulo");
-  var capName=F&&F.capitals?F.capitals[uf]:null, cap=city&&capName?norm(city)===norm(capName):null;
-  var item=p?(p.brand+" "+p.name+" ("+p.ml+" ml)"):"";
-  var where=(city?city+"/":"")+(uf||"");
-  var h='<div class="fopts">';
-  if(isSP){
-    h+='<div class="fopt hot"><div class="ft"><b>Fast Entrega · Moto disponível</b><small>Hoje, para pedidos confirmados até 17:30. Taxa conforme a distância, confirmada no WhatsApp de acordo com as motos disponíveis agora.</small></div>'+
-       '<a class="btn wa sm" target="_blank" rel="noopener" href="'+wa("Olá! Quero Fast Entrega por moto para o CEP "+fmtCep(c)+(item?" — "+item:"")+". Tem moto disponível agora?")+'">'+ICON.wa+'Verificar moto disponível</a></div>';
-  }
-  h+='<div class="fopt"><div class="ft"><b>Retire grátis na loja</b><small>Mega Polo Brás · Loja 357 · 08:00–17:30</small></div><span class="fp free">Grátis</span></div>';
-  var sx=null, sxTxt='', E=F&&F.sedex?F.sedex[uf]:null;
-  if(E){
-    var L=cap===true?[E.cap||E.int]:cap===false?[E.int||E.cap]:[E.cap,E.int];
-    L=L.filter(Boolean);
-    if(L.length){
-      var lo=Math.min.apply(null,L.map(function(e){return e.price})), hi=Math.max.apply(null,L.map(function(e){return e.max||e.price}));
-      var dlo=Math.min.apply(null,L.map(function(e){return e.days})), dhi=Math.max.apply(null,L.map(function(e){return e.daysMax||e.days}));
-      sx={price:lo,range:hi>lo};
-      sxTxt=money(lo)+(hi>lo?' a '+money(hi):'')+' · '+(dhi>dlo?dlo+' a '+daysTxt(dhi):daysTxt(dlo));
-    }
-  }
-  if(sx){
-    h+='<div class="fopt"><div class="ft"><b>SEDEX</b><small>Estimativa '+esc(sxTxt)+' após a postagem'+(cap!==true?' (referência do interior; varia por cidade)':'')+' · postagem em 1–2 dias úteis após o pagamento</small></div><span class="fp">'+(sx.range?'<small>a partir de</small>':'')+money(sx.price)+'</span></div>';
-  } else {
-    h+='<div class="fopt"><div class="ft"><b>SEDEX</b><small>Valor e prazo confirmados no WhatsApp</small></div></div>';
-  }
-  h+='</div>';
-  var msg="Olá! "+(item?"Quero o "+item+(p?" de "+p.priceLabel:"")+". ":"")+"Meu CEP é "+fmtCep(c)+(where?" ("+where+")":"")+"."+(sx?" Estimativa SEDEX no site: "+sxTxt+".":"")+" Qual o frete/prazo?";
-  h+='<a class="btn wa fgo" target="_blank" rel="noopener" href="'+wa(msg)+'">'+ICON.wa+'Fechar pelo WhatsApp</a>';
-  if(sx&&F) h+='<p class="fnote">SEDEX: estimativa pela tabela de balcão dos Correios (pacote até '+esc(F.weightLabel||"1 kg")+', saindo do Brás/SP, consultada em '+esc(F.date)+'). O valor final é confirmado no WhatsApp.</p>';
-  $(".fres",form).innerHTML=(where?'<div class="fwhere">Entrega para <b>'+esc(where)+'</b> · CEP '+fmtCep(c)+'</div>':'')+h;
+function freteMsg(pid,c){
+  var p=pid?byId(pid):null, info=CEPCACHE[c], where=info&&info.state?(info.city?info.city+"/":"")+info.state:"";
+  return "Olá! "+(p?"Quero o "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+". ":"")+"Meu CEP é "+fmtCep(c)+(where?" ("+where+")":"")+". Quanto fica o frete e o prazo?";
 }
 var CEPCACHE={};
-document.addEventListener("input",function(e){ if(!e.target.classList.contains("cepin")) return; var v=e.target.value.replace(/\D/g,"").slice(0,8); e.target.value=v.length>5?v.slice(0,5)+"-"+v.slice(5):v; });
+function cepLookup(c){ /* só enriquece a mensagem se já tiver resposta; nunca bloqueia o envio */
+  if(CEPCACHE[c]!==undefined) return; CEPCACHE[c]=null;
+  fetch("https://brasilapi.com.br/api/cep/v1/"+c).then(function(r){return r.ok?r.json():null}).then(function(d){ if(d&&d.state) CEPCACHE[c]={state:d.state,city:d.city}; }).catch(function(){});
+}
+document.addEventListener("input",function(e){ if(!e.target.classList.contains("cepin")) return; var v=e.target.value.replace(/\D/g,"").slice(0,8); e.target.value=v.length>5?v.slice(0,5)+"-"+v.slice(5):v; if(v.length===8) cepLookup(v); });
 document.addEventListener("submit",function(e){
   var form=e.target.closest("form.frete"); if(!form) return; e.preventDefault();
   var c=$(".cepin",form).value.replace(/\D/g,""), out=$(".fres",form);
-  if(c.length!==8){ out.innerHTML='<div class="ferr">Digite um CEP com 8 números (ex.: 03010-000).</div>'; return; }
-  if(!ufOf(c)){ out.innerHTML='<div class="ferr">CEP não encontrado. Confira os números.</div>'; return; }
-  out.innerHTML='<div class="fload">Calculando…</div>';
-  var done=function(info){ CEPCACHE[c]=info||{}; freteResult(form,c,info); };
-  if(CEPCACHE[c]) return done(CEPCACHE[c]);
-  var ctl=("AbortController" in window)?new AbortController():null, to=setTimeout(function(){ if(ctl) ctl.abort(); },4500);
-  fetch("https://brasilapi.com.br/api/cep/v1/"+c,ctl?{signal:ctl.signal}:{}).then(function(r){return r.ok?r.json():null}).then(function(d){clearTimeout(to); done(d&&d.state?{state:d.state,city:d.city}:null)}).catch(function(){clearTimeout(to); done(null)});
+  if(c.length!==8){ out.innerHTML='<div class="ferr">Digite um CEP com 8 números (ex.: 03010-000).</div>'; $(".cepin",form).focus(); return; }
+  var url=wa(freteMsg(form.dataset.frete,c)), w=window.open(url,"_blank"); if(w){ try{ w.opener=null; }catch(_){} }
+  out.innerHTML='<div class="fok">Abrimos o WhatsApp com o seu CEP <b>'+fmtCep(c)+'</b>. Nossa equipe confirma o frete e o prazo. <a href="'+url+'" target="_blank" rel="noopener">Não abriu? Toque aqui</a></div>';
+  if(!w){ try{ location.href=url; }catch(_){} }
 });
 
 /* ---------- vitrines: famílias, faixas de preço, mais vendidos, decants ---------- */
