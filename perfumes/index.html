@@ -12,7 +12,7 @@
 <meta property="og:image" content="assets/hero-art.webp">
 <link rel="preload" href="assets/fonts/playfair-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/cinzel-600.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/app.css?v=20261018">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Store","name":"BAGDA PERFUMES","address":{"@type":"PostalAddress","streetAddress":"Rua Barão de Ladário, 670 — Mega Polo Brás, Loja 357, 3º andar","addressLocality":"São Paulo","addressRegion":"SP","addressCountry":"BR"},"telephone":"+55 11 99287-3509","openingHours":"Mo-Sa 08:00-17:30","sameAs":["https://www.instagram.com/bagda.perfumes/"]}</script>
 </head>
 <body>
@@ -22,6 +22,7 @@
     <nav class="nav">
       <a class="back" href="/" aria-label="Voltar para a BAGDA STORES">← BAGDA STORES</a>
       <a class="l" href="#catalogo">Catálogo</a>
+      <a class="l" href="#decants">Decants</a>
       <a class="l" href="#quiz">Encontre seu perfume</a>
       <a class="l" href="#loja">A loja</a>
       <a class="btn sm" id="navCmpBtn" href="#" aria-label="Comparar">Comparar <span class="cmp-count" id="navCmp">0</span></a>
@@ -34,6 +35,7 @@
   <div class="art" aria-hidden="true"></div>
   <div class="wrap">
     <span class="kicker">Perfumaria árabe · Brás, São Paulo</span>
+    <p class="hero-off"><span class="seal" aria-hidden="true">✦</span> Distribuidor oficial · até 25% abaixo das principais lojas</p>
     <h1>A arte árabe da <em class="gold-text">perfumaria</em>, ao seu alcance.</h1>
     <p class="lead">Fragrâncias originais das casas mais desejadas do Oriente Médio — intensas, duradouras e com a assinatura olfativa dos grandes clássicos que você já ama.</p>
     <div class="ctas">
@@ -57,6 +59,17 @@
   </div>
 </section>
 
+<section class="trust" aria-label="Por que comprar na BAGDA">
+  <div class="wrap">
+    <ul>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 15.4 6.8 18.1l1-5.8L3.5 8.2l5.9-.9z"/></svg><span><b>Distribuidor oficial</b><small>Arabiyat Prestige · Armaf · Ferassa</small></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span><b>100% original e lacrado</b><small>Direto das casas árabes</small></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10l9-6 9 6v10H3z"/><path d="M9 20v-6h6v6"/></svg><span><b>Loja física no Brás</b><small>Seg. a sáb. · 08:00–17:30</small></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg><span><b>Até 12x no cartão</b><small>PIX · dinheiro · débito</small></span></li>
+    </ul>
+  </div>
+</section>
+
 <section class="sec" id="sobre">
   <div class="wrap">
     <div class="sec-head reveal">
@@ -72,6 +85,27 @@
     <p class="reveal" style="margin-top:26px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted);font-size:13px">Buscas populares:
       <button class="chip" data-insp="Aventus">Aventus</button><button class="chip" data-insp="Sauvage">Sauvage</button><button class="chip" data-insp="Le Male">Le Male</button><button class="chip" data-insp="Scandal">Scandal</button><button class="chip" data-insp="Delina">Delina</button><button class="chip" data-insp="Tom Ford">Tom Ford</button><button class="chip" data-insp="Kayali">Kayali</button>
     </p>
+  </div>
+</section>
+
+<section class="sec vit" id="familias">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Explore</span>
+      <h2>Por família <span class="gold-text">olfativa</span></h2>
+    </div>
+    <div class="ftiles" id="famTiles"></div>
+    <div class="pcuts" id="priceCuts" aria-label="Atalhos por preço"></div>
+  </div>
+</section>
+
+<section class="sec vit" id="maisvendidos">
+  <div class="wrap" id="bestWrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Os favoritos da loja</span>
+      <h2>Mais <span class="gold-text">vendidos</span></h2>
+    </div>
+    <div class="strip" id="bestStrip"></div>
   </div>
 </section>
 
@@ -108,6 +142,20 @@
     </div>
   </div>
   <div class="scrim" id="scrim"></div>
+</section>
+
+<section class="sec decants" id="decants">
+  <div class="wrap">
+    <div class="decbox reveal">
+      <div class="dechead">
+        <span class="kicker">Decants 10 ml <span class="soonb" id="decSoon">Em breve</span></span>
+        <h2>Experimente antes de levar <span class="gold-text">o frasco</span></h2>
+        <p>Frascos de 10 ml das fragrâncias mais desejadas do catálogo: ideais para conhecer, presentear ou levar na bolsa.</p>
+        <a class="btn wa sm" href="https://wa.me/5511992873509?text=Ol%C3%A1!%20Quero%20ser%20avisado%20quando%20os%20decants%20de%2010%20ml%20chegarem." target="_blank" rel="noopener">Quero ser avisado</a>
+      </div>
+      <div class="decgrid" id="decGrid"></div>
+    </div>
+  </div>
 </section>
 
 <section class="sec" id="quiz" style="padding-top:20px">
@@ -156,8 +204,9 @@
   <div class="box"><button class="x" data-close aria-label="Fechar">×</button><div id="mbody"></div></div>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<a class="fab" href="https://wa.me/5511992873509?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20BAGDA%20PERFUMES." target="_blank" rel="noopener" aria-label="Falar no WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.5 2 2 6.46 2 11.96c0 1.76.47 3.48 1.35 4.99L2 22l5.2-1.36a10.1 10.1 0 004.84 1.23C17.58 21.87 22 17.41 22 11.91 22 6.46 17.58 2 12.04 2zm5.83 14.1c-.25.69-1.44 1.33-2 1.41-.51.08-1.15.11-1.86-.12a17 17 0 01-1.68-.62c-2.96-1.27-4.89-4.25-5.04-4.45-.15-.2-1.2-1.6-1.2-3.05 0-1.45.76-2.16 1.03-2.46.27-.3.59-.37.79-.37h.57c.18 0 .43-.07.67.51.25.6.84 2.06.92 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.45.52-.15.15-.3.31-.13.61.17.3.77 1.27 1.66 2.06 1.14 1.01 2.1 1.33 2.4 1.48.3.15.47.12.65-.07.17-.2.74-.86.94-1.16.2-.3.4-.25.67-.15.27.1 1.73.81 2.03.96.3.15.5.22.57.35.08.12.08.71-.17 1.4z"/></svg></a>
+<a class="fab" data-label="Fale conosco" href="https://wa.me/5511992873509?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20BAGDA%20PERFUMES." target="_blank" rel="noopener" aria-label="Falar no WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.5 2 2 6.46 2 11.96c0 1.76.47 3.48 1.35 4.99L2 22l5.2-1.36a10.1 10.1 0 004.84 1.23C17.58 21.87 22 17.41 22 11.91 22 6.46 17.58 2 12.04 2zm5.83 14.1c-.25.69-1.44 1.33-2 1.41-.51.08-1.15.11-1.86-.12a17 17 0 01-1.68-.62c-2.96-1.27-4.89-4.25-5.04-4.45-.15-.2-1.2-1.6-1.2-3.05 0-1.45.76-2.16 1.03-2.46.27-.3.59-.37.79-.37h.57c.18 0 .43-.07.67.51.25.6.84 2.06.92 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.45.52-.15.15-.3.31-.13.61.17.3.77 1.27 1.66 2.06 1.14 1.01 2.1 1.33 2.4 1.48.3.15.47.12.65-.07.17-.2.74-.86.94-1.16.2-.3.4-.25.67-.15.27.1 1.73.81 2.03.96.3.15.5.22.57.35.08.12.08.71-.17 1.4z"/></svg></a>
 <script src="assets/data.js"></script>
-<script src="assets/app.js"></script>
+<script src="assets/extras.js?v=20261018"></script>
+<script src="assets/app.js?v=20261018"></script>
 </body>
 </html>
