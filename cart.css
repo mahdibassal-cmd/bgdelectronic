@@ -42,3 +42,13 @@ html.bc-lock,html.bc-lock body{overflow:hidden}
 .bc-toast{position:fixed;left:50%;bottom:86px;transform:translate(-50%,20px);z-index:210;background:var(--bcbg);color:var(--bcg2);border:1px solid var(--bcln);padding:10px 16px;border-radius:99px;font-size:13px;opacity:0;pointer-events:none;transition:.25s}
 .bc-toast.on{opacity:1;transform:translate(-50%,0)}
 body.tray-on .bc-fab{bottom:96px}
+.bc-pix{margin-top:14px}
+.bc-pixbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;border-radius:6px;border:0;background:linear-gradient(180deg,var(--bcg2),var(--bcg));color:#1a1407;font:700 12px/1 inherit;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.bc-pixbtn svg{width:18px;height:18px}
+.bc-pixbox{margin-top:12px;padding:16px;border:1px solid var(--bcln);border-radius:8px;background:#15110c;text-align:center}
+.bc-qr{width:min(220px,100%);margin:0 auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box}.bc-qr svg{display:block;width:100%;height:auto}
+.bc-pixid{font-size:12px;color:var(--bcdim);margin:10px 0 12px}.bc-pixid b{color:var(--bcg2);letter-spacing:.06em}
+.bc-pixbox .bc-cl{text-align:left}
+.bc-pixcode{width:100%;box-sizing:border-box;resize:none;padding:10px;border-radius:6px;border:1px solid var(--bcln);background:#0f0c09;color:var(--bcink);font:12px/1.4 ui-monospace,monospace;word-break:break-all}
+.bc-copy{margin-top:8px;width:100%;padding:12px;border-radius:6px;border:1px solid var(--bcg);background:transparent;color:var(--bcg2);font:600 12px/1 inherit;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.bc-pixbox .bc-small{text-align:left}
