@@ -108,13 +108,20 @@
   if (F && $('ent-calc')) $('ent-calc').innerHTML = F.box({ id: 'home' });
   if ($('ent-maps')) $('ent-maps').href = $('maps').href;
   var pv = $('pv'), lastFocus = null;
+  function payLink(p) {
+    var k = ((p.image || '').match(/eletronicos\/([^\/]+)\.\w+$/) || [])[1];
+    var u = (typeof PAY_LINKS !== 'undefined' && k) ? PAY_LINKS[k] : '';
+    return /^https:\/\//.test(u || '') ? u : '';
+  }
   function openPV(i) {
     var p = PRODUCTS[i]; if (!p || !pv) return;
+    var pay = payLink(p);
     var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" decoding="async">' : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
     $('pv-body').innerHTML = '<div class="pv-grid"><div class="pv-pic' + (p.image ? '' : ' is-ph') + '">' + vis + '</div><div class="pv-txt">' +
       '<p class="label mono">' + esc(p.category) + '</p><h3 class="pv-h">' + esc(p.name) + '</h3>' +
       '<p class="pv-price">' + esc(p.price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
       '<a class="btn btn-wa mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg>Pedir no WhatsApp</a>' +
+      (pay ? '<a class="btn btn-gold btn-pay mono" target="_blank" rel="noopener" href="' + esc(pay) + '">Pagar · PIX ou cartão</a><p class="pv-paynote mono">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</p>' : '') +
       '<ul class="pv-dlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>' +
       (F ? F.box({ id: 'p' + i, item: p.name, price: p.price }) : '') +
       '<p class="pv-note mono">Preço de varejo do site. Estoque confirmado no WhatsApp.</p></div></div>';

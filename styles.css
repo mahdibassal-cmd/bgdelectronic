@@ -284,3 +284,7 @@ body.pv-lock{overflow:hidden}
 .hero-dlv a:first-child{background:var(--navy);border-color:var(--navy);color:#fff}
 .hero-dlv a:first-child b{color:var(--gold)}
 .hero-dlv a:hover{border-color:var(--navy)}
+
+/* Getnet pay button (product view) */
+.pv-txt .btn-pay{margin-top:10px;width:100%;font-weight:600;letter-spacing:.04em}
+.pv-paynote{font-size:10px;color:var(--muted,#777);margin:8px 0 0;line-height:1.5}

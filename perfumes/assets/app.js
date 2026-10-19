@@ -16,7 +16,7 @@ var ICON={
 var DATA=window.BAGDA_DATA, P=[], META={};
 var X=window.BAGDA_EXTRAS||{}; X.installments=X.installments||{max:12,noInterest:false}; X.products=X.products||{}; X.decants=X.decants||[]; X.bestSellers=X.bestSellers||[]; X.lowStockAt=X.lowStockAt||3;
 function ext(p){ return X.products[p.id]||{}; }
-function mpLink(p){ var u=ext(p).mpLink||p.mpLink||""; return /^https:\/\//.test(u)?u:""; }
+function payLink(p){ var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
 function lowStock(p){ var st=ext(p).stock; if(st==null) st=p.stock; return !p.soldOut&&typeof st==="number"&&st>0&&st<=X.lowStockAt; }
 function instText(p,long){ var n=X.installments.max||12; if(X.installments.noInterest) return (long?'ou ':'')+n+'x de '+money(p.price/n)+' sem juros'; return long?'ou em até '+n+'x no cartão':'em até '+n+'x no cartão'; }
 var OFFB='<span class="offb">✦ Distribuidor oficial</span>';
@@ -177,10 +177,10 @@ function detail(p){
   if(p.soldOut){
     h+='<div class="buy"><div class="price" style="color:var(--dim)">Esgotado</div>'+soldWA(p,'big')+'</div>';
   } else {
-    var mp=mpLink(p);
+    var mp=payLink(p);
     h+='<div class="buy"><div><div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div><div class="inst lg">'+instText(p,true)+'</div>'+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
        '<div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Comprar pelo WhatsApp</a>'+
-       (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar · Mercado Pago</a>':'')+'</div></div>';
+       (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a>':'')+'</div>'+(mp?'<div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div>';
   }
   h+='<div class="payline">PIX, dinheiro, débito ou crédito em até '+(X.installments.max||12)+'x'+(X.installments.noInterest?' sem juros':'')+'. Loja física no Brás · 08:00–17:30.</div>';
   h+='<ul class="pdlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>';
@@ -369,7 +369,7 @@ function vitrines(){
   } else {
     dh=D.map(function(o){ var d=o.d,p=o.p, av=d.available!==false&&typeof d.price==="number";
       var msg=av?"Olá! Quero o decant "+(d.ml||10)+" ml de "+p.brand+" "+p.name+" ("+money(d.price)+"), que vi no site.":"Olá! Quero ser avisado quando o decant de "+p.brand+" "+p.name+" chegar.";
-      var mp=/^https:\/\//.test(d.mpLink||"")?d.mpLink:"";
+      var dl=d.payLink||d.mpLink||""; var mp=/^https:\/\//.test(dl)?dl:"";
       return '<div class="dcard"><img loading="lazy" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker">'+esc(p.brand)+'</span><b>'+esc(p.name)+'</b><small>Decant '+(d.ml||10)+' ml</small>'+
         '<div class="dprice">'+(av?money(d.price):'Em breve')+'</div><a class="btn wa sm" href="https://wa.me/'+WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">'+ICON.wa+(av?'Pedir':'Avise-me')+'</a>'+(av&&mp?'<a class="btn gold sm" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar</a>':'')+'</div>'; }).join("");
   }

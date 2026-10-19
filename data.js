@@ -256,3 +256,38 @@ const PRODUCTS = [
 ];
 
 const FEATURED_PERFUMES = ["arabiyat-prestige-marwa", "arabiyat-prestige-bahiya-garnet", "arabiyat-prestige-hypnotic-vanilla", "armaf-club-de-nuit-intense-man", "ferassa-burkan"];
+
+// Links de pagamento Getnet (PIX/cartão), chave = slug da imagem img/eletronicos/<id>.webp
+const PAY_LINKS = {
+  "nintendo-switch-oled-neon": "https://pag.getnet.com.br/6HoQdbXTDV",
+  "starlink-mini": "https://pag.getnet.com.br/Au7W7Yv8Q",
+  "hori-split-pad-pro-ergon-mico-para-nintendo-switch": "https://pag.getnet.com.br/Q2vl-YKEJ",
+  "kit-gamer-teclado-mouse": "https://pag.getnet.com.br/jCw9eJ4uS",
+  "mouse-pad-gamer-rgb": "https://pag.getnet.com.br/4UgOzRO3t",
+  "jbl-boombox-4-black": "https://pag.getnet.com.br/8OnTKdiay",
+  "hopestar-a60-450w-2-microfones": "https://pag.getnet.com.br/fSenl2bPf",
+  "joog-hi-lite": "https://pag.getnet.com.br/Xn3-TbpD7",
+  "rastreador-compat-vel-com-iphone-buscador": "https://pag.getnet.com.br/BjY3ZZIvs",
+  "oura-ring-5-tamanho-7-gold": "https://pag.getnet.com.br/17_4VU2r2",
+  "oura-ring-5-tamanho-7-rose": "https://pag.getnet.com.br/X04bcbUKL",
+  "oura-ring-5-tamanho-8-gold": "https://pag.getnet.com.br/A3v7VIV3c",
+  "oura-ring-5-tamanho-8-rosa": "https://pag.getnet.com.br/qz5TtPlCv",
+  "oura-ring-5-tamanho-9-black": "https://pag.getnet.com.br/2TbrhXb-y",
+  "oura-ring-5-tamanho-10-silver": "https://pag.getnet.com.br/Y6olLtNp4",
+  "google-fit-air-pulseira": "https://pag.getnet.com.br/kDSAMMQYo",
+  "garmin-170-music-white": "https://pag.getnet.com.br/ViRs3Hra0",
+  "huawei-watch-gt5-41mm-feminino-white-gold-brown-woven": "https://pag.getnet.com.br/xzk0XPnrY",
+  "huawei-watch-gt5-46mm-masculino-black-black-brown-prateado-b": "https://pag.getnet.com.br/ERn_mQ0ak",
+  "airtag-nossa-marca": "https://pag.getnet.com.br/B7tZiZ4mX",
+  "fone-usb-c-com-fio-apple-original": "https://pag.getnet.com.br/yUTk3hfpa",
+  "cabo-usb-c-lightning-usb-1m": "https://pag.getnet.com.br/TKvfwldcg",
+  "cabo-usb-c-lightning-usb-1-5m": "https://pag.getnet.com.br/J0hkTcz-K",
+  "iphone-pocket-80-cm": "https://pag.getnet.com.br/n3ohEqyvq",
+  "iphone-pocket-40-cm": "https://pag.getnet.com.br/jCq3587s1",
+  "logitech-mk220-teclado-mouse-sem-fio": "https://pag.getnet.com.br/_GNWjtnut",
+  "logitech-mk235-ii-teclado-mouse-sem-fio": "https://pag.getnet.com.br/nBU-mb0qg",
+  "logitech-mk250-teclado-mouse-sem-fio": "https://pag.getnet.com.br/GGw_nqARQ",
+  "logitech-mk470-teclado-mouse-sem-fio": "https://pag.getnet.com.br/ZTrxmJqJA",
+  "airfryer-ninja-pro": "https://pag.getnet.com.br/SlnqgvSeX",
+  "airfryer-ninja-foodi": "https://pag.getnet.com.br/Sdzhnv0He"
+};

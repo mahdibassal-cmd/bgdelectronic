@@ -434,3 +434,6 @@ body.tray-on .fab{bottom:96px}
 .fok{font-size:12.5px;color:var(--muted);line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .fok b{color:var(--ink)}.fok a{color:var(--gold2);white-space:nowrap}
 .modal .box{scroll-padding-top:76px}
+
+/* Getnet pay note */
+.paynote{flex-basis:100%;width:100%;font-size:11px;letter-spacing:.04em;color:var(--dim);margin-top:-6px;text-align:left}
