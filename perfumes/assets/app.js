@@ -14,6 +14,12 @@ var ICON={
 };
 
 var DATA=window.BAGDA_DATA, P=[], META={};
+var X=window.BAGDA_EXTRAS||{}; X.installments=X.installments||{max:12,noInterest:false}; X.products=X.products||{}; X.decants=X.decants||[]; X.bestSellers=X.bestSellers||[]; X.lowStockAt=X.lowStockAt||3;
+function ext(p){ return X.products[p.id]||{}; }
+function mpLink(p){ var u=ext(p).mpLink||p.mpLink||""; return /^https:\/\//.test(u)?u:""; }
+function lowStock(p){ var st=ext(p).stock; if(st==null) st=p.stock; return !p.soldOut&&typeof st==="number"&&st>0&&st<=X.lowStockAt; }
+function instText(p,long){ var n=X.installments.max||12; if(X.installments.noInterest) return (long?'ou ':'')+n+'x de '+money(p.price/n)+' sem juros'; return long?'ou em até '+n+'x no cartão':'em até '+n+'x no cartão'; }
+var OFFB='<span class="offb">✦ Distribuidor oficial</span>';
 function boot(d){
   DATA=d; META=d.meta; P=d.perfumes;
   P.forEach(function(p,i){
@@ -29,7 +35,8 @@ var HOUSES=["Tom Ford","Creed","Jean Paul Gaultier","Carolina Herrera","Yves Sai
 function houseOf(s){ if(!s) return null; for(var i=0;i<HOUSES.length;i++){ if(s.indexOf(HOUSES[i])===0) return HOUSES[i]==="By Kilian"?"Kilian":HOUSES[i]; } return null; }
 
 /* ---------- state ---------- */
-var S={q:"",brand:[],gender:[],family:[],price:[],house:[],insp:false,avail:false,sort:"featured"};
+var S={q:"",brand:[],gender:[],family:[],price:[],house:[],insp:false,avail:false,max:0,sort:"featured"};
+var MAXES=[150,200,300];
 var CMP=[];
 var PRICE=[{k:"a",l:"Até R$ 150",t:function(v){return v<=150}},{k:"b",l:"R$ 150 – 250",t:function(v){return v>150&&v<=250}},{k:"c",l:"Acima de R$ 250",t:function(v){return v>250}}];
 var BRAND_ORDER=["Arabiyat Prestige","Armaf","Ferassa","MPF","French Avenue","Ibraheem Al Qurashi","Al Wataniah","Rayhaan","Rasasi"];
@@ -40,7 +47,7 @@ function uniq(a){return a.filter(function(v,i){return v&&a.indexOf(v)===i})}
 
 /* ---------- filters UI ---------- */
 function chipHTML(group,val,label,n){
-  var on=group==="insp"?S.insp:(group==="avail"?S.avail:S[group].indexOf(val)>-1);
+  var on=group==="insp"?S.insp:(group==="avail"?S.avail:(group==="max"?S.max===+val:S[group].indexOf(val)>-1));
   return '<button class="chip'+(on?' on':'')+'" data-g="'+group+'" data-v="'+esc(val)+'" aria-pressed="'+on+'">'+esc(label)+(n!=null?'<small>'+n+'</small>':'')+'</button>';
 }
 function buildPanel(){
@@ -62,20 +69,20 @@ function quickChips(){
   var h=chipHTML("avail","1","Disponíveis")+chipHTML("insp","1","Com inspiração");
   ["Masculino","Feminino","Unissex"].forEach(function(g){h+=chipHTML("gender",g,g)});
   ["Arabiyat Prestige","Armaf","Ferassa","MPF"].forEach(function(b){h+=chipHTML("brand",b,b)});
-  PRICE.forEach(function(r){h+=chipHTML("price",r.k,r.l)});
+  MAXES.forEach(function(m){h+=chipHTML("max",String(m),"Até R$ "+m)});
   ["Oriental & Âmbar","Amadeirado","Floral","Gourmand","Cítrico"].forEach(function(f){h+=chipHTML("family",f,f)});
   $("#quick").innerHTML=h;
 }
 document.addEventListener("click",function(e){
   var c=e.target.closest(".chip[data-g]"); if(!c) return;
   var g=c.dataset.g,v=c.dataset.v;
-  if(g==="insp") S.insp=!S.insp; else if(g==="avail") S.avail=!S.avail;
+  if(g==="insp") S.insp=!S.insp; else if(g==="avail") S.avail=!S.avail; else if(g==="max") S.max=(S.max===+v?0:+v);
   else { var i=S[g].indexOf(v); if(i>-1) S[g].splice(i,1); else S[g].push(v); }
   refresh();
 });
 function setQ(v){S.q=v; $("#q").value=v; var iq=$("#inspq"); if(iq&&iq!==document.activeElement) iq.value=v; $(".search").classList.toggle("has",!!v); render();}
 function refresh(){ buildPanel(); quickChips(); render(); }
-function activeCount(){return S.brand.length+S.gender.length+S.family.length+S.price.length+S.house.length+(S.insp?1:0)+(S.avail?1:0)+(S.q?1:0)}
+function activeCount(){return S.brand.length+S.gender.length+S.family.length+S.price.length+S.house.length+(S.insp?1:0)+(S.avail?1:0)+(S.max?1:0)+(S.q?1:0)}
 
 /* ---------- filtering ---------- */
 function filtered(){
@@ -88,6 +95,7 @@ function filtered(){
     if(S.price.length&&!PRICE.some(function(r){return S.price.indexOf(r.k)>-1&&r.t(p.price)})) return false;
     if(S.insp&&!p.inspiredBy) return false;
     if(S.avail&&p.soldOut) return false;
+    if(S.max&&p.price>S.max) return false;
     for(var i=0;i<terms.length;i++) if(p._hay.indexOf(terms[i])<0) return false;
     return true;
   });
@@ -115,15 +123,18 @@ function priceHTML(p){
   if(p.soldOut) return '<div class="price">Esgotado</div>';
   return '<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div>';
 }
-function card(p,extra){
+function soldWA(p,cls){ return '<a class="soldwa'+(cls?' '+cls:'')+'" href="'+waSold(p)+'" target="_blank" rel="noopener">'+ICON.wa+'<span>Esgotado · avise-me no WhatsApp</span></a>'; }
+function card(p,extra,cls){
   var on=CMP.indexOf(p.id)>-1;
-  return '<article class="card'+(p.soldOut?' sold':'')+'" data-id="'+p.id+'" tabindex="0" aria-label="'+esc(p.brand+' '+p.name)+'">'+
+  return '<article class="card'+(p.soldOut?' sold':'')+(cls?' '+cls:'')+'" data-id="'+p.id+'" tabindex="0" aria-label="'+esc(p.brand+' '+p.name)+'">'+
    '<div class="ph"><img loading="lazy" decoding="async" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name+' '+p.size)+'" width="640" height="800">'+
    (p.familyGroup?'<span class="badge">'+esc(p.familyGroup)+'</span>':'')+
    '<button class="cmpbox'+(on?' on':'')+'" data-cmp="'+p.id+'" aria-label="Comparar" title="Comparar">'+(on?ICON.check:ICON.cmp)+'</button>'+
+   (lowStock(p)?'<span class="lowb">Últimas unidades</span>':'')+(OFFICIAL[p.brand]?OFFB:'')+
    (p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+(extra||'')+'</div>'+
    '<div class="info"><span class="brand">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3>'+inspTag(p)+
-   '<div class="bottom">'+priceHTML(p)+'<span class="ml">'+p.ml+' ml</span></div></div></article>';
+   '<div class="bottom">'+priceHTML(p)+'<span class="ml">'+p.ml+' ml</span></div>'+
+   (p.soldOut?soldWA(p):'<div class="inst">'+instText(p)+'</div>')+'</div></article>';
 }
 var io=("IntersectionObserver" in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -5% 0px"}):null;
 function observe(root){ $$(".card:not(.in),.reveal:not(.in)",root).forEach(function(el,i){ if(io){ el.style.transitionDelay=(el.classList.contains("card")?Math.min(i%8,7)*45:0)+"ms"; io.observe(el);} else el.classList.add("in"); }); }
@@ -146,20 +157,32 @@ function openModal(html,cls){
   document.body.classList.add("lock"); $(".box",m).scrollTop=0; setTimeout(function(){$(".x",m).focus()},60);
 }
 function closeModal(){ var m=$("#modal"); m.className="modal"; m.setAttribute("aria-hidden","true"); document.body.classList.remove("lock"); if(location.hash.indexOf("#p=")===0) history.replaceState(null,"",location.pathname+location.search); if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
-function waLink(p){ return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Tenho interesse no perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) do site."); }
+function waLink(p){ if(p.soldOut) return waSold(p); return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero comprar o perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+", que vi no site."); }
+function waSold(p){ return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! O perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) está esgotado no site. Pode me avisar quando chegar?"); }
+function related(p){
+  var L=P.filter(function(x){return x.id!==p.id&&!x.soldOut&&p.familyGroup&&x.familyGroup===p.familyGroup});
+  L.sort(function(a,b){ var da=Math.abs(a.price-p.price)/p.price+(a.gender===p.gender||a.gender==="Unissex"?0:.6)+(OFFICIAL[a.brand]?0:.15), db=Math.abs(b.price-p.price)/p.price+(b.gender===p.gender||b.gender==="Unissex"?0:.6)+(OFFICIAL[b.brand]?0:.15); return da-db; });
+  return L.slice(0,4);
+}
 function tier(cls,label,arr){ if(!arr||!arr.length) return ''; return '<div class="tier '+cls+'"><span class="lv">'+label+'</span><div class="ns">'+arr.map(function(n){return '<span>'+esc(n)+'</span>'}).join("")+'</div></div>'; }
 function srcLink(s){ return s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener nofollow">'+esc(s.label||s.url)+'</a>':esc(s.label||s.ref||""); }
 function detail(p){
   var hasNotes=p.notes&&((p.notes.top||[]).length+(p.notes.heart||[]).length+(p.notes.base||[]).length)>0;
   var acc=(p.accords||[]).slice(0,6);
   var h='<div class="pd"><div class="pic"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'">'+(p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+'</div><div class="txt">';
-  h+='<span class="kicker">'+esc(p.brand)+(OFFICIAL[p.brand]?' · Distribuidor oficial':'')+'</span><h2>'+esc(p.name)+'</h2>';
+  h+='<span class="kicker">'+esc(p.brand)+'</span>'+(OFFICIAL[p.brand]?'<span class="offb inl">✦ Distribuidor oficial</span>':'')+'<h2>'+esc(p.name)+'</h2>';
   h+='<div class="tags">'+(p.familyGroup?'<span class="tag g">'+esc(p.familyGroup)+'</span>':'')+(p.gender?'<span class="tag">'+esc(p.gender)+'</span>':'')+'<span class="tag">'+p.ml+' ml</span>'+(p.soldOut?'<span class="tag">Esgotado</span>':'')+'</div>';
   if(p.inspiredBy) h+='<div class="inspbox"><div class="k">Inspiração olfativa</div><div class="v">'+esc(p.inspiredBy)+'</div></div>';
   else if(p.originalCreation) h+='<div class="inspbox"><div class="k">Assinatura própria</div><div class="v">Criação original '+esc(p.brand)+'</div></div>';
-  h+='<div class="buy">'+(p.soldOut?'<div class="price" style="color:var(--dim)">Esgotado</div>':'<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div>')+
-     '<a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+(p.soldOut?'Avise-me quando chegar':'Comprar pelo WhatsApp')+'</a></div>';
-  h+='<div style="font-size:12px;color:var(--dim)">PIX, dinheiro, débito ou crédito em até 12x.</div>';
+  if(p.soldOut){
+    h+='<div class="buy"><div class="price" style="color:var(--dim)">Esgotado</div>'+soldWA(p,'big')+'</div>';
+  } else {
+    var mp=mpLink(p);
+    h+='<div class="buy"><div><div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div><div class="inst lg">'+instText(p,true)+'</div>'+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
+       '<div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Comprar pelo WhatsApp</a>'+
+       (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar · Mercado Pago</a>':'')+'</div></div>';
+  }
+  h+='<div class="payline">PIX, dinheiro, débito ou crédito em até '+(X.installments.max||12)+'x'+(X.installments.noInterest?' sem juros':'')+'. Loja física no Brás · 08:00–17:30.</div>';
   if(hasNotes) h+='<div class="pyr"><h4>Pirâmide olfativa</h4>'+tier("t1","Notas de topo",p.notes.top)+tier("t2","Notas de coração",p.notes.heart)+tier("t3","Notas de fundo",p.notes.base)+'</div>';
   if(acc.length) h+='<div class="acc"><h4>Acordes principais</h4>'+acc.map(function(a){return '<div class="bar"><span>'+esc(a.name)+'</span><i style="--w:'+(a.w/100)+'"></i></div>'}).join("")+'</div>';
   h+='<div class="facts">'+
@@ -171,6 +194,8 @@ function detail(p){
   var src=[];
   if(p.notesSource) src.push('Notas, acordes e família: <a href="'+esc(p.notesSource)+'" target="_blank" rel="noopener nofollow">'+(p.notesSource.indexOf("fragrantica")>-1?'Fragrantica':esc(p.notesSource.replace(/^https?:\/\/(www\.)?/,'').split('/')[0]))+'</a>');
   if((p.inspiredSources||[]).length) src.push((p.originalCreation?'Criação original':'Inspiração')+': '+p.inspiredSources.map(srcLink).join(' · '));
+  var rel=related(p);
+  if(rel.length) h+='<div class="rel"><h4>Você também pode gostar</h4><div class="relgrid">'+rel.map(function(r){return card(r,'','in mini')}).join("")+'</div></div>';
   h+='<div class="srcs">'+(src.length?'Fontes — '+src.join('<br>'):'')+(p.inspiredBy?'<div class="disc">'+esc(META.disclaimer)+'</div>':'')+'</div>';
   h+='</div></div>';
   return h;
@@ -285,6 +310,47 @@ document.addEventListener("click",function(e){
   if(e.target.closest("[data-qreset]")){ QI=0; QA={}; quizRender(); return; }
 });
 
+/* ---------- vitrines: famílias, faixas de preço, mais vendidos, decants ---------- */
+var FAMT=[
+ {l:"Orientais & Âmbar",s:"Calorosos, envolventes",f:["Oriental & Âmbar"]},
+ {l:"Amadeirados",s:"Madeiras, oud e couro",f:["Amadeirado","Couro","Chipre"]},
+ {l:"Florais",s:"Rosa, jasmim, flores brancas",f:["Floral","Frutado"]},
+ {l:"Doces",s:"Baunilha, caramelo, gourmand",f:["Gourmand"]},
+ {l:"Cítricos",s:"Luminosos e solares",f:["Cítrico"]},
+ {l:"Frescos & Aromáticos",s:"Aquáticos, ervas, fougère",f:["Aromático & Fougère","Fresco & Aquático"]}
+];
+function goCatalog(){ $("#catalogo").scrollIntoView({behavior:"smooth"}); }
+function vitrines(){
+  var fh=FAMT.map(function(t,i){
+    var L=P.filter(function(p){return t.f.indexOf(p.familyGroup)>-1}); if(!L.length) return '';
+    var pic=(L.filter(function(p){return !p.soldOut&&OFFICIAL[p.brand]})[0]||L[0]).photo;
+    return '<button class="ftile" data-fam="'+i+'"><img loading="lazy" decoding="async" src="'+pic+'" alt="" width="640" height="800"><span class="ft"><b>'+esc(t.l)+'</b><small>'+esc(t.s)+'</small><em>'+L.length+' perfumes →</em></span></button>';
+  }).join("");
+  $("#famTiles").innerHTML=fh;
+  $("#priceCuts").innerHTML=MAXES.map(function(m){ return '<button class="pcut" data-max="'+m+'"><small>Até</small><b>R$ '+m+'</b><span>'+count(function(p){return !p.soldOut&&p.price<=m})+' perfumes</span></button>'; }).join("");
+  var bs=X.bestSellers.map(byId).filter(Boolean);
+  $("#bestStrip").innerHTML=bs.map(function(p,i){return card(p,'<span class="rank">'+(i+1)+'</span>','in')}).join("");
+  $("#bestWrap").style.display=bs.length?"":"none";
+  var D=X.decants.map(function(d){ var p=byId(d.perfumeId); return p?{d:d,p:p}:null; }).filter(Boolean);
+  var dh;
+  if(!D.length){
+    dh=[1,2,3,4].map(function(){return '<div class="dcard soon"><span class="vial" aria-hidden="true"></span><b>10 ml</b><small>Em breve</small></div>'}).join("");
+  } else {
+    dh=D.map(function(o){ var d=o.d,p=o.p, av=d.available!==false&&typeof d.price==="number";
+      var msg=av?"Olá! Quero o decant "+(d.ml||10)+" ml de "+p.brand+" "+p.name+" ("+money(d.price)+"), que vi no site.":"Olá! Quero ser avisado quando o decant de "+p.brand+" "+p.name+" chegar.";
+      var mp=/^https:\/\//.test(d.mpLink||"")?d.mpLink:"";
+      return '<div class="dcard"><img loading="lazy" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker">'+esc(p.brand)+'</span><b>'+esc(p.name)+'</b><small>Decant '+(d.ml||10)+' ml</small>'+
+        '<div class="dprice">'+(av?money(d.price):'Em breve')+'</div><a class="btn wa sm" href="https://wa.me/'+WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">'+ICON.wa+(av?'Pedir':'Avise-me')+'</a>'+(av&&mp?'<a class="btn gold sm" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar</a>':'')+'</div>'; }).join("");
+  }
+  $("#decGrid").innerHTML=dh;
+  $("#decSoon").style.display=D.some(function(o){return o.d.available!==false&&typeof o.d.price==="number"})?"none":"";
+}
+document.addEventListener("click",function(e){
+  var t;
+  if((t=e.target.closest("[data-fam]"))){ var ft=FAMT[+t.dataset.fam]; S.family=ft.f.slice(); S.max=0; S.price=[]; setQ(""); refresh(); goCatalog(); return; }
+  if((t=e.target.closest("[data-max]"))){ S.max=+t.dataset.max; S.avail=true; S.price=[]; S.family=[]; setQ(""); refresh(); goCatalog(); return; }
+});
+
 /* ---------- toast ---------- */
 var tt; function toast(m){ var t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tt); tt=setTimeout(function(){t.classList.remove("on")},2200); }
 
@@ -294,13 +360,13 @@ function init(){
   $("#statI").textContent=P.filter(function(p){return p.inspiredBy}).length;
   $("#statB").textContent=uniq(P.map(function(p){return p.brand})).length;
   $("#disc").textContent=META.disclaimer;
-  buildPanel(); quickChips(); render(); quizRender(); tray(); observe(document);
+  buildPanel(); quickChips(); render(); quizRender(); tray(); vitrines(); observe(document);
 
   var q=$("#q"), deb;
   q.addEventListener("input",function(){ clearTimeout(deb); var v=q.value; deb=setTimeout(function(){setQ(v)},120); });
   $(".search .clr").addEventListener("click",function(){ setQ(""); q.focus(); });
   $("#sort").addEventListener("change",function(e){S.sort=e.target.value; render();});
-  var clear=function(){ S.brand=[];S.gender=[];S.family=[];S.price=[];S.house=[];S.insp=false;S.avail=false; setQ(""); refresh(); };
+  var clear=function(){ S.brand=[];S.gender=[];S.family=[];S.price=[];S.house=[];S.insp=false;S.avail=false;S.max=0; setQ(""); refresh(); };
   $("#clearAll").addEventListener("click",clear);
   $("#panelClear").addEventListener("click",clear);
   document.addEventListener("click",function(e){ if(e.target.closest("[data-clear]")) clear(); });
