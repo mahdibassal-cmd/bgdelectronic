@@ -56,6 +56,7 @@
       onPick(b.dataset.f);
     });
   }
+  function buyMsg(p) { return C.storesProduct.replace('{produto}', p.name).replace('{preco}', p.price); }
   function count(list, key) { var o = {}; list.forEach(function (p) { o[p[key]] = (o[p[key]] || 0) + 1; }); return o; }
 
   // Eletrônicos
@@ -64,12 +65,14 @@
     $('el-grid').innerHTML = list.map(function (p) {
       var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="' + LOAD + '" decoding="async">'
         : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
+      var i = PRODUCTS.indexOf(p);
       return '<article class="pcard">' +
-        '<div class="pvisual' + (p.image ? '' : ' is-ph') + '">' + vis + '</div>' +
+        '<button class="pvisual pv-open' + (p.image ? '' : ' is-ph') + '" type="button" data-pv="' + i + '" aria-label="Ver ' + esc(p.name) + ' e calcular frete">' + vis + '</button>' +
         '<p class="label mono">' + esc(p.category) + '</p>' +
-        '<h3>' + esc(p.name) + '</h3>' +
+        '<h3><button class="pv-open pv-name" type="button" data-pv="' + i + '">' + esc(p.name) + '</button></h3>' +
         '<div class="prow"><span class="price">' + esc(p.price) + '</span>' +
-        '<a class="btn btn-sm mono" target="_blank" rel="noopener" href="' + wa(C.storesProduct.replace('{produto}', p.name)) + '">Pedir no WhatsApp</a></div>' +
+        '<a class="btn btn-sm mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '">Pedir no WhatsApp</a></div>' +
+        '<button class="pv-open pv-frete mono" type="button" data-pv="' + i + '">Frete e entrega →</button>' +
         '</article>';
     }).join('');
     $('el-count').textContent = list.length + ' itens';
@@ -94,9 +97,39 @@
         '<p class="label mono">' + esc(p.brand) + ' · ' + esc(p.size) + '</p>' +
         '<h3>' + esc(p.name) + '</h3>' +
         '<div class="prow"><span class="price">' + esc(p.soldOut ? 'Esgotado' : p.priceLabel) + '</span>' +
-        '<a class="btn btn-sm btn-gold mono" target="_blank" rel="noopener" href="' + wa(C.perfumesProduct.replace('{produto}', full)) + '">Pedir</a></div>' +
+        '<a class="btn btn-sm btn-gold mono" target="_blank" rel="noopener" href="' + wa(C.perfumesProduct.replace('{produto}', full).replace('{preco}', p.priceLabel)) + '">Pedir</a></div>' +
         '</article>';
     }).join('');
   }
   if (window.BAGDA_DATA) teaser(); else window.addEventListener('load', teaser);
+
+  // Entregas: CEP → WhatsApp (frete.js) + vista do produto
+  var F = window.BagdaFrete;
+  if (F && $('ent-calc')) $('ent-calc').innerHTML = F.box({ id: 'home' });
+  if ($('ent-maps')) $('ent-maps').href = $('maps').href;
+  var pv = $('pv'), lastFocus = null;
+  function openPV(i) {
+    var p = PRODUCTS[i]; if (!p || !pv) return;
+    var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" decoding="async">' : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
+    $('pv-body').innerHTML = '<div class="pv-grid"><div class="pv-pic' + (p.image ? '' : ' is-ph') + '">' + vis + '</div><div class="pv-txt">' +
+      '<p class="label mono">' + esc(p.category) + '</p><h3 class="pv-h">' + esc(p.name) + '</h3>' +
+      '<p class="pv-price">' + esc(p.price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
+      '<a class="btn btn-wa mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg>Pedir no WhatsApp</a>' +
+      '<ul class="pv-dlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>' +
+      (F ? F.box({ id: 'p' + i, item: p.name, price: p.price }) : '') +
+      '<p class="pv-note mono">Preço de varejo do site. Estoque confirmado no WhatsApp.</p></div></div>';
+    lastFocus = document.activeElement;
+    pv.classList.add('open'); pv.setAttribute('aria-hidden', 'false'); document.body.classList.add('pv-lock');
+    pv.querySelector('.pv-box').scrollTop = 0; setTimeout(function () { pv.querySelector('.pv-x').focus(); }, 60);
+  }
+  function closePV() {
+    if (!pv || !pv.classList.contains('open')) return;
+    pv.classList.remove('open'); pv.setAttribute('aria-hidden', 'true'); document.body.classList.remove('pv-lock');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  document.addEventListener('click', function (e) {
+    var o = e.target.closest('[data-pv]'); if (o) { openPV(+o.dataset.pv); return; }
+    if (e.target.closest('[data-pvclose]')) closePV();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePV(); });
 })();
