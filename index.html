@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="img/hero-jbl.webp">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261018e">
 </head>
 <body>
   <div class="wrap">
@@ -21,6 +21,7 @@
       <nav class="nav mono">
         <a href="#eletronicos">Eletrônicos</a>
         <a href="perfumes/">Perfumes</a>
+        <a href="#entregas">Entregas</a>
         <a href="#loja">A loja</a>
         <a href="#contato">Contato</a>
       </nav>
@@ -34,6 +35,7 @@
         <h1>Bagda<br>Stores.</h1>
         <p class="hero-chip"><span class="dot" aria-hidden="true"></span>Sony • Nintendo • Microsoft • Meta e muito mais!</p>
         <p class="hero-lead">Eletrônicos, games e perfumes originais.<br>Escolha na vitrine, chame no WhatsApp<br>ou visite a loja no Brás.</p>
+        <p class="hero-dlv"><a href="#entregas"><b>Fast Entrega</b> · moto no mesmo dia em SP</a><a href="#entregas">Retire grátis no Brás</a><a href="#entregas">SEDEX para todo o Brasil</a></p>
         <div class="hero-btns">
           <a class="btn mono js-wa" href="#" target="_blank" rel="noopener">Pedir no WhatsApp <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg></a>
           <a class="btn btn-ghost mono" href="#eletronicos">Ver vitrine</a>
@@ -67,6 +69,13 @@
       </aside>
     </section>
 
+    <!-- DESTAQUE DE ENTREGA -->
+    <a class="dlv-strip" href="#entregas" aria-label="Opções de entrega">
+      <span class="dlv-c hot"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h5l3-6h-4l-2-3H7M16.5 11l2 6M14 6h3l1.5 5"/></g></svg><span><b>Fast Entrega</b><small class="mono">Moto no mesmo dia em SP</small></span></span>
+      <span class="dlv-c"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 4.5 4h15L21 9.5M3 9.5h18M3 9.5a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M5 12v8h14v-8M10 20v-5h4v5"/></g></svg><span><b>Retire grátis no Brás</b><small class="mono">Loja 357 · 08:00–17:30</small></span></span>
+      <span class="dlv-c"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></g></svg><span><b>SEDEX para SP e todo o Brasil</b><small class="mono">Frete calculado no WhatsApp</small></span></span>
+    </a>
+
     <!-- DUAS MARCAS -->
     <div class="section-bar mono"><span>Duas marcas</span><span>Uma loja</span></div>
     <section class="block">
@@ -91,7 +100,7 @@
           <p class="label mono">03 / Loja física</p>
           <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <h3>Mega Polo Brás</h3>
-          <p>Retire na loja ou peça frete em SP (serviço terceirizado).</p>
+          <p>Retire grátis na loja ou receba hoje em SP com a Fast Entrega por moto.</p>
         </a>
       </div>
     </section>
@@ -109,6 +118,24 @@
       <p class="note mono">Preços de varejo do site. Valores e estoque sujeitos a confirmação no WhatsApp.</p>
     </div>
   </section>
+
+  <!-- ENTREGAS -->
+  <div class="wrap">
+    <div class="section-bar mono" id="entregas"><span>Entregas</span><span>Fast Entrega · Retirada · SEDEX</span></div>
+    <section class="block ent">
+      <div class="block-head">
+        <h2>Receba hoje em SP.<br><span class="soft">Ou retire no Brás.</span></h2>
+        <p class="muted side">Digite seu CEP e fale com a gente no WhatsApp:<br>nossa equipe calcula o frete e o prazo na hora.</p>
+      </div>
+      <div class="ent-calc" id="ent-calc"></div>
+      <div class="ent-grid">
+        <div class="ent-card hot"><div class="ent-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h5l3-6h-4l-2-3H7M16.5 11l2 6M14 6h3l1.5 5"/></g></svg></div><p class="label mono">01 / Fast Entrega · moto</p><h3>No mesmo dia em São Paulo</h3><p>Entrega no mesmo dia em <b>São Paulo capital</b> para pedidos confirmados no horário da loja (08:00–17:30). A taxa depende da distância e é confirmada no WhatsApp, conforme as motos disponíveis no momento.</p></div>
+        <div class="ent-card"><div class="ent-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 4.5 4h15L21 9.5M3 9.5h18M3 9.5a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M5 12v8h14v-8M10 20v-5h4v5"/></g></svg></div><p class="label mono">02 / Retirada</p><h3>Retire grátis na loja</h3><p>Rua Barão de Ladário, 670 · Mega Polo Brás · 3º andar · Loja 357 · Brás, São Paulo/SP. Das 08:00 às 17:30.</p><a class="ent-link mono" id="ent-maps" target="_blank" rel="noopener">Como chegar →</a></div>
+        <div class="ent-card"><div class="ent-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></g></svg></div><p class="label mono">03 / SEDEX</p><h3>SEDEX para SP e todo o Brasil</h3><p>Interior de São Paulo e todos os estados. Frete e prazo calculados no WhatsApp pelo seu CEP. Postagem em 1 a 2 dias úteis após a confirmação do pagamento, com código de rastreio enviado pelo WhatsApp.</p></div>
+        <div class="ent-card"><div class="ent-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13l-3-3M20 15H7l3 3"/></g></svg></div><p class="label mono">04 / Trocas</p><h3>Trocas e devoluções</h3><p>Compras pelo site ou WhatsApp: até 7 dias após o recebimento para desistir, com o produto lacrado e sem uso (direito de arrependimento, art. 49 do CDC). Defeito ou avaria: avise em até 7 dias após o recebimento, com fotos do produto e da embalagem.</p></div>
+      </div>
+    </section>
+  </div>
 
   <!-- PERFUMES: teaser do catálogo completo em /perfumes/ -->
   <section class="gold-band" id="perfumes">
@@ -162,7 +189,7 @@
       </div>
       <footer class="foot">
         <span class="brand-stores"><img class="badge" src="img/brand/bagda-stores.jpg" alt="" width="40" height="40" loading="lazy"><span class="txt-stores">BAGDA<br>STORES</span></span>
-        <span class="mono small">Sony • Nintendo • Microsoft • Meta e muito mais!</span>
+        <span class="mono small">Sony • Nintendo • Microsoft • Meta e muito mais!<br><a class="foot-dlv" href="#entregas">Entregas: Fast Entrega (moto) em SP · Retirada grátis no Brás · SEDEX para todo o Brasil</a></span>
         <span class="mono small">© <span id="year"></span> BGD Electronics Distribuidora Ltda</span>
       </footer>
     </div>
@@ -177,9 +204,16 @@
     <symbol id="i-bottle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3h-4zM9 5h6l1 3H8z"/><rect x="5" y="8" width="14" height="14" rx="3"/><path d="M9 14h6"/></g></symbol>
   </svg>
 
+  <!-- VISTA DO PRODUTO -->
+  <div class="pv" id="pv" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Produto">
+    <div class="pv-bd" data-pvclose></div>
+    <div class="pv-box"><div class="pv-top"><span class="pv-grab" aria-hidden="true"></span><span class="mono pv-brand">Bagda Stores</span><button class="pv-x" data-pvclose aria-label="Fechar">×</button></div><div id="pv-body"></div></div>
+  </div>
+
   <script src="config.js"></script>
   <script src="data.js"></script>
   <script src="perfumes/assets/data.js" defer></script>
-  <script src="main.js" defer></script>
+  <script src="frete.js?v=20261018e" defer></script>
+  <script src="main.js?v=20261018e" defer></script>
 </body>
 </html>
