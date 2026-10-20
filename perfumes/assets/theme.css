@@ -9,3 +9,11 @@
 .ftile .ft{background:linear-gradient(180deg,transparent,rgba(42,23,18,.82) 55%);color:#fff}
 .btn.gold{background:linear-gradient(135deg,#e7967a,#b0604a);color:#fff}
 .opt .ic{background:rgba(176,96,74,.1)}
+.hero:after{background:radial-gradient(900px 500px at 70% 20%,rgba(217,139,111,.18),transparent 60%),linear-gradient(180deg,rgba(255,250,245,.55) 0%,rgba(255,250,245,.75) 45%,rgba(255,250,245,.96) 80%,var(--bg) 100%)}
+.toolbar,.modal .mtop{background:rgba(255,250,245,.92)}
+.search input,select.sort,.fgroup input[type=text]{background:#fff}
+.opt,.frete,.tier .ns span{background:#fff}
+.dlv-i.hot{background:linear-gradient(135deg,rgba(217,139,111,.18),#fff)}
+footer.site{background:linear-gradient(180deg,var(--bg),#f6e6dc)}
+.ftile{background:#f7ece4}
+.top:not(.solid) .logo b{color:#2a1712}
