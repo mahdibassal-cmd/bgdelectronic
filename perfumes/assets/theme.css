@@ -44,3 +44,8 @@ footer.site{background:linear-gradient(180deg,var(--bg),#f6e6dc)}
 .cmpbox{background:rgba(255,255,255,.9);color:#9a4a36}
 .cmpbox.on,.cmp-count,.chip.on{background:#9a4a36;color:#fff;border-color:#9a4a36}
 .fab:after{background:#fff;color:#2a1712}
+/* cr3: AA contrast */
+:root{--gold:#9a4a36;--gold2:#a4553f}
+.btn.wa{background:#157a43}.btn.wa:hover{background:#12693a}
+.soonb{color:#fff}
+.btn.gold{background:linear-gradient(135deg,#b25a43,#8c3f2c);color:#fff}
