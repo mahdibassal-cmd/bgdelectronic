@@ -1,0 +1,37 @@
+/* Option A — Bright & Clean: light bands, electric blue + orange accents */
+:root{--navy:#1747d6;--navy2:#2b5cf0;--navy-line:#c9d6ff;--blue:#1747d6;--gold:#ff8a1f;--gold2:#f26b00;--black:#1a1a1a;--soft:#f2f6ff;--muted:#5b6475}
+body{background:#fafbff}
+.hero-visual{background:radial-gradient(90% 70% at 50% 40%,#ffffff 0%,#e3ecff 55%,#c8d8ff 100%)!important}
+.navy-band{background:linear-gradient(180deg,#eef3ff 0%,#ffffff 100%)!important;color:#0f1730}
+.navy-band .soft{color:#1747d6}.navy-band .muted,.navy-band .label{color:#4a5468}
+.navy-band .chip{color:#1d2a4a;border-color:#c9d6ff;background:#fff}
+.navy-band .chip.is-on{background:#1747d6;color:#fff;border-color:#1747d6}
+.navy-band .btn-sm{background:#1747d6;color:#fff}
+.gold-band,.dark-band{background:linear-gradient(180deg,#fff4ea 0%,#ffffff 100%)!important;color:#2a1a0c}
+.gold-band .soft,.dark-band .soft{color:#b4540a}.gold-band .muted,.gold-band .label{color:#6b5442}
+.gold-band .chip{color:#3a250f;border-color:#ffd2ad;background:#fff}
+.gold-band .chip.is-on{background:#f26b00;color:#fff;border-color:#f26b00}
+.ccard.navy{background:linear-gradient(160deg,#2b5cf0,#1747d6)!important}
+.ccard.gold{background:linear-gradient(160deg,#ff9a3c,#e85d00)!important;border-color:#e85d00}
+.ccard.navy p:not(.label){color:#e3ebff}
+.ent-card.hot,.dlv-c.hot{background:linear-gradient(135deg,#1747d6,#6a3df0)!important}
+.pv-pic,.pvisual.is-ph,.pv-pic.is-ph{background:radial-gradient(90% 70% at 50% 40%,#fff 0%,#e8efff 70%,#d4e0ff 100%)!important}
+.btn{background:#1747d6}.btn-gold{background:linear-gradient(180deg,#ff9a3c,#f26b00);color:#fff}
+.btn-ghost{background:transparent;color:#1747d6;border-color:#1747d6}.btn-light{background:#fff;color:#1747d6}
+.pf .pvisual{background:#fff}
+
+/* Cart drawer + floating bag: theme A (light) */
+.bc{--bcg:#1747d6;--bcg2:#1747d6;--bcbg:#ffffff;--bcln:rgba(30,40,70,.14);--bcink:#1a1a1a;--bcdim:#5b6475}
+.bc-fab{background:#fff;color:#1747d6;border-color:rgba(30,40,70,.18);box-shadow:0 10px 28px rgba(30,40,70,.18)}
+.bc-n{background:#1747d6;color:#fff}
+.bc-add.pill{color:#1747d6;border-color:#1747d6}
+.bc-bd{background:rgba(20,25,40,.45)}
+.bc-top{color:#1a1a1a}
+.bc-it img,.bc-ph{background:#f3f5fa}
+.bc-cep,.bc-pixcode{background:#f7f8fb;color:#1a1a1a}
+.bc-pay,.bc-pixbtn{background:#1747d6;color:#fff}
+.bc-pixbox{background:#f7f8fb}
+.bc-qr{background:#fff;padding:10px;border:1px solid rgba(30,40,70,.14)}
+.bc-pixid b{color:#1a1a1a}
+.bc-copy{color:#1747d6;border-color:#1747d6}
+.bc-toast{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
