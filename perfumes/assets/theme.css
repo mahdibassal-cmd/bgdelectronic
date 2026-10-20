@@ -20,3 +20,27 @@ footer.site{background:linear-gradient(180deg,var(--bg),#f6e6dc)}
 .dlv-i{background:#fff}
 .ftile .ft,.ftile .ft *{color:#fff!important}
 .cmpbar,.compare{background:#2a1712}
+
+/* Cart drawer + floating bag: theme A (light) */
+.bc{--bcg:#9a4a36;--bcg2:#9a4a36;--bcbg:#ffffff;--bcln:rgba(30,40,70,.14);--bcink:#1a1a1a;--bcdim:#5b6475}
+.bc-fab{background:#fff;color:#9a4a36;border-color:rgba(30,40,70,.18);box-shadow:0 10px 28px rgba(30,40,70,.18)}
+.bc-n{background:#9a4a36;color:#fff}
+.bc-add.pill{color:#9a4a36;border-color:#9a4a36}
+.bc-bd{background:rgba(20,25,40,.45)}
+.bc-top{color:#1a1a1a}
+.bc-it img,.bc-ph{background:#f3f5fa}
+.bc-cep,.bc-pixcode{background:#f7f8fb;color:#1a1a1a}
+.bc-pay,.bc-pixbtn{background:#9a4a36;color:#fff}
+.bc-pixbox{background:#f7f8fb}
+.bc-qr{background:#fff;padding:10px;border:1px solid rgba(30,40,70,.14)}
+.bc-pixid b{color:#1a1a1a}
+.bc-copy{color:#9a4a36;border-color:#9a4a36}
+.bc-toast{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+/* polish */
+.hero-off{background:#fff!important;color:#5a2a1e!important;border-color:rgba(154,74,54,.45)!important}
+.hero-off .seal{color:#9a4a36}
+.tray{background:rgba(255,255,255,.97)!important;border-color:rgba(154,74,54,.3)!important;box-shadow:0 14px 40px -10px rgba(42,23,18,.3)}
+.tray .it button{background:#9a4a36;color:#fff}
+.cmpbox{background:rgba(255,255,255,.9);color:#9a4a36}
+.cmpbox.on,.cmp-count,.chip.on{background:#9a4a36;color:#fff;border-color:#9a4a36}
+.fab:after{background:#fff;color:#2a1712}
