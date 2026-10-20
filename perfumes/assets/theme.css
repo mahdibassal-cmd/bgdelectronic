@@ -17,3 +17,6 @@
 footer.site{background:linear-gradient(180deg,var(--bg),#f6e6dc)}
 .ftile{background:#f7ece4}
 .top:not(.solid) .logo b{color:#2a1712}
+.dlv-i{background:#fff}
+.ftile .ft,.ftile .ft *{color:#fff!important}
+.cmpbar,.compare{background:#2a1712}
