@@ -40,7 +40,7 @@ var MAXES=[150,200,300];
 var CMP=[];
 var PRICE=[{k:"a",l:"Até R$ 150",t:function(v){return v<=150}},{k:"b",l:"R$ 150 – 250",t:function(v){return v>150&&v<=250}},{k:"c",l:"Acima de R$ 250",t:function(v){return v>250}}];
 var BRAND_ORDER=["Arabiyat Prestige","Armaf","Ferassa","MPF","French Avenue","Ibraheem Al Qurashi","Al Wataniah","Rayhaan","Rasasi"];
-var OFFICIAL={"Arabiyat Prestige":1,"Armaf":1,"Ferassa":1};
+var OFFICIAL={"Arabiyat Prestige":1,"Ferassa":1};
 
 function count(fn){return P.filter(fn).length}
 function uniq(a){return a.filter(function(v,i){return v&&a.indexOf(v)===i})}
