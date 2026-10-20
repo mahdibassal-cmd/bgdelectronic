@@ -35,3 +35,28 @@ body{background:#fafbff}
 .bc-pixid b{color:#1a1a1a}
 .bc-copy{color:#1747d6;border-color:#1747d6}
 .bc-toast{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+
+/* cr3: readable perfumes card (white on deeper warm orange, AA) */
+.ccard.gold{background:linear-gradient(160deg,#c2410c,#9a3412)!important;border-color:#9a3412;color:#fff}
+.ccard.gold h3{color:#fff}
+.ccard.gold p:not(.label){color:#fff}
+.ccard.gold .label,.ccard.navy .label{color:#fff}
+.ccard.navy p:not(.label){color:#fff}
+.ccard.gold .cicon{background:#fff;color:#9a3412}
+.hero-dlv a:first-child b{color:#ffe2c4}
+.btn.bf-go{background:var(--wa)!important;color:#06361a}
+.soft{color:#6b7280}
+.navy-band .band-top,.navy-band .band-top *{color:#4a5468!important}
+.gold-band .band-top,.gold-band .band-top *,.dark-band .band-top,.dark-band .band-top *{color:#6b5442!important}
+:root{--gold:#c2410c;--gold2:#9a3412}
+.section-bar.inv{color:#4a5468;border-bottom-color:rgba(30,40,70,.12)}
+.gold-band .section-bar.inv{color:#6b5442}
+.price{color:#0f1730}
+.pf .price{color:#9a3412}.pf .label{color:#9a3412}
+.is-out .price{color:#6b5442}
+.gold-band .soft,.gold-band .muted,.gold-band p{color:#6b4a30}
+.gold-band .soft{color:#c2410c}
+.hero-visual .tag{background:rgba(255,255,255,.88);border-color:rgba(23,71,214,.25);color:#0f1730}
+.hero-visual .tag i{background:#1747d6}
+.hero-visual .caption{color:#3b4a75}
+.btn-gold{background:linear-gradient(180deg,#c2410c,#9a3412)!important;color:#fff}
