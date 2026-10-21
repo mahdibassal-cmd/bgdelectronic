@@ -10,7 +10,7 @@
 <input type="hidden" name="_subject" value="Novo cadastro – Sorteio semanal"><input type="hidden" name="_template" value="table"><input type="text" name="_honey" style="display:none">
 <button>Participar</button><p id="e" style="color:#c00"></p></form>
 <div class="ok" id="ok"><h2>Obrigado! ✅</h2><p>Seu cadastro foi recebido. Agora complete para participar do sorteio semanal:</p><ol>
-<li>Siga <a href="https://www.instagram.com/bagda.perfumes/">@bagda.perfumes</a> no Instagram.</li>
-<li>Comente e marque amigos no post do sorteio no perfil @bagda.perfumes.</li></ol><p>O sorteio acontece <b>toda semana</b>. Boa sorte! 🍀</p></div></div></div>
+<li>Siga <a href="https://www.instagram.com/lojabagdastores/">@lojabagdastores</a> e <a href="https://www.instagram.com/bagda.perfumes/">@bagda.perfumes</a> no Instagram.</li>
+<li>Acesse o <a id="post" href="https://www.instagram.com/bagda.perfumes/">post do sorteio da semana</a>, curta, comente e marque amigos.</li></ol><p>O sorteio acontece <b>toda semana</b>. Boa sorte! 🍀</p></div></div></div>
 <script>const w=document.getElementById('w');w.oninput=()=>{let d=w.value.replace(/\D/g,'').slice(0,11),r=d;if(d.length>2)r='('+d.slice(0,2)+') '+d.slice(2);if(d.length>6)r='('+d.slice(0,2)+') '+d.slice(2,d.length-4)+'-'+d.slice(-4);w.value=r};
 f.onsubmit=async e=>{e.preventDefault();try{const r=await fetch('https://formsubmit.co/ajax/DESTINO_PENDENTE',{method:'POST',headers:{Accept:'application/json'},body:new FormData(f)});if(!r.ok)throw 0;f.style.display='none';ok.style.display='block'}catch(x){document.getElementById('e').textContent='Erro ao enviar. Tente novamente.'}}</script></body></html>
