@@ -42,7 +42,7 @@
   $('year').textContent = new Date().getFullYear();
   $('stat-count').textContent = PRODUCTS.length;
   var jbl = PRODUCTS.filter(function (p) { return /JBL Boombox 4/.test(p.name); })[0];
-  $('hero-jbl-price').textContent = jbl ? jbl.price : '';
+  $('hero-jbl-price').textContent = jbl ? (jbl.promo ? '🔥 ' : '') + jbl.price : '';
 
   function chips(el, list, counts, onPick) {
     el.innerHTML = '<button class="chip is-on" data-f="Todos">Todos</button>' + list.map(function (c) {
@@ -69,6 +69,7 @@
       return '<article class="pcard">' +
         '<button class="pvisual pv-open' + (p.image ? '' : ' is-ph') + '" type="button" data-pv="' + i + '" aria-label="Ver ' + esc(p.name) + ' e calcular frete">' + vis + '</button>' +
         '<p class="label mono">' + esc(p.category) + '</p>' +
+        (p.promo ? '<span class="fire-promo">🔥 ' + esc(p.promo) + '</span>' : '') +
         '<h3><button class="pv-open pv-name" type="button" data-pv="' + i + '">' + esc(p.name) + '</button></h3>' +
         '<div class="prow"><span class="price">' + esc(p.price) + '</span>' +
         '<a class="btn btn-sm mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '">Pedir no WhatsApp</a></div>' +
@@ -119,7 +120,7 @@
     var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" decoding="async">' : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
     $('pv-body').innerHTML = '<div class="pv-grid"><div class="pv-pic' + (p.image ? '' : ' is-ph') + '">' + vis + '</div><div class="pv-txt">' +
       '<p class="label mono">' + esc(p.category) + '</p><h3 class="pv-h">' + esc(p.name) + '</h3>' +
-      '<p class="pv-price">' + esc(p.price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
+      (p.promo ? '<span class="fire-promo">🔥 ' + esc(p.promo) + '</span>' : '') + '<p class="pv-price">' + esc(p.price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
       '<a class="btn btn-wa mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg>Pedir no WhatsApp</a>' +
       (window.BagdaCart ? BagdaCart.button({ key: 'el:' + (((p.image || '').match(/eletronicos\/([^\/]+)\.\w+$/) || [])[1] || p.name), name: p.name, variant: '', price: parseFloat(String(p.price).replace(/[^\d,]/g, '').replace(',', '.')), payLink: pay, img: p.image ? (/^(\/|https?:)/.test(p.image) ? p.image : '/' + p.image) : '' }) : '') +
       (pay ? '<a class="btn btn-gold btn-pay mono" target="_blank" rel="noopener" href="' + esc(pay) + '">Pagar · PIX ou cartão</a><p class="pv-paynote mono">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</p>' : '') +
