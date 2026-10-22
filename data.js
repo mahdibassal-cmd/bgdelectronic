@@ -49,6 +49,7 @@ const PRODUCTS = [
   "name": "JBL Boombox 4 Black",
   "category": "Áudio & Som",
   "price": "R$ 2.169,99",
+  "promo": "PROMO",
   "icon": "speaker",
   "image": "img/eletronicos/jbl-boombox-4-black.webp",
   "imageSource": "JBL — assets/jbl/official-p2.png"

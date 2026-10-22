@@ -288,3 +288,5 @@ body.pv-lock{overflow:hidden}
 /* Getnet pay button (product view) */
 .pv-txt .btn-pay{margin-top:10px;width:100%;font-weight:600;letter-spacing:.04em}
 .pv-paynote{font-size:10px;color:var(--muted,#777);margin:8px 0 0;line-height:1.5}
+.fire-promo{display:inline-block;margin:4px 0 2px;padding:3px 10px;border-radius:999px;background:linear-gradient(90deg,#ff3d00,#ff9100);color:#fff;font-weight:800;font-size:12px;letter-spacing:.08em;box-shadow:0 0 12px rgba(255,90,0,.55);animation:firepulse 1.6s ease-in-out infinite}
+@keyframes firepulse{50%{box-shadow:0 0 20px rgba(255,120,0,.9)}}
