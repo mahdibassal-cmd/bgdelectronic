@@ -41,7 +41,10 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
   <div class="wrap">
     <span class="kicker">Sorteio Semanal · BAGDA PERFUMES</span>
     <h1>Sorteio <em class="gold-text">Semanal</em></h1>
-    <p class="lead">3 ganhadores, cada um leva 1 perfume. Resultado hoje às 16:30.</p>
+    <p class="lead">3 ganhadores, cada um leva 1 perfume.</p>
+    <p class="lead" id="rd" style="margin-top:6px;font-weight:600"></p>
+    <p style="margin-top:12px"><a href="https://www.instagram.com/bagda.perfumes/p/Dej1lMOllau/" target="_blank" rel="noopener" style="color:var(--gold)">Ver o post no Instagram →</a></p>
+    <p style="font-size:14px;opacity:.75;margin-top:6px">1º Marwa · 2º Fahad Regal · 3º Bahiya Garnet</p>
     <div class="stage" id="s">✦</div>
     <button class="btn gold" id="b" type="button">Sortear</button>
     <ol id="w"></ol>
@@ -51,6 +54,7 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
   <div class="wrap">
     <span class="kicker">Lista oficial</span>
     <h2>Participantes (<span id="n">0</span>)</h2>
+    <p id="tot" style="margin:-8px 0 16px;opacity:.8"></p>
     <ul id="list"></ul>
   </div>
 </section>
@@ -72,12 +76,14 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
   </div>
 </footer>
 <script>
-let all=[],pool=[],wins=0;const $=i=>document.getElementById(i);
-function fmt(full){const p=String(full).trim().split(/\s+/);return p.length>1?cap(p[0])+' '+p[p.length-1][0].toUpperCase()+'.':cap(p[0])}
-function cap(s){return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()}
-fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const seen=new Set();d.forEach(x=>{const nome=typeof x=='string'?x:x.nome;const key=typeof x=='string'?nome.toLowerCase().trim():(x.email||x.whatsapp||nome).toLowerCase().trim();if(!nome||seen.has(key))return;seen.add(key);all.push(fmt(nome))});init()}).catch(init);
-function init(){$('n').textContent=all.length;all.forEach((t,i)=>{const li=document.createElement('li');li.textContent=t;li.id='p'+i;$('list').appendChild(li)});pool=all.map((_,i)=>i);if(!all.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
-$('b').onclick=()=>{if(!pool.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=all[pool[Math.random()*pool.length|0]];if(Date.now()>end){clearInterval(t);const k=crypto.getRandomValues(new Uint32Array(1))[0]%pool.length;const i=pool.splice(k,1)[0];wins++;$('s').textContent='🏆 '+all[i];const li=document.createElement('li');li.textContent=wins+'º — '+all[i];$('w').appendChild(li);$('p'+i).classList.add('win');$('b').disabled=wins>=3||!pool.length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
+const RESULT_DATE='Inscrições até domingo, 25/10, às 23:59. Resultado: segunda-feira, 26/10.'; // edite aqui a data do resultado
+const PRIZES=['Marwa','Fahad Regal','Bahiya Garnet'];
+let ppl=[],wins=0,won=new Set();const $=i=>document.getElementById(i);$('rd').textContent=RESULT_DATE;
+fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const m=new Map();d.forEach(x=>{const h=String(x.handle||'').trim().replace(/^@/,'').toLowerCase();const e=Math.max(1,x.entries|0);if(!h)return;m.set(h,(m.get(h)||0)+e)});ppl=[...m].map(([h,e])=>({h:'@'+h,e}));init()}).catch(init);
+function left(){return ppl.map((p,i)=>i).filter(i=>!won.has(i))}
+function pick(){const L=left(),T=L.reduce((s,i)=>s+ppl[i].e,0);let r=crypto.getRandomValues(new Uint32Array(1))[0]%T;for(const i of L){if((r-=ppl[i].e)<0)return i}}
+function init(){$('n').textContent=ppl.length;$('tot').textContent=ppl.length+' pessoas · '+ppl.reduce((s,p)=>s+p.e,0)+' participações (cada comentário = 1 participação)';ppl.forEach((p,i)=>{const li=document.createElement('li');li.textContent=p.h+' · '+p.e+(p.e>1?' participações':' participação');li.id='p'+i;$('list').appendChild(li)});if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
+$('b').onclick=()=>{const L=left();if(!L.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=ppl[L[Math.random()*L.length|0]].h;if(Date.now()>end){clearInterval(t);const i=pick();won.add(i);const pr=PRIZES[wins];wins++;$('s').textContent='🏆 '+ppl[i].h+' — '+pr;const li=document.createElement('li');li.textContent=wins+'º — '+ppl[i].h+' · '+pr;$('w').appendChild(li);$('p'+i).classList.add('win');$('b').disabled=wins>=3||!left().length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
 </script>
 </body>
 </html>
