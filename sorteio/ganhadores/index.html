@@ -1,0 +1,21 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Sorteio Semanal – Ganhadores | Bagda Perfumes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>:root{--g:#D4AF5F}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#1c1813,#0b0a08 70%);color:#eadfc6;font-family:'Cormorant Garamond',Georgia,serif;min-height:100vh}
+.c{max-width:720px;margin:auto;padding:32px 18px;text-align:center}.brand{letter-spacing:.35em;color:var(--g);font-size:15px}h1{font-family:'Playfair Display',serif;color:var(--g);font-size:clamp(32px,8vw,54px);margin:.2em 0}
+.line{width:120px;height:1px;background:var(--g);margin:14px auto}.info{font-size:22px;font-style:italic}
+.stage{border:1px solid var(--g);border-radius:14px;padding:26px 12px;margin:24px 0;min-height:110px;font-family:'Playfair Display',serif;font-size:clamp(30px,8vw,46px);color:var(--g);background:#0006}
+button{background:var(--g);color:#0b0a08;border:0;border-radius:40px;padding:14px 46px;font:700 22px 'Cormorant Garamond',serif;letter-spacing:.1em;cursor:pointer}button:disabled{opacity:.4;cursor:default}
+ol#w{list-style:none;padding:0;font-size:24px}ol#w li{margin:8px 0;color:var(--g)}h2{font-family:'Playfair Display',serif;color:var(--g);font-size:24px;margin-top:34px}
+#list{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0;list-style:none}#list li{border:1px solid #d4af5f55;border-radius:20px;padding:4px 12px;font-size:18px}#list li.win{background:var(--g);color:#0b0a08}</style></head><body><div class="c">
+<div class="brand">BAGDA PERFUMES</div><h1>Sorteio Semanal</h1><div class="line"></div>
+<p class="info">3 ganhadores, cada um leva 1 perfume. Resultado hoje às 16:30.</p>
+<div class="stage" id="s">✦</div><button id="b">Sortear</button><ol id="w"></ol>
+<h2>Participantes (<span id="n">0</span>)</h2><ul id="list"></ul></div>
+<script>
+let all=[],pool=[],wins=0;const $=i=>document.getElementById(i);
+function fmt(full){const p=String(full).trim().split(/\s+/);return p.length>1?cap(p[0])+' '+p[p.length-1][0].toUpperCase()+'.':cap(p[0])}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()}
+fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const seen=new Set();d.forEach(x=>{const nome=typeof x=='string'?x:x.nome;const key=typeof x=='string'?nome.toLowerCase().trim():(x.email||x.whatsapp||nome).toLowerCase().trim();if(!nome||seen.has(key))return;seen.add(key);all.push(fmt(nome))});init()}).catch(init);
+function init(){$('n').textContent=all.length;all.forEach((t,i)=>{const li=document.createElement('li');li.textContent=t;li.id='p'+i;$('list').appendChild(li)});pool=all.map((_,i)=>i);if(!all.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
+$('b').onclick=()=>{if(!pool.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=all[pool[Math.random()*pool.length|0]];if(Date.now()>end){clearInterval(t);const k=crypto.getRandomValues(new Uint32Array(1))[0]%pool.length;const i=pool.splice(k,1)[0];wins++;$('s').textContent='🏆 '+all[i];const li=document.createElement('li');li.textContent=wins+'º — '+all[i];$('w').appendChild(li);$('p'+i).classList.add('win');$('b').disabled=wins>=3||!pool.length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
+</script></body></html>
