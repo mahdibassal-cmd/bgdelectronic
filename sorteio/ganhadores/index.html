@@ -45,8 +45,8 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
     <p class="lead" id="rd" style="margin-top:6px;font-weight:600"></p>
     <p style="margin-top:12px"><a href="https://www.instagram.com/bagda.perfumes/p/Dej1lMOllau/" target="_blank" rel="noopener" style="color:var(--gold)">Ver o post no Instagram →</a></p>
     <p style="font-size:14px;opacity:.75;margin-top:6px">1º Marwa · 2º Fahad Regal · 3º Bahiya Garnet</p>
-    <div class="stage" id="s">✦</div>
-    <button class="btn gold" id="b" type="button">Sortear</button>
+    <div class="stage" id="s" hidden>✦</div>
+    <button class="btn gold" id="b" type="button" hidden>Sortear</button>
     <ol id="w"></ol>
   </div>
 </section>
@@ -75,6 +75,7 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
     <div class="legal"><span>© 2026 BAGDA PERFUMES</span></div>
   </div>
 </footer>
+<script>(async()=>{try{const k=new URLSearchParams(location.search).get('k');if(!k)return;const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(k));const h=[...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('');if(h==='a67708b898172bdca2fc0b675f56c5e61569e8e73bfb3d9642ee0c9ea83074af'){document.getElementById('b').hidden=false;document.getElementById('s').hidden=false;}}catch(e){}})();</script>
 <script>
 const RESULT_DATE='Inscrições até domingo, 25/10, às 23:59. Resultado: segunda-feira, 26/10.'; // edite aqui a data do resultado
 const PRIZES=['Marwa','Fahad Regal','Bahiya Garnet'];
