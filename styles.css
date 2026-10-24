@@ -292,3 +292,4 @@ body.pv-lock{overflow:hidden}
 @keyframes firepulse{50%{box-shadow:0 0 20px rgba(255,120,0,.9)}}
 .nav-sorteio{color:#c0392b!important;font-weight:700}
 .sorteio-bar{display:block;position:relative;z-index:60;text-align:center;padding:9px 12px;background:linear-gradient(90deg,#8a2b14,#c0392b,#d4af5f);color:#fff!important;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.04em;text-decoration:none}
+.btn-gold,.btn-gold:hover{color:#fff!important;text-shadow:0 1px 2px rgba(0,0,0,.35)}.btn-gold .ico{fill:#fff;color:#fff}
