@@ -17,3 +17,5 @@
 .bsearch{width:100%;max-width:420px;padding:12px 16px;border-radius:99px;border:1px solid var(--line2,rgba(212,175,95,.35));background:rgba(255,255,255,.04);color:inherit;font-size:15px}
 .bcount{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .bempty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
+
+.bfoot{flex-wrap:wrap}.bfoot .btn.mp{flex:1 1 auto;text-align:center}.bfoot .paynote{margin-top:0}
