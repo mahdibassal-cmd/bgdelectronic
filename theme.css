@@ -60,3 +60,4 @@ body{background:#fafbff}
 .hero-visual .tag i{background:#1747d6}
 .hero-visual .caption{color:#3b4a75}
 .btn-gold{background:linear-gradient(180deg,#c2410c,#9a3412)!important;color:#fff}
+.dark-band .band-top .btn-gold,.dark-band .band-top .btn-gold *,.gold-band .band-top .btn-gold,.gold-band .band-top .btn-gold *{color:#fff!important;fill:#fff!important}
