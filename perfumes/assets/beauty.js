@@ -16,8 +16,8 @@ window.BAGDA_BEAUTY = [
   var esc=function(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
   g.innerHTML=window.BAGDA_BEAUTY.map(function(p){
     var wa='https://wa.me/5511992873509?text='+encodeURIComponent((p.price?'Olá! Quero comprar o '+p.name+' ('+p.price+')':'Olá! Quero saber o preço do '+p.name));
-    var src='img/beauty/'+p.img;
-    return '<article class="bcard"><div class="bimg"><picture><source srcset="'+src+'.webp" type="image/webp"><img src="'+src+'.jpg" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
+    var src='img/beauty/'+p.img;var v='?v=i2';
+    return '<article class="bcard"><div class="bimg"><picture><source srcset="'+src+'.webp'+v+'" type="image/webp"><img src="'+src+'.jpg'+v+'" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
       '<div class="bbody"><span class="bmeta">'+esc(p.brand)+(p.origin?' · '+esc(p.origin):'')+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p>'+
       '<div class="bfoot"><span class="'+(p.price?'price':'bask')+'">'+(p.price?esc(p.price):'Consulte o preço')+'</span>'+
       '<a class="btn wa sm" href="'+wa+'" target="_blank" rel="noopener">Comprar pelo WhatsApp</a></div></div></article>';
