@@ -1,0 +1,11 @@
+.beauty .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px}
+.bcard{display:flex;flex-direction:column;border:1px solid var(--line2,rgba(212,175,95,.25));border-radius:18px;overflow:hidden;background:rgba(255,255,255,.03)}
+.bimg{aspect-ratio:3/4;overflow:hidden;background:#140e06}
+.bimg img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s}
+.bcard:hover .bimg img{transform:scale(1.04)}
+.bbody{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.bmeta{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.bbody h3{font-family:var(--serif);font-weight:500;font-size:21px;line-height:1.15;margin:0}
+.bbody p{color:var(--muted);font-size:14px;margin:0;flex:1}
+.bfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.bask{font-family:var(--serif);font-weight:600;font-size:16px;color:var(--gold2)}
