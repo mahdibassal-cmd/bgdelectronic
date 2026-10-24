@@ -10,11 +10,8 @@ window.BAGDA_EXTRAS={
     "armaf-club-de-nuit-intense-man",
     "armaf-club-de-nuit-elite",
     "arabiyat-prestige-mahd-al-dhahab",
-    "armaf-odyssey-mandarine-sky",
     "arabiyat-prestige-la-di-da-for-her",
-    "ferassa-jamra",
-    "armaf-yum-yum",
-    "arabiyat-prestige-hypnotic-vanilla"
+    "ferassa-jamra"
   ],
 
   /* Por produto (chave = id):
