@@ -9,3 +9,11 @@
 .bbody p{color:var(--muted);font-size:14px;margin:0;flex:1}
 .bfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 .bask{font-family:var(--serif);font-weight:600;font-size:16px;color:var(--gold2)}
+.bmore{margin-top:22px;text-align:center}.bmore a{color:var(--gold);text-decoration:none;font-weight:600;letter-spacing:.04em}
+.btools{display:flex;flex-direction:column;gap:14px;margin:0 0 26px}
+.bchips{display:flex;flex-wrap:wrap;gap:8px}
+.bchips .chip{cursor:pointer;border:1px solid var(--line2,rgba(212,175,95,.35));background:transparent;color:inherit;padding:8px 16px;border-radius:99px;font:600 13px/1 inherit;letter-spacing:.04em}
+.bchips .chip.on{background:var(--gold,#d4af5f);color:#0b0907;border-color:transparent}
+.bsearch{width:100%;max-width:420px;padding:12px 16px;border-radius:99px;border:1px solid var(--line2,rgba(212,175,95,.35));background:rgba(255,255,255,.04);color:inherit;font-size:15px}
+.bcount{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.bempty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
