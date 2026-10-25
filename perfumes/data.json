@@ -1,9 +1,9 @@
 {
  "meta": {
-  "generated": "2026-10-24",
+  "generated": "2026-10-25",
   "store": "BAGDA PERFUMES",
   "priceRule": "Preço de varejo aprovado (24/10/2026)",
-  "count": 83,
+  "count": 91,
   "disclaimer": "As marcas e nomes de perfumes citados como inspiração olfativa pertencem aos seus respectivos donos e são usados apenas como referência de estilo. Nossos perfumes são fragrâncias originais das casas árabes que representamos — não são réplicas nem falsificações."
  },
  "perfumes": [
@@ -6238,6 +6238,320 @@
    "inspiredBy": null,
    "originalCreation": false,
    "inspiredSources": []
+  },
+  {
+   "id": "mpf-poudre",
+   "brand": "MPF",
+   "name": "Poudre",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-poudre.webp",
+   "photoSource": "https://eg.myperfumes.ae/products/poudre-100ml",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Bergamota"
+    ],
+    "heart": [
+     "Acorde floral amadeirado"
+    ],
+    "base": [
+     "Baunilha",
+     "Sândalo",
+     "Almíscar",
+     "Âmbar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://eg.myperfumes.ae/products/poudre-100ml",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-dark-scudo",
+   "brand": "MPF",
+   "name": "Dark Scudo",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-dark-scudo.webp",
+   "photoSource": "https://uk.myperfumes.ae/products/dark-scudo-edp-100ml",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Bergamota",
+     "Laranja Amarga",
+     "Limão",
+     "Toranja"
+    ],
+    "heart": [
+     "Semente de Cenoura",
+     "Gerânio",
+     "Gengibre",
+     "Carvalho"
+    ],
+    "base": [
+     "Vetiver",
+     "Âmbar",
+     "Almíscar",
+     "Sândalo"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://uk.myperfumes.ae/products/dark-scudo-edp-100ml",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-highway-parfum",
+   "brand": "MPF",
+   "name": "Highway Parfum",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-highway-parfum.webp",
+   "photoSource": "placeholder (sem foto oficial encontrada)",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [],
+    "heart": [],
+    "base": []
+   },
+   "accords": [],
+   "notesSource": null,
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-vanilla-tobacco",
+   "brand": "MPF",
+   "name": "Vanilla & Tobacco",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-vanilla-tobacco.webp",
+   "photoSource": "https://myperfumes.ae/products/vanilla-tobacco-100ml",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Açafrão",
+     "Cardamomo",
+     "Casca de Canela"
+    ],
+    "heart": [
+     "Patchouli",
+     "Sândalo",
+     "Caramelo"
+    ],
+    "base": [
+     "Âmbar",
+     "Baunilha",
+     "Almíscar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://myperfumes.ae/products/vanilla-tobacco-100ml",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-wicked-elixir",
+   "brand": "MPF",
+   "name": "Wicked Elixir",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-wicked-elixir.webp",
+   "photoSource": "placeholder (sem foto oficial encontrada)",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Masculino",
+   "notes": {
+    "top": [
+     "Lavanda",
+     "Cardamomo",
+     "Pimenta Preta"
+    ],
+    "heart": [
+     "Incenso",
+     "Patchouli"
+    ],
+    "base": [
+     "Fava de Baunilha",
+     "Fava Tonka"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://dubaicollection.eu/product/apa-de-parfum-mpf-wicked-elixir-barbati/",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-wicked-legend",
+   "brand": "MPF",
+   "name": "Wicked Legend",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-wicked-legend.webp",
+   "photoSource": "https://uk.myperfumes.ae/products/wicked-legend-100ml",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Cipreste",
+     "Bergamota Italiana",
+     "Toranja"
+    ],
+    "heart": [
+     "Acorde Marinho",
+     "Lavanda",
+     "Hortelã"
+    ],
+    "base": [
+     "Âmbar Seco",
+     "Cedro",
+     "Musgo"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://uk.myperfumes.ae/products/wicked-legend-100ml",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-wicked-noir",
+   "brand": "MPF",
+   "name": "Wicked Noir",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-wicked-noir.webp",
+   "photoSource": "https://uk.myperfumes.ae/products/wicked-noir-100ml",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Limão",
+     "Maçã",
+     "Gálbano"
+    ],
+    "heart": [
+     "Lavanda",
+     "Noz-moscada",
+     "Heliotrópio"
+    ],
+    "base": [
+     "Fava Tonka",
+     "Baunilha",
+     "Âmbar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://uk.myperfumes.ae/products/wicked-noir-100ml",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "mpf-murano-crystal",
+   "brand": "MPF",
+   "name": "Murano Crystal",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 99.99,
+   "price": 99.99,
+   "priceLabel": "R$ 99,99",
+   "photo": "assets/img/mpf-murano-crystal.webp",
+   "photoSource": "https://eg.myperfumes.ae/products/murano-crystal-edp",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Feminino",
+   "notes": {
+    "top": [
+     "Yuzu",
+     "Cítricos",
+     "Romã"
+    ],
+    "heart": [
+     "Peônia",
+     "Magnólia",
+     "Flor de Lótus"
+    ],
+    "base": [
+     "Almíscar",
+     "Amberwood",
+     "Cashmere"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://eg.myperfumes.ae/products/murano-crystal-edp",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
   }
  ]
 }
