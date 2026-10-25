@@ -101,7 +101,16 @@ window.BAGDA_EXTRAS={
     "ibraheem-al-qurashi-dominic-tobacco":{payLink:"https://pag.getnet.com.br/t0_Fv_0gq"},
     "ibraheem-al-qurashi-jamaican-tobacco":{payLink:"https://pag.getnet.com.br/jVFWNnsYI"},
     "ibraheem-al-qurashi-mexican-tobacco":{payLink:"https://pag.getnet.com.br/Gz8wIKSfZ"},
-    "ibraheem-al-qurashi-balas-rose":{payLink:"https://pag.getnet.com.br/rY8mxWP3a"}
+    "ibraheem-al-qurashi-balas-rose":{payLink:"https://pag.getnet.com.br/rY8mxWP3a"},
+    /* MPF novo 25/10 — cole o link Getnet R$ 99,99 em payLink */
+    "mpf-poudre":{payLink:""},
+    "mpf-dark-scudo":{payLink:""},
+    "mpf-highway-parfum":{payLink:""},
+    "mpf-vanilla-tobacco":{payLink:""},
+    "mpf-wicked-elixir":{payLink:""},
+    "mpf-wicked-legend":{payLink:""},
+    "mpf-wicked-noir":{payLink:""},
+    "mpf-murano-crystal":{payLink:""}
   },
 
   /* Decants 10 ml. Enquanto a lista estiver vazia a seção aparece como "Em breve".
