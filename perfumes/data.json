@@ -6401,12 +6401,12 @@
    "shopPrice": 99.99,
    "price": 99.99,
    "priceLabel": "R$ 99,99",
-   "photo": "assets/img/mpf-wicked-elixir.webp",
-   "photoSource": "placeholder (sem foto oficial encontrada)",
+   "photo": "assets/img/mpf-wicked-elixir-v2.webp",
+   "photoSource": "https://http2.mlstatic.com/D_NQ_NP_2X_866847-MLB114673529041_072026-F-perfume-wicked-elixir-edp-100ml-unissex.webp (Mercado Livre MLBU4347190378, escolhida por MB)",
    "family": null,
    "familySource": null,
    "familyGroup": null,
-   "gender": "Masculino",
+   "gender": "Unissex",
    "notes": {
     "top": [
      "Lavanda",
