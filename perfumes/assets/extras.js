@@ -39,7 +39,7 @@ window.BAGDA_EXTRAS={
     "mpf-strength-in-amber":{payLink:"https://pag.getnet.com.br/fC_PeJHvv"},
     "mpf-wild-deep":{payLink:"https://pag.getnet.com.br/KLtp0kV71"},
     "mpf-scudo-electrique":{payLink:"https://pag.getnet.com.br/JbCi0Jrt4"},
-    "mpf-wicked":{payLink:"https://pag.getnet.com.br/Hf5QlKxgN"},
+    "mpf-wicked":{payLink:"" /* oculto 25/10: link antigo cobra R$ 100 -> restaurar/substituir: https://pag.getnet.com.br/Hf5QlKxgN */},
     "mpf-black-morgan":{payLink:"https://pag.getnet.com.br/p56qZCKS_"},
     "mpf-europa-very-red":{payLink:"https://pag.getnet.com.br/yf2jNH39H"},
     "mpf-his-dynasty":{payLink:"https://pag.getnet.com.br/X8RCdPi9l"},
