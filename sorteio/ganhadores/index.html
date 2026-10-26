@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><style>#b[hidden],#s[hidden]{display:none!important}</style>
+<head><style>#b[hidden],#s[hidden],#ctl[hidden],#rst[hidden]{display:none!important}</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
@@ -16,7 +16,7 @@
 .sw h1{font-family:var(--serif);font-size:clamp(34px,6vw,58px);line-height:1.1;margin:12px 0 14px}
 .sw .lead{max-width:46ch;margin:0 auto;font-size:18px;opacity:.88}
 .stage{max-width:640px;margin:34px auto 22px;border:1px solid rgba(212,175,95,.45);border-radius:var(--r);padding:30px 14px;min-height:118px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:clamp(28px,6vw,44px);color:var(--gold,#d4af5f);background:rgba(255,255,255,.03)}
-#b{font-size:17px;padding:15px 52px}#b:disabled{opacity:.45;cursor:default}
+#ctl{margin:14px auto 8px;max-width:640px}#b{display:block;width:100%;max-width:420px;margin:0 auto;font-size:26px;font-weight:700;letter-spacing:.12em;padding:22px 20px;border-radius:14px;background:linear-gradient(180deg,#f3d58a,#d4af5f 55%,#a8822f);color:#0b0907;border:0;box-shadow:0 6px 24px rgba(212,175,95,.45)}#ctl .stage{margin:16px auto 6px;min-height:90px;padding:18px 12px}#rst{font-size:13px;opacity:.6;margin:8px 0 0}@media(max-width:600px){.sw{padding-top:96px}}#b:disabled{opacity:.45;cursor:default}
 ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-size:22px}ol#w li{margin:8px 0;color:var(--gold,#d4af5f)}
 .parts{padding:20px 0 80px;text-align:center}.parts h2{font-family:var(--serif);font-size:28px;margin:0 0 18px}
 #list{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0;list-style:none;max-width:900px;margin:0 auto}
@@ -40,14 +40,17 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
 <section class="sw">
   <div class="wrap">
     <span class="kicker">Sorteio Semanal · BAGDA PERFUMES</span>
+    <div id="ctl" hidden>
+      <button class="btn gold" id="b" type="button" hidden>SORTEAR</button>
+      <div class="stage" id="s" hidden>✦</div>
+      <ol id="w"></ol>
+    </div>
+    <p id="rst" hidden>Acesso restrito</p>
     <h1>Sorteio <em class="gold-text">Semanal</em></h1>
     <p class="lead">3 ganhadores, cada um leva 1 perfume.</p>
     <p class="lead" id="rd" style="margin-top:6px;font-weight:600"></p>
     <p style="margin-top:12px"><a href="https://www.instagram.com/bagda.perfumes/p/Dej1lMOllau/" target="_blank" rel="noopener" style="color:var(--gold)">Ver o post no Instagram →</a></p>
     <p style="font-size:14px;opacity:.75;margin-top:6px">1º Marwa · 2º Fahad Regal · 3º Bahiya Garnet</p>
-    <div class="stage" id="s" hidden>✦</div>
-    <button class="btn gold" id="b" type="button" hidden>Sortear</button>
-    <ol id="w"></ol>
   </div>
 </section>
 <section class="parts">
@@ -75,7 +78,14 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
     <div class="legal"><span>© 2026 BAGDA PERFUMES</span></div>
   </div>
 </footer>
-<script>(async()=>{try{const k=new URLSearchParams(location.search).get('k');if(!k)return;const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(k));const h=[...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('');if(h==='a67708b898172bdca2fc0b675f56c5e61569e8e73bfb3d9642ee0c9ea83074af'){document.getElementById('b').hidden=false;document.getElementById('s').hidden=false;}}catch(e){}})();</script>
+<script>(async()=>{const H='a67708b898172bdca2fc0b675f56c5e61569e8e73bfb3d9642ee0c9ea83074af';
+const raw=[new URLSearchParams(location.search).get('k'),new URLSearchParams(location.hash.replace(/^#/,'')).get('k')];
+const norm=v=>{let x=String(v||'');for(let n=0;n<3;n++){try{const y=decodeURIComponent(x.replace(/\+/g,' '));if(y===x)break;x=y}catch(e){break}}return x.trim().replace(/[\s\/.,;:!?'")\]}>]+$/,'').replace(/^[\s'"(<]+/,'').trim()};
+const sha=async v=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+let ok=false;try{for(const r of raw){if(r==null)continue;const c=norm(r);if(c&&await sha(c)===H){ok=true;break}}}catch(e){}
+const g=i=>document.getElementById(i);
+if(ok){g('ctl').hidden=false;g('b').hidden=false;g('s').hidden=false;try{const q=new URLSearchParams(location.search);q.delete('k');const qs=q.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:''))}catch(e){}}
+else{g('rst').hidden=false}})();</script>
 <script>
 const RESULT_DATE='Inscrições até domingo, 25/10, às 23:59. Resultado: segunda-feira, 26/10.'; // edite aqui a data do resultado
 const PRIZES=['Marwa','Fahad Regal','Bahiya Garnet'];
