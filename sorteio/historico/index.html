@@ -1,0 +1,30 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Histórico de Sorteios – Bagda Perfumes</title>
+<meta name="description" content="Histórico de sorteios e ganhadores da Bagda Perfumes.">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,'Times New Roman',serif;color:#fbe9c8;background:radial-gradient(ellipse at 50% 0,#c9822f 0,#7a3f12 45%,#2a1205 100%) fixed;min-height:100vh}
+.c{max-width:480px;margin:auto;padding:22px 16px 40px;text-align:center}
+.brand{letter-spacing:.18em;font-weight:700;color:#f3c977;font-size:15px;border-bottom:1px solid #f3c97766;padding-bottom:10px;margin:0}
+h1{margin:16px 0 6px;font-size:clamp(30px,9vw,44px);line-height:1.05;letter-spacing:.03em;background:linear-gradient(180deg,#fff3cf,#f5c35a 55%,#c98a2a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin:4px 0 18px;color:#fde7bd}
+.card{background:#1d0d04e6;border:1px solid #f3c97788;border-radius:16px;padding:16px;margin:0 0 18px;text-align:left;box-shadow:0 8px 30px #0006}
+.card h2{margin:0 0 4px;color:#fff3cf;font-size:22px}
+.meta{font-family:system-ui,sans-serif;font-size:13px;color:#f7dca4;margin:0 0 12px}
+.w{display:flex;gap:12px;align-items:center;background:linear-gradient(#1a0c04,#3a1d08);border:1px solid #f3c97755;border-radius:12px;padding:8px;margin:8px 0}
+.w img{width:70px;height:70px;object-fit:contain;flex:none}
+.pos{font-size:26px;font-weight:700;color:#f5c35a;min-width:38px;text-align:center}
+.w b{display:block;color:#fff3cf;font-family:system-ui,sans-serif;font-size:16px;word-break:break-all}
+.w span{font-size:13px;color:#f7dca4}
+a{color:#ffe08a;font-weight:700}.ft{font-family:system-ui,sans-serif;font-size:14px}
+</style></head><body><main class="c">
+<p class="brand">BAGDA PERFUMES</p>
+<h1>HISTÓRICO DE SORTEIOS</h1>
+<p class="sub">Todos os ganhadores dos nossos sorteios. Parabéns! 🎉</p>
+<div id="list"><p>Carregando…</p></div>
+<p class="ft"><a href="/sorteio/">Participe do próximo sorteio</a> · <a href="https://instagram.com/bagda.perfumes">@bagda.perfumes</a></p>
+</main>
+<script>
+fetch('history.json?cb='+Date.now()).then(r=>r.json()).then(d=>{
+ const e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ document.getElementById('list').innerHTML=d.slice().reverse().map(s=>`<section class="card"><h2>${e(s.titulo)}</h2><p class="meta">Inscrições encerradas: ${e(s.encerramento)} · Resultado: ${e(s.resultado)}</p>${s.ganhadores.map(g=>`<div class="w"><div class="pos">${g.pos}º</div><img src="${e(g.img)}" alt="${e(g.premio)}" loading="lazy"><div><b>${e(g.handle)}</b><span>${e(g.premio)}</span></div></div>`).join('')}</section>`).join('');
+}).catch(()=>{document.getElementById('list').innerHTML='<p>Não foi possível carregar o histórico.</p>'});
+</script></body></html>
