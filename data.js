@@ -284,7 +284,7 @@ const PAY_LINKS = {
   "cabo-usb-c-lightning-usb-1m": "https://pag.getnet.com.br/TKvfwldcg",
   "cabo-usb-c-lightning-usb-1-5m": "https://pag.getnet.com.br/J0hkTcz-K",
   "iphone-pocket-80-cm": "https://pag.getnet.com.br/n3ohEqyvq",
-  "iphone-pocket-40-cm": "https://pag.getnet.com.br/jCq3587s1",
+  "iphone-pocket-40-cm": "https://pag.getnet.com.br/vot-tki2H",
   "logitech-mk220-teclado-mouse-sem-fio": "https://pag.getnet.com.br/_GNWjtnut",
   "logitech-mk235-ii-teclado-mouse-sem-fio": "https://pag.getnet.com.br/nBU-mb0qg",
   "logitech-mk250-teclado-mouse-sem-fio": "https://pag.getnet.com.br/GGw_nqARQ",
