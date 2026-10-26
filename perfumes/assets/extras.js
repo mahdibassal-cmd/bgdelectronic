@@ -39,7 +39,7 @@ window.BAGDA_EXTRAS={
     "mpf-strength-in-amber":{payLink:"https://pag.getnet.com.br/fC_PeJHvv"},
     "mpf-wild-deep":{payLink:"https://pag.getnet.com.br/KLtp0kV71"},
     "mpf-scudo-electrique":{payLink:"https://pag.getnet.com.br/JbCi0Jrt4"},
-    "mpf-wicked":{payLink:"" /* oculto 25/10: link antigo cobra R$ 100 -> restaurar/substituir: https://pag.getnet.com.br/Hf5QlKxgN */},
+    "mpf-wicked":{payLink:"https://pag.getnet.com.br/t1Px1KRpQ"},
     "mpf-black-morgan":{payLink:"https://pag.getnet.com.br/p56qZCKS_"},
     "mpf-europa-very-red":{payLink:"https://pag.getnet.com.br/yf2jNH39H"},
     "mpf-his-dynasty":{payLink:"https://pag.getnet.com.br/X8RCdPi9l"},
@@ -103,14 +103,14 @@ window.BAGDA_EXTRAS={
     "ibraheem-al-qurashi-mexican-tobacco":{payLink:"https://pag.getnet.com.br/Gz8wIKSfZ"},
     "ibraheem-al-qurashi-balas-rose":{payLink:"https://pag.getnet.com.br/rY8mxWP3a"},
     /* MPF novo 25/10 — cole o link Getnet R$ 99,99 em payLink */
-    "mpf-poudre":{payLink:""},
-    "mpf-dark-scudo":{payLink:""},
-    "mpf-highway-parfum":{payLink:""},
-    "mpf-vanilla-tobacco":{payLink:""},
-    "mpf-wicked-elixir":{payLink:""},
-    "mpf-wicked-legend":{payLink:""},
-    "mpf-wicked-noir":{payLink:""},
-    "mpf-murano-crystal":{payLink:""}
+    "mpf-poudre":{payLink:"https://pag.getnet.com.br/SMA90Eiqp"},
+    "mpf-dark-scudo":{payLink:"https://pag.getnet.com.br/hc9eu148n"},
+    "mpf-highway-parfum":{payLink:"https://pag.getnet.com.br/nwJrF1wl6"},
+    "mpf-vanilla-tobacco":{payLink:"https://pag.getnet.com.br/TLXqkkAT4"},
+    "mpf-wicked-elixir":{payLink:"https://pag.getnet.com.br/SK5DqABA3"},
+    "mpf-wicked-legend":{payLink:"https://pag.getnet.com.br/Aqrd1HzT0"},
+    "mpf-wicked-noir":{payLink:"https://pag.getnet.com.br/dj6xRCSbT"},
+    "mpf-murano-crystal":{payLink:"https://pag.getnet.com.br/6a1GSUBh6"}
   },
 
   /* Decants 10 ml. Enquanto a lista estiver vazia a seção aparece como "Em breve".
