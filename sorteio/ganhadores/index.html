@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><style>#b[hidden],#s[hidden],#ctl[hidden],#rst[hidden]{display:none!important}</style>
+<head><style>#b[hidden],#s[hidden],#ctl[hidden],#rst[hidden],#list[hidden],#lt[hidden]{display:none!important}</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
@@ -58,7 +58,8 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
     <span class="kicker">Lista oficial</span>
     <h2>Participantes</h2>
     <p id="tot" style="margin:-8px 0 16px;opacity:.8">+4.000 participações</p>
-    <ul id="list"></ul>
+    <p id="lt" hidden><button type="button" id="tg" aria-expanded="false" style="background:none;border:1px solid rgba(212,175,95,.5);border-radius:999px;padding:6px 16px;font-size:14px;color:inherit;cursor:pointer">ver lista</button></p>
+    <ul id="list" hidden></ul>
   </div>
 </section>
 </main>
@@ -84,7 +85,7 @@ const norm=v=>{let x=String(v||'');for(let n=0;n<3;n++){try{const y=decodeURICom
 const sha=async v=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)))].map(x=>x.toString(16).padStart(2,'0')).join('');
 let ok=false;try{for(const r of raw){if(r==null)continue;const c=norm(r);if(c&&await sha(c)===H){ok=true;break}}}catch(e){}
 const g=i=>document.getElementById(i);
-if(ok){g('ctl').hidden=false;g('b').hidden=false;g('s').hidden=false;try{const q=new URLSearchParams(location.search);q.delete('k');const qs=q.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:''))}catch(e){}}
+if(ok){window.UNL=true;if(window.buildList)window.buildList();g('ctl').hidden=false;g('b').hidden=false;g('s').hidden=false;try{const q=new URLSearchParams(location.search);q.delete('k');const qs=q.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:''))}catch(e){}}
 else{g('rst').hidden=false}})();</script>
 <script>
 const RESULT_DATE='Inscrições até domingo, 25/10, às 23:59. Resultado: segunda-feira, 26/10.'; // edite aqui a data do resultado
@@ -93,8 +94,10 @@ let ppl=[],wins=0,won=new Set();const $=i=>document.getElementById(i);$('rd').te
 fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const m=new Map();d.forEach(x=>{const h=String(x.handle||'').trim().replace(/^@/,'').toLowerCase();const e=Math.max(1,x.entries|0);if(!h)return;m.set(h,(m.get(h)||0)+e)});ppl=[...m].map(([h,e])=>({h:'@'+h,e}));init()}).catch(init);
 function left(){return ppl.map((p,i)=>i).filter(i=>!won.has(i))}
 function pick(){const L=left(),T=L.reduce((s,i)=>s+ppl[i].e,0);let r=crypto.getRandomValues(new Uint32Array(1))[0]%T;for(const i of L){if((r-=ppl[i].e)<0)return i}}
-function init(){ppl.forEach((p,i)=>{const li=document.createElement('li');li.textContent=p.h+' · '+p.e+(p.e>1?' participações':' participação');li.id='p'+i;$('list').appendChild(li)});if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
-$('b').onclick=()=>{const L=left();if(!L.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=ppl[L[Math.random()*L.length|0]].h;if(Date.now()>end){clearInterval(t);const i=pick();won.add(i);const pr=PRIZES[wins];wins++;$('s').textContent='🏆 '+ppl[i].h+' — '+pr;const li=document.createElement('li');li.textContent=wins+'º — '+ppl[i].h+' · '+pr;$('w').appendChild(li);$('p'+i).classList.add('win');$('b').disabled=wins>=3||!left().length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
+let built=false,ready=false;function init(){ready=true;if(window.UNL)buildList();if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
+window.buildList=function(){if(built||!ready)return;built=true;$('lt').hidden=false;ppl.forEach((p,i)=>{const li=document.createElement('li');li.textContent=p.h+' · '+p.e+(p.e>1?' participações':' participação');li.id='p'+i;$('list').appendChild(li)})};
+$('tg').onclick=()=>{const l=$('list'),o=l.hidden;l.hidden=!o;$('tg').textContent=o?'fechar lista':'ver lista';$('tg').setAttribute('aria-expanded',o)};
+$('b').onclick=()=>{const L=left();if(!L.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=ppl[L[Math.random()*L.length|0]].h;if(Date.now()>end){clearInterval(t);const i=pick();won.add(i);const pr=PRIZES[wins];wins++;$('s').textContent='🏆 '+ppl[i].h+' — '+pr;const li=document.createElement('li');li.textContent=wins+'º — '+ppl[i].h+' · '+pr;$('w').appendChild(li);const pe=$('p'+i);if(pe)pe.classList.add('win');$('b').disabled=wins>=3||!left().length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
 </script>
 </body>
 </html>
