@@ -56,8 +56,8 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
 <section class="parts">
   <div class="wrap">
     <span class="kicker">Lista oficial</span>
-    <h2>Participantes (<span id="n">0</span>)</h2>
-    <p id="tot" style="margin:-8px 0 16px;opacity:.8"></p>
+    <h2>Participantes</h2>
+    <p id="tot" style="margin:-8px 0 16px;opacity:.8">+4.000 participações</p>
     <ul id="list"></ul>
   </div>
 </section>
@@ -93,7 +93,7 @@ let ppl=[],wins=0,won=new Set();const $=i=>document.getElementById(i);$('rd').te
 fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const m=new Map();d.forEach(x=>{const h=String(x.handle||'').trim().replace(/^@/,'').toLowerCase();const e=Math.max(1,x.entries|0);if(!h)return;m.set(h,(m.get(h)||0)+e)});ppl=[...m].map(([h,e])=>({h:'@'+h,e}));init()}).catch(init);
 function left(){return ppl.map((p,i)=>i).filter(i=>!won.has(i))}
 function pick(){const L=left(),T=L.reduce((s,i)=>s+ppl[i].e,0);let r=crypto.getRandomValues(new Uint32Array(1))[0]%T;for(const i of L){if((r-=ppl[i].e)<0)return i}}
-function init(){$('n').textContent=ppl.length;$('tot').textContent=ppl.length+' pessoas · '+ppl.reduce((s,p)=>s+p.e,0)+' participações';ppl.forEach((p,i)=>{const li=document.createElement('li');li.textContent=p.h+' · '+p.e+(p.e>1?' participações':' participação');li.id='p'+i;$('list').appendChild(li)});if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
+function init(){ppl.forEach((p,i)=>{const li=document.createElement('li');li.textContent=p.h+' · '+p.e+(p.e>1?' participações':' participação');li.id='p'+i;$('list').appendChild(li)});if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
 $('b').onclick=()=>{const L=left();if(!L.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=ppl[L[Math.random()*L.length|0]].h;if(Date.now()>end){clearInterval(t);const i=pick();won.add(i);const pr=PRIZES[wins];wins++;$('s').textContent='🏆 '+ppl[i].h+' — '+pr;const li=document.createElement('li');li.textContent=wins+'º — '+ppl[i].h+' · '+pr;$('w').appendChild(li);$('p'+i).classList.add('win');$('b').disabled=wins>=3||!left().length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
 </script>
 </body>
