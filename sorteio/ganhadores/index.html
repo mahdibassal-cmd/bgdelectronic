@@ -83,15 +83,17 @@ ol#w{list-style:none;padding:0;margin:22px 0 0;font-family:var(--serif);font-siz
 const raw=[new URLSearchParams(location.search).get('k'),new URLSearchParams(location.hash.replace(/^#/,'')).get('k')];
 const norm=v=>{let x=String(v||'');for(let n=0;n<3;n++){try{const y=decodeURIComponent(x.replace(/\+/g,' '));if(y===x)break;x=y}catch(e){break}}return x.trim().replace(/[\s\/.,;:!?'")\]}>]+$/,'').replace(/^[\s'"(<]+/,'').trim()};
 const sha=async v=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)))].map(x=>x.toString(16).padStart(2,'0')).join('');
-let ok=false;try{for(const r of raw){if(r==null)continue;const c=norm(r);if(c&&await sha(c)===H){ok=true;break}}}catch(e){}
+let ok=false,kc='';try{for(const r of raw){if(r==null)continue;const c=norm(r);if(c&&await sha(c)===H){ok=true;kc=c;break}}}catch(e){}
 const g=i=>document.getElementById(i);
-if(ok){window.UNL=true;if(window.buildList)window.buildList();g('ctl').hidden=false;g('b').hidden=false;g('s').hidden=false;try{const q=new URLSearchParams(location.search);q.delete('k');const qs=q.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:''))}catch(e){}}
+if(ok){window.UNL=true;window.UNK=kc;if(window.loadNames)window.loadNames(kc);g('ctl').hidden=false;g('b').hidden=false;g('s').hidden=false;try{const q=new URLSearchParams(location.search);q.delete('k');const qs=q.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:''))}catch(e){}}
 else{g('rst').hidden=false}})();</script>
 <script>
 const RESULT_DATE='Inscrições até domingo, 25/10, às 23:59. Resultado: segunda-feira, 26/10.'; // edite aqui a data do resultado
 const PRIZES=['Marwa','Fahad Regal','Bahiya Garnet'];
 let ppl=[],wins=0,won=new Set();const $=i=>document.getElementById(i);$('rd').textContent=RESULT_DATE;
-fetch('names.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{const m=new Map();d.forEach(x=>{const h=String(x.handle||'').trim().replace(/^@/,'').toLowerCase();const e=Math.max(1,x.entries|0);if(!h)return;m.set(h,(m.get(h)||0)+e)});ppl=[...m].map(([h,e])=>({h:'@'+h,e}));init()}).catch(init);
+const b64=v=>Uint8Array.from(atob(v),c=>c.charCodeAt(0));let loading=false;
+window.loadNames=async code=>{if(loading||!code)return;loading=true;try{const e=await (await fetch('names.enc.json?v='+Date.now(),{cache:'no-store'})).json();const te=new TextEncoder();const km=await crypto.subtle.importKey('raw',te.encode(code),'PBKDF2',false,['deriveKey']);const k=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64(e.salt),iterations:e.iter},km,{name:'AES-GCM',length:256},false,['decrypt']);const d=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},k,b64(e.ct))));const m=new Map();d.forEach(x=>{const h=String(x.handle||'').trim().replace(/^@/,'').toLowerCase();const n=Math.max(1,x.entries|0);if(!h)return;m.set(h,(m.get(h)||0)+n)});ppl=[...m].map(([h,n])=>({h:'@'+h,e:n}))}catch(err){ppl=[]}init()};
+if(window.UNK)window.loadNames(window.UNK);
 function left(){return ppl.map((p,i)=>i).filter(i=>!won.has(i))}
 function pick(){const L=left(),T=L.reduce((s,i)=>s+ppl[i].e,0);let r=crypto.getRandomValues(new Uint32Array(1))[0]%T;for(const i of L){if((r-=ppl[i].e)<0)return i}}
 let built=false,ready=false;function init(){ready=true;if(window.UNL)buildList();if(!ppl.length){$('s').textContent='Nenhum participante';$('b').disabled=true}}
