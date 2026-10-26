@@ -4,4 +4,3 @@ function buildUrl(nome,tel,ig){let t='Olá! Quero me cadastrar no sorteio da Bag
 f.onsubmit=e=>{e.preventDefault();const nome=f.nome.value.trim(),tel=w.value.trim(),ig=f.instagram.value.trim().replace(/\s/g,''),dig=tel.replace(/\D/g,'');
 if(nome.length<2)return err.textContent='Informe seu nome.';if(dig.length<10||dig.length>11)return err.textContent='Informe um WhatsApp válido com DDD.';if(!document.getElementById('lgpd').checked)return err.textContent='Marque a concordância com a LGPD.';
 err.textContent='';location.href=buildUrl(nome,tel,ig)};
-fetch('stats.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{document.getElementById('np').textContent=d.participantes.toLocaleString('pt-BR');document.getElementById('upd').textContent='(atualizado em '+d.atualizado+')'}).catch(()=>{});
