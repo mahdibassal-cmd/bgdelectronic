@@ -1,0 +1,12 @@
+[
+  {
+    "titulo": "Sorteio Semanal #1",
+    "encerramento": "25/10/2026 23:59",
+    "resultado": "26/10/2026",
+    "ganhadores": [
+      {"pos": 1, "handle": "@muryloooherique", "premio": "Arabiyat Prestige Marwa", "img": "/perfumes/assets/img/arabiyat-prestige-marwa.webp"},
+      {"pos": 2, "handle": "@_miriam_moura_", "premio": "Arabiyat Prestige Fahad Regal", "img": "/perfumes/assets/img/arabiyat-prestige-fahad-regal.webp"},
+      {"pos": 3, "handle": "@omutrecotrucate", "premio": "Arabiyat Prestige Bahiya Garnet", "img": "/perfumes/assets/img/arabiyat-prestige-bahiya-garnet.webp"}
+    ]
+  }
+]
