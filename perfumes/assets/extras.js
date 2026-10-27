@@ -112,18 +112,18 @@ window.BAGDA_EXTRAS={
     "mpf-wicked-noir":{payLink:"https://pag.getnet.com.br/dj6xRCSbT"},
     "mpf-murano-crystal":{payLink:"https://pag.getnet.com.br/6a1GSUBh6"},
     /* Paris Corner + French Avenue novos 27/10 — cole o link Getnet no payLink */
-    "paris-corner-khair-pistachio":{payLink:""},
-    "paris-corner-eshal-vanilla":{payLink:""},
-    "paris-corner-dulzura":{payLink:""},
-    "paris-corner-december-vanilla":{payLink:""},
-    "paris-corner-azm":{payLink:""},
-    "paris-corner-marshmallow-blush":{payLink:""},
-    "french-avenue-azzure-aoud":{payLink:""},
-    "french-avenue-aether-extrait":{payLink:""},
-    "french-avenue-atlantis-extrait":{payLink:""},
-    "french-avenue-vulcan-feu":{payLink:""},
-    "french-avenue-royal-blend":{payLink:""},
-    "french-avenue-spectre-wraith":{payLink:""}
+    "paris-corner-khair-pistachio":{payLink:"https://pag.getnet.com.br/czci3fwH6"},
+    "paris-corner-eshal-vanilla":{payLink:"https://pag.getnet.com.br/mrznWEi08"},
+    "paris-corner-dulzura":{payLink:"https://pag.getnet.com.br/g6fOhcTJU"},
+    "paris-corner-december-vanilla":{payLink:"https://pag.getnet.com.br/pLcgQ-g5a"},
+    "paris-corner-azm":{payLink:"https://pag.getnet.com.br/8H3Wq5pmS"},
+    "paris-corner-marshmallow-blush":{payLink:"https://pag.getnet.com.br/J6LGXgPMl"},
+    "french-avenue-azzure-aoud":{payLink:"https://pag.getnet.com.br/jqEpCaBrV"},
+    "french-avenue-aether-extrait":{payLink:"https://pag.getnet.com.br/x0BcA9OWd"},
+    "french-avenue-atlantis-extrait":{payLink:"https://pag.getnet.com.br/WEpgt5sCX"},
+    "french-avenue-vulcan-feu":{payLink:"https://pag.getnet.com.br/ufSzPFIQR"},
+    "french-avenue-royal-blend":{payLink:"https://pag.getnet.com.br/tnOyf-gqL"},
+    "french-avenue-spectre-wraith":{payLink:"https://pag.getnet.com.br/ws1bdGGzA"}
   },
 
   /* Decants 10 ml. Enquanto a lista estiver vazia a seção aparece como "Em breve".
