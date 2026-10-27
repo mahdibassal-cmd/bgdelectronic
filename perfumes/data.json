@@ -1,9 +1,9 @@
 {
  "meta": {
-  "generated": "2026-10-25",
+  "generated": "2026-10-27",
   "store": "BAGDA PERFUMES",
   "priceRule": "Preço de varejo aprovado (24/10/2026)",
-  "count": 91,
+  "count": 103,
   "disclaimer": "As marcas e nomes de perfumes citados como inspiração olfativa pertencem aos seus respectivos donos e são usados apenas como referência de estilo. Nossos perfumes são fragrâncias originais das casas árabes que representamos — não são réplicas nem falsificações."
  },
  "perfumes": [
@@ -6547,6 +6547,511 @@
    },
    "accords": [],
    "notesSource": "https://eg.myperfumes.ae/products/murano-crystal-edp",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-khair-pistachio",
+   "brand": "Paris Corner",
+   "name": "Khair Pistachio",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 85.0,
+   "price": 85.0,
+   "priceLabel": "R$ 85,00",
+   "photo": "assets/img/paris-corner-khair-pistachio.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/khair-pistachio",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Bergamota",
+     "Gelato de Pistache",
+     "Avelã",
+     "Rum",
+     "Cardamomo"
+    ],
+    "heart": [
+     "Gerânio",
+     "Peônia Branca",
+     "Lírio-do-vale",
+     "Jasmim",
+     "Framboesa",
+     "Pêssego Branco",
+     "Pera"
+    ],
+    "base": [
+     "Chantilly",
+     "Marshmallow",
+     "Algodão-doce",
+     "Manjar Turco",
+     "Cacau",
+     "Cedro",
+     "Sândalo",
+     "Fava Tonka"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/khair-pistachio",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-eshal-vanilla",
+   "brand": "Paris Corner",
+   "name": "Eshal Vanilla",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 185.0,
+   "price": 185.0,
+   "priceLabel": "R$ 185,00",
+   "photo": "assets/img/paris-corner-eshal-vanilla.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/eshal-vanilla",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Feminino",
+   "notes": {
+    "top": [
+     "Açúcar"
+    ],
+    "heart": [
+     "Jasmim",
+     "Rosa"
+    ],
+    "base": [
+     "Baunilha",
+     "Caramelo",
+     "Almíscar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/eshal-vanilla",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-dulzura",
+   "brand": "Paris Corner",
+   "name": "Dulzura",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 135.0,
+   "price": 135.0,
+   "priceLabel": "R$ 135,00",
+   "photo": "assets/img/paris-corner-dulzura.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/dulzura",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Pimenta-preta",
+     "Leitelho"
+    ],
+    "heart": [
+     "Bolo",
+     "Baunilha",
+     "Creme"
+    ],
+    "base": [
+     "Âmbar",
+     "Almíscar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/dulzura",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-december-vanilla",
+   "brand": "Paris Corner",
+   "name": "December Vanilla",
+   "size": "80 ml",
+   "ml": 80,
+   "soldOut": false,
+   "shopPrice": 100.0,
+   "price": 100.0,
+   "priceLabel": "R$ 100,00",
+   "photo": "assets/img/paris-corner-december-vanilla.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/december-vanilla",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Rum",
+     "Orquídea de Baunilha",
+     "Jasmim"
+    ],
+    "heart": [
+     "Baunilha",
+     "Crème Brûlée",
+     "Especiarias",
+     "Couro",
+     "Fava Tonka",
+     "Rosa"
+    ],
+    "base": [
+     "Patchouli",
+     "Açúcar Mascavo",
+     "Oud",
+     "Açúcar",
+     "Âmbar",
+     "Almíscar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/december-vanilla",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-azm",
+   "brand": "Paris Corner",
+   "name": "AZM",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 185.0,
+   "price": 185.0,
+   "priceLabel": "R$ 185,00",
+   "photo": "assets/img/paris-corner-azm.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/azm",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Pera",
+     "Pêssego",
+     "Tangerina",
+     "Rum"
+    ],
+    "heart": [
+     "Jasmim",
+     "Tuberosa"
+    ],
+    "base": [
+     "Baunilha",
+     "Sândalo",
+     "Vetiver",
+     "Almíscar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/azm",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "paris-corner-marshmallow-blush",
+   "brand": "Paris Corner",
+   "name": "Marshmallow Blush",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 200.0,
+   "price": 200.0,
+   "priceLabel": "R$ 200,00",
+   "photo": "assets/img/paris-corner-marshmallow-blush.webp",
+   "photoSource": "https://www.pariscornerperfumes.com/products/marshmallow-blush",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Feminino",
+   "notes": {
+    "top": [
+     "Morango",
+     "Framboesa",
+     "Limão"
+    ],
+    "heart": [
+     "Ambroxan",
+     "Flor de Laranjeira",
+     "Chantilly"
+    ],
+    "base": [
+     "Almíscar",
+     "Marshmallow",
+     "Baunilha"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://www.pariscornerperfumes.com/products/marshmallow-blush",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-azzure-aoud",
+   "brand": "French Avenue",
+   "name": "Azzure Aoud",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 175.0,
+   "price": 175.0,
+   "priceLabel": "R$ 175,00",
+   "photo": "assets/img/french-avenue-azzure-aoud.webp",
+   "photoSource": "https://frenchavenue.com/products/azzure-aoud",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Maracujá",
+     "Notas Frutadas",
+     "Rosa Turca",
+     "Açafrão"
+    ],
+    "heart": [
+     "Oud",
+     "Folha de Patchouli",
+     "Benjoim"
+    ],
+    "base": [
+     "Couro",
+     "Akigalawood",
+     "Âmbar",
+     "Láudano",
+     "Baunilha"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/azzure-aoud",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-aether-extrait",
+   "brand": "French Avenue",
+   "name": "Aether Extrait",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 195.0,
+   "price": 195.0,
+   "priceLabel": "R$ 195,00",
+   "photo": "assets/img/french-avenue-aether-extrait.webp",
+   "photoSource": "https://frenchavenue.com/products/aether",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Maçã Verde",
+     "Bergamota",
+     "Tangerina"
+    ],
+    "heart": [
+     "Petitgrain",
+     "Cashmeran",
+     "Cedro",
+     "Violeta"
+    ],
+    "base": [
+     "Musgo de Carvalho",
+     "Almíscar",
+     "Amberwood"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/aether",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-atlantis-extrait",
+   "brand": "French Avenue",
+   "name": "Atlantis Extrait",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 245.0,
+   "price": 245.0,
+   "priceLabel": "R$ 245,00",
+   "photo": "assets/img/french-avenue-atlantis-extrait.webp",
+   "photoSource": "https://frenchavenue.com/products/atlantis-extrait",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Feminino",
+   "notes": {
+    "top": [
+     "Laranja",
+     "Melancia"
+    ],
+    "heart": [
+     "Coco",
+     "Flores Brancas"
+    ],
+    "base": [
+     "Baunilha",
+     "Cacau"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/atlantis-extrait",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-vulcan-feu",
+   "brand": "French Avenue",
+   "name": "Vulcan Feu",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 255.0,
+   "price": 255.0,
+   "priceLabel": "R$ 255,00",
+   "photo": "assets/img/french-avenue-vulcan-feu.webp",
+   "photoSource": "https://frenchavenue.com/products/vulcan-feu",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": "Unissex",
+   "notes": {
+    "top": [
+     "Gengibre",
+     "Manga",
+     "Limão",
+     "Ruibarbo"
+    ],
+    "heart": [
+     "Jasmim",
+     "Violeta",
+     "Pralinê",
+     "Pimenta-rosa"
+    ],
+    "base": [
+     "Cedro",
+     "Âmbar Cinza",
+     "Fava Tonka",
+     "Musgo"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/vulcan-feu",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-royal-blend",
+   "brand": "French Avenue",
+   "name": "Royal Blend",
+   "size": "100 ml",
+   "ml": 100,
+   "soldOut": false,
+   "shopPrice": 190.0,
+   "price": 190.0,
+   "priceLabel": "R$ 190,00",
+   "photo": "assets/img/french-avenue-royal-blend.webp",
+   "photoSource": "https://frenchavenue.com/products/royal-blend",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Conhaque"
+    ],
+    "heart": [
+     "Canela",
+     "Fava Tonka",
+     "Carvalho"
+    ],
+    "base": [
+     "Pralinê",
+     "Baunilha",
+     "Sândalo"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/royal-blend",
+   "inspiredBy": null,
+   "originalCreation": false,
+   "inspiredSources": [],
+   "inspiredNote": null,
+   "new": true
+  },
+  {
+   "id": "french-avenue-spectre-wraith",
+   "brand": "French Avenue",
+   "name": "Spectre Wraith",
+   "size": "80 ml",
+   "ml": 80,
+   "soldOut": false,
+   "shopPrice": 185.0,
+   "price": 185.0,
+   "priceLabel": "R$ 185,00",
+   "photo": "assets/img/french-avenue-spectre-wraith.webp",
+   "photoSource": "https://frenchavenue.com/products/spectre-wraith",
+   "family": null,
+   "familySource": null,
+   "familyGroup": null,
+   "gender": null,
+   "notes": {
+    "top": [
+     "Rum",
+     "Especiarias"
+    ],
+    "heart": [
+     "Café",
+     "Vetiver",
+     "Patchouli",
+     "Sândalo"
+    ],
+    "base": [
+     "Cana-de-açúcar"
+    ]
+   },
+   "accords": [],
+   "notesSource": "https://frenchavenue.com/products/spectre-wraith",
    "inspiredBy": null,
    "originalCreation": false,
    "inspiredSources": [],
