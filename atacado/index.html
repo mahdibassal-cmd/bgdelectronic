@@ -148,7 +148,7 @@ async function unlock(code){
  var k=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64(e.salt),iterations:e.iter},km,{name:'AES-GCM',length:256},false,['decrypt']);
  var j=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},k,b64(e.ct))));
  document.getElementById('ger').textContent=j.gerado;
- document.getElementById('grid').innerHTML=j.items.map(function(i){return '<div class="it"><img loading="lazy" src="'+esc(i.img)+'" alt=""><div><span class="b">'+esc(i.b)+'</span><br>'+esc(i.n)+(i.s?' · '+esc(i.s):'')+'<br><span class="a">'+esc(i.a)+'</span><br><span class="v">Varejo '+esc(i.v)+'</span></div></div>'}).join('');
+ var cd=function(i){return '<div class="it"><img loading="lazy" src="'+esc(i.img)+'" alt=""><div><span class="b">'+esc(i.b)+'</span><br>'+esc(i.n)+(i.s?' · '+esc(i.s):'')+'<br><span class="a">'+esc(i.a)+'</span><br><span class="v">Varejo '+esc(i.v)+'</span></div></div>'}).join('');
  document.getElementById('lock').hidden=true;document.getElementById('lista').hidden=false;try{sessionStorage.setItem('atc',code)}catch(_){}
 }
 document.getElementById('uf').addEventListener('submit',function(e){e.preventDefault();unlock(document.getElementById('code').value.trim()).catch(function(){document.getElementById('cerr').hidden=false})});
