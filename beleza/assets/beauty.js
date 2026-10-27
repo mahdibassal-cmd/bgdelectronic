@@ -23,8 +23,26 @@ window.BAGDA_BEAUTY = [
     getnet: "https://pag.getnet.com.br/5RnCiqv4z" },
   { name: "Celimax Retinal Shot Tightening Booster 15 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
     desc: "Booster com Retinal 0,1%, Pantenol 1% e Matrixyl 3000 3% para uma pele mais firme.",
-    img: "celimax-retinal-shot", price: "R$ 99,99", novo: true,
-    getnet: "https://pag.getnet.com.br/9_fhJVYkr" }
+    img: "celimax-retinal-shot", price: "R$ 89,99", novo: true, wkey: "Celimax Retinal Shot",
+    getnet: "" /* link antigo R$ 99,99 removido 27/10 — criar novo link R$ 89,99 */ },
+  { name: "Celimax Retinol Shot Tightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Sérum com retinol para firmeza e textura da pele. Produto diferente do Retinal Shot.",
+    img: "celimax-retinol-shot", price: "R$ 89,99", novo: true, wkey: "Celimax Retinol Shot Serum" },
+  { name: "Celimax Dual Barrier Skin Wearable Cream 50 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Creme hidratante com 5 ceramidas e ácido hialurônico para fortalecer a barreira da pele seca e sensível.",
+    img: "celimax-dual-barrier-cream", price: "R$ 89,99", novo: true, wkey: "Celimax Dual Barrier Cream" },
+  { name: "Celimax Pore + Dark Spot Brightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Sérum clareador com niacinamida e ácido tranexâmico para manchas e poros.",
+    img: "celimax-pore-dark-spot-serum", price: "R$ 99,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum" },
+  { name: "Celimax The Real Noni Energy Ampoule 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Ampola de noni calmante e iluminadora para hidratar e revitalizar a pele.",
+    img: "celimax-noni-ampoule", price: "R$ 89,99", novo: true, wkey: "Celimax Noni Ampoule" },
+  { name: "Celimax Ji Woo Gae Cica BHA Blemish Toner Pad (60 pads)", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Discos tônicos com centella (cica) e BHA para pele oleosa e com imperfeições.",
+    img: "celimax-cica-bha-toner-pad", price: "R$ 89,99", novo: true, wkey: "Celimax Cica BHA Toner Pad" },
+  { name: "Celimax Pore + Dark Spot Brightening Serum Mask 27 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
+    desc: "Máscara facial em folha com o sérum clareador Pore + Dark Spot.",
+    img: "celimax-pore-dark-spot-mask", price: "R$ 29,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask" }
 ];
 (function(){
   var L=window.BAGDA_BEAUTY, IMG='/perfumes/img/beauty/', CATS=['Cabelo','Pele/Skincare','Maquiagem','Corpo'];
