@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /atacado/
+Disallow: /sorteio/ganhadores/
+
+Sitemap: https://bgdstores.com/sitemap.xml
