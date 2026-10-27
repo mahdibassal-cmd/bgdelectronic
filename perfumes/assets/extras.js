@@ -131,10 +131,10 @@ window.BAGDA_EXTRAS={
      (perfumeId puxa nome, marca e foto do catálogo; price em reais) */
   /* Decants Arabiyat Prestige 27/10 (R$ 10,00, sem ml, só varejo; Fahad Gaze/Regal não estão no catálogo de frascos) */
   decants:[
-    {perfumeId:"arabiyat-prestige-bahiya-garnet", price:10.00, available:true},
-    {perfumeId:"arabiyat-prestige-uhud", price:10.00, available:true},
-    {perfumeId:"arabiyat-prestige-marwa", price:10.00, available:true},
-    {brand:"Arabiyat Prestige", name:"Fahad Gaze", photo:"assets/img/arabiyat-prestige-fahad-gaze.webp", price:10.00, available:true},
-    {brand:"Arabiyat Prestige", name:"Fahad Regal", photo:"assets/img/arabiyat-prestige-fahad-regal.webp", price:10.00, available:true}
+    {perfumeId:"arabiyat-prestige-bahiya-garnet", price:10.00, available:true, payLink:"https://pag.getnet.com.br/dS6zzAmP8"},
+    {perfumeId:"arabiyat-prestige-uhud", price:10.00, available:true, payLink:"https://pag.getnet.com.br/dS6zzAmP8"},
+    {perfumeId:"arabiyat-prestige-marwa", price:10.00, available:true, payLink:"https://pag.getnet.com.br/dS6zzAmP8"},
+    {brand:"Arabiyat Prestige", name:"Fahad Gaze", photo:"assets/img/arabiyat-prestige-fahad-gaze.webp", price:10.00, available:true, payLink:"https://pag.getnet.com.br/dS6zzAmP8"},
+    {brand:"Arabiyat Prestige", name:"Fahad Regal", photo:"assets/img/arabiyat-prestige-fahad-regal.webp", price:10.00, available:true, payLink:"https://pag.getnet.com.br/dS6zzAmP8"}
   ]
 };
