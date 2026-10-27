@@ -110,7 +110,20 @@ window.BAGDA_EXTRAS={
     "mpf-wicked-elixir":{payLink:"https://pag.getnet.com.br/SK5DqABA3"},
     "mpf-wicked-legend":{payLink:"https://pag.getnet.com.br/Aqrd1HzT0"},
     "mpf-wicked-noir":{payLink:"https://pag.getnet.com.br/dj6xRCSbT"},
-    "mpf-murano-crystal":{payLink:"https://pag.getnet.com.br/6a1GSUBh6"}
+    "mpf-murano-crystal":{payLink:"https://pag.getnet.com.br/6a1GSUBh6"},
+    /* Paris Corner + French Avenue novos 27/10 — cole o link Getnet no payLink */
+    "paris-corner-khair-pistachio":{payLink:""},
+    "paris-corner-eshal-vanilla":{payLink:""},
+    "paris-corner-dulzura":{payLink:""},
+    "paris-corner-december-vanilla":{payLink:""},
+    "paris-corner-azm":{payLink:""},
+    "paris-corner-marshmallow-blush":{payLink:""},
+    "french-avenue-azzure-aoud":{payLink:""},
+    "french-avenue-aether-extrait":{payLink:""},
+    "french-avenue-atlantis-extrait":{payLink:""},
+    "french-avenue-vulcan-feu":{payLink:""},
+    "french-avenue-royal-blend":{payLink:""},
+    "french-avenue-spectre-wraith":{payLink:""}
   },
 
   /* Decants 10 ml. Enquanto a lista estiver vazia a seção aparece como "Em breve".
