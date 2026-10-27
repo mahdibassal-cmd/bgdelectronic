@@ -363,15 +363,15 @@ function vitrines(){
   var bs=X.bestSellers.map(byId).filter(Boolean);
   $("#bestStrip").innerHTML=bs.map(function(p,i){return card(p,'<span class="rank">'+(i+1)+'</span>','in')}).join("");
   $("#bestWrap").style.display=bs.length?"":"none";
-  var D=X.decants.map(function(d){ var p=byId(d.perfumeId); return p?{d:d,p:p}:null; }).filter(Boolean);
+  var D=X.decants.map(function(d){ var p=byId(d.perfumeId)||(d.name&&d.photo?{brand:d.brand||"",name:d.name,photo:d.photo}:null); return p?{d:d,p:p}:null; }).filter(Boolean);
   var dh;
   if(!D.length){
     dh=[1,2,3,4].map(function(){return '<div class="dcard soon"><span class="vial" aria-hidden="true"></span><b>10 ml</b><small>Em breve</small></div>'}).join("");
   } else {
     dh=D.map(function(o){ var d=o.d,p=o.p, av=d.available!==false&&typeof d.price==="number";
-      var msg=av?"Olá! Quero o decant "+(d.ml||10)+" ml de "+p.brand+" "+p.name+" ("+money(d.price)+"), que vi no site.":"Olá! Quero ser avisado quando o decant de "+p.brand+" "+p.name+" chegar.";
+      var msg=av?(d.ml?"Olá! Quero o decant "+d.ml+" ml de "+p.brand+" "+p.name+" ("+money(d.price)+"), que vi no site.":"Olá! Quero o Decant "+p.name+" ("+money(d.price)+") do site bgdstores.com"):"Olá! Quero ser avisado quando o decant de "+p.brand+" "+p.name+" chegar.";
       var dl=d.payLink||d.mpLink||""; var mp=/^https:\/\//.test(dl)?dl:"";
-      return '<div class="dcard"><img loading="lazy" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker">'+esc(p.brand)+'</span><b>'+esc(p.name)+'</b><small>Decant '+(d.ml||10)+' ml</small>'+
+      return '<div class="dcard"><img loading="lazy" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker">'+esc(p.brand)+'</span><b>'+esc(p.name)+'</b><small>Decant'+(d.ml?' '+d.ml+' ml':'')+'</small>'+
         '<div class="dprice">'+(av?money(d.price):'Em breve')+'</div><a class="btn wa sm" href="https://wa.me/'+WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">'+ICON.wa+(av?'Pedir':'Avise-me')+'</a>'+(av&&mp?'<a class="btn gold sm" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar</a>':'')+'</div>'; }).join("");
   }
   $("#decGrid").innerHTML=dh;
