@@ -50,7 +50,7 @@ window.BAGDA_BEAUTY = [
   var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')};
   function card(p){
     var wa='https://wa.me/5511992873509?text='+encodeURIComponent(p.price?'Olá! Quero comprar o '+p.name+' ('+p.price+')':'Olá! Quero saber o preço do '+p.name);
-    var src=IMG+p.img, v='?v=i3', mp=/^https:\/\//.test(p.getnet||'')?p.getnet:'';
+    var src=IMG+p.img, v='?v=i4', mp=/^https:\/\//.test(p.getnet||'')?p.getnet:'';
     return '<article class="bcard"><div class="bimg"><picture><source srcset="'+src+'.webp'+v+'" type="image/webp"><img src="'+src+'.jpg'+v+'" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
       '<div class="bbody"><span class="bmeta">'+esc(p.brand)+(p.origin?' · '+esc(p.origin):'')+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p>'+
       '<div class="bfoot"><span class="'+(p.price?'price':'bask')+'">'+(p.price?esc(p.price):'Consulte o preço')+'</span>'+
