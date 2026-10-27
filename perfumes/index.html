@@ -15,7 +15,6 @@
 <link rel="stylesheet" href="assets/app.css?v=20261019p1">
 <link rel="stylesheet" href="/cart.css?v=20261019p1">
 <link rel="stylesheet" href="assets/theme.css?v=cr3">
-<link rel="stylesheet" href="assets/beauty.css?v=c2">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Store","name":"BAGDA PERFUMES","address":{"@type":"PostalAddress","streetAddress":"Rua Barão de Ladário, 670 — Mega Polo Brás, Loja 357, 3º andar","addressLocality":"São Paulo","addressRegion":"SP","addressCountry":"BR"},"telephone":"+55 11 99287-3509","openingHours":"Mo-Sa 08:00-17:30","sameAs":["https://www.instagram.com/bagda.perfumes/"]}</script>
 </head>
 <body>
@@ -26,7 +25,6 @@
     <nav class="nav">
       <a class="back" href="/" aria-label="Voltar para a BAGDA STORES">← BAGDA STORES</a>
       <a class="l" href="#catalogo">Catálogo</a>
-      <a class="l" href="#novidades">Novidades</a>
       <a class="l" href="/beleza/">Beleza &amp; Cosméticos</a>
       <a class="l nav-sorteio" href="/sorteio/">🎁 Sorteio</a>
       <a class="l" href="/atacado/">Atacado</a>
@@ -162,17 +160,6 @@
   <div class="scrim" id="scrim"></div>
 </section>
 
-<section class="sec beauty" id="novidades">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="kicker">Novidades</span>
-      <h2>Beleza &amp; <span class="gold-text">Cuidados</span></h2>
-      <p>Cuidados com cabelo e pele que acabaram de chegar à loja. Compre pelo WhatsApp.</p>
-    </div>
-    <div class="bgrid" id="beautyGrid"></div>
-    <p class="bmore"><a href="/beleza/">Ver todos em Beleza &amp; Cosméticos →</a></p>
-  </div>
-</section>
 
 <section class="sec entregas" id="entregas">
   <div class="wrap">
@@ -217,6 +204,26 @@
 </section>
 </main>
 
+<section class="bcta" aria-label="Beleza &amp; Cosméticos">
+  <div class="bcta-in">
+    <span class="bcta-k">Nova seção</span>
+    <h2>DESCUBRA BELEZA &amp; COSMÉTICOS</h2>
+    <p>Skincare coreano Celimax, Fino (Shiseido) e mais — originais, no Brás.</p>
+    <div class="bcta-th"><img src="/perfumes/img/beauty/celimax-retinal-shot.webp?v=c8" alt="" loading="lazy" decoding="async"><img src="/perfumes/img/beauty/celimax-pore-dark-spot-serum.webp?v=c8" alt="" loading="lazy" decoding="async"><img src="/perfumes/img/beauty/celimax-noni-ampoule.webp?v=c8" alt="" loading="lazy" decoding="async"><img src="/perfumes/img/beauty/fino-premium-touch.webp?v=c8" alt="" loading="lazy" decoding="async"></div>
+    <a class="bcta-btn" href="/beleza/">Ir para Beleza &amp; Cosméticos →</a>
+  </div>
+</section>
+<style>
+.bcta{padding:28px 16px 36px}
+.bcta-in{max-width:960px;margin:0 auto;background:linear-gradient(160deg,#141010,#2a1d14);border:1px solid #c9a24a;border-radius:20px;padding:28px 20px;text-align:center;color:#f5ead2;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.bcta-k{display:inline-block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:#e6c46a;border:1px solid #c9a24a;border-radius:999px;padding:4px 12px}
+.bcta h2{margin:14px 0 6px;font-size:clamp(1.45rem,6vw,2.3rem);letter-spacing:.04em;line-height:1.1;background:linear-gradient(135deg,#f3d98b,#c9a24a 55%,#f3d98b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bcta p{margin:0 auto 18px;max-width:480px;color:#e9dcc0;font-size:.98rem}
+.bcta-th{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:520px;margin:0 auto 22px}
+.bcta-th img{width:100%;aspect-ratio:1;object-fit:contain;background:#fff;border-radius:14px;padding:6px;border:1px solid rgba(201,162,74,.5)}
+.bcta-btn{display:inline-block;background:linear-gradient(135deg,#f3d98b,#c9a24a);color:#141010;font-weight:700;padding:14px 26px;border-radius:999px;text-decoration:none;font-size:1rem}
+.bcta-btn:hover{filter:brightness(1.06)}
+</style>
 <footer class="site" id="loja">
   <div class="wrap">
     <div class="fgrid">
@@ -257,6 +264,5 @@
 <script src="/vendor/qrcode-generator-2.0.4.js?v=20261019p1"></script>
 <script src="/cart.js?v=20261019p1"></script>
 <script src="assets/app.js?v=20261027n1"></script>
-<script src="/beleza/assets/beauty.js?v=c7"></script>
 </body>
 </html>
