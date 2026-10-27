@@ -58,7 +58,7 @@ window.BAGDA_BEAUTY = [
       (mp?'<a class="btn gold sm mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a><div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div></div></article>';
   }
   var g=document.getElementById('beautyGrid');
-  if(g){ var n=L.filter(function(p){return p.novo}); g.innerHTML=(n.length?n:L).slice(0,8).map(card).join(''); }
+  if(g){ var n=L.filter(function(p){return p.novo}); g.innerHTML=(n.length?n:L).slice(0,12).map(card).join(''); }
   var grid=document.getElementById('belezaGrid'); if(!grid) return;
   var chips=document.getElementById('belezaChips'), q=document.getElementById('belezaQ'), cnt=document.getElementById('belezaCount'), cur='Todos';
   var has=function(c){return L.some(function(p){return p.category===c})};
