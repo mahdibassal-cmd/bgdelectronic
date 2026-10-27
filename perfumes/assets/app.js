@@ -216,7 +216,7 @@ function toggleCmp(id){
 function byId(id){return P.filter(function(p){return p.id===id})[0]}
 function tray(){
   var t=$("#tray"), h='';
-  for(var i=0;i<3;i++){ var p=byId(CMP[i]); h+=p?'<div class="it"><img src="'+p.photo+'" alt=""><button data-rm="'+p.id+'" aria-label="Remover">×</button></div>':'<div class="it ph">+</div>'; }
+  for(var i=0;i<3;i++){ var p=byId(CMP[i]); h+=p?'<div class="it"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><button data-rm="'+p.id+'" aria-label="Remover">×</button></div>':'<div class="it ph">+</div>'; }
   $(".its",t).innerHTML=h;
   $("#cmpGo").disabled=CMP.length<2; $("#cmpGo").style.opacity=CMP.length<2?.5:1;
   t.classList.toggle("on",CMP.length>0); document.body.classList.toggle("tray-on",CMP.length>0);
@@ -227,7 +227,7 @@ function compareView(){
   var row=function(label,fn,hl){ var vals=L.map(fn); var same=hl&&vals.every(function(v){return v&&v===vals[0]}); return '<div class="rh">'+label+'</div>'+vals.map(function(v){return '<div class="'+(same?'same':'')+'">'+(v||'<span style="color:var(--dim)">—</span>')+'</div>'}).join(""); };
   var nl=function(a){return a&&a.length?'<span class="nl">'+a.map(esc).join(", ")+'</span>':''};
   var h='<div class="txt" style="padding:28px 20px 30px"><span class="kicker">Comparar</span><h2 style="font-family:var(--serif);font-weight:500;font-size:34px;margin:6px 0 20px">Lado a lado</h2><div class="ctable"><div class="ccols" style="--n:'+n+'">';
-  h+='<div class="rh"></div>'+L.map(function(p){return '<div class="hd"><img src="'+p.photo+'" alt=""><span class="kicker" style="font-size:9.5px">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3></div>'}).join("");
+  h+='<div class="rh"></div>'+L.map(function(p){return '<div class="hd"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker" style="font-size:9.5px">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3></div>'}).join("");
   h+=row("Preço",function(p){return p.soldOut?'Esgotado':'<b style="color:var(--gold2);font-family:var(--serif);font-size:20px">'+esc(p.priceLabel)+'</b>'});
   h+=row("Volume",function(p){return esc(p.size)},true);
   h+=row("Inspiração",function(p){return p.inspiredBy?esc(p.inspiredBy):(p.originalCreation?'Criação original':'')});
@@ -356,7 +356,7 @@ function vitrines(){
   var fh=FAMT.map(function(t,i){
     var L=P.filter(function(p){return t.f.indexOf(p.familyGroup)>-1}); if(!L.length) return '';
     var pic=(L.filter(function(p){return !p.soldOut&&OFFICIAL[p.brand]})[0]||L[0]).photo;
-    return '<button class="ftile" data-fam="'+i+'"><img loading="lazy" decoding="async" src="'+pic+'" alt="" width="640" height="800"><span class="ft"><b>'+esc(t.l)+'</b><small>'+esc(t.s)+'</small><em>'+L.length+' perfumes →</em></span></button>';
+    return '<button class="ftile" data-fam="'+i+'"><img loading="lazy" decoding="async" src="'+pic+'" alt="Perfumes da família olfativa" width="640" height="800"><span class="ft"><b>'+esc(t.l)+'</b><small>'+esc(t.s)+'</small><em>'+L.length+' perfumes →</em></span></button>';
   }).join("");
   $("#famTiles").innerHTML=fh;
   $("#priceCuts").innerHTML=MAXES.map(function(m){ return '<button class="pcut" data-max="'+m+'"><small>Até</small><b>R$ '+m+'</b><span>'+count(function(p){return !p.soldOut&&p.price<=m})+' perfumes</span></button>'; }).join("");
