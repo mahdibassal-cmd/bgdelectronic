@@ -372,7 +372,7 @@ function vitrines(){
       var msg=av?(d.ml?"Olá! Quero o decant "+d.ml+" ml de "+p.brand+" "+p.name+" ("+money(d.price)+"), que vi no site.":"Olá! Quero o Decant "+p.name+" ("+money(d.price)+") do site bgdstores.com"):"Olá! Quero ser avisado quando o decant de "+p.brand+" "+p.name+" chegar.";
       var dl=d.payLink||d.mpLink||""; var mp=/^https:\/\//.test(dl)?dl:"";
       return '<div class="dcard"><img loading="lazy" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker">'+esc(p.brand)+'</span><b>'+esc(p.name)+'</b><small>Decant'+(d.ml?' '+d.ml+' ml':'')+'</small>'+
-        '<div class="dprice">'+(av?money(d.price):'Em breve')+'</div><a class="btn wa sm" href="https://wa.me/'+WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">'+ICON.wa+(av?'Pedir':'Avise-me')+'</a>'+(av&&mp?'<a class="btn gold sm" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar</a>':'')+'</div>'; }).join("");
+        '<div class="dprice">'+(av?money(d.price):'Em breve')+'</div>'+(av&&mp?'<a class="btn gold sm" href="'+esc(mp)+'" target="_blank" rel="noopener">Comprar</a>':'<a class="btn wa sm" href="https://wa.me/'+WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">'+ICON.wa+(av?'Pedir':'Avise-me')+'</a>')+'</div>'; }).join("");
   }
   $("#decGrid").innerHTML=dh;
   $("#decSoon").style.display=D.some(function(o){return o.d.available!==false&&typeof o.d.price==="number"})?"none":"";
