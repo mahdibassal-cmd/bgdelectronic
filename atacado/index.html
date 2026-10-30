@@ -90,6 +90,7 @@ footer{border-top:1px solid var(--line);margin-top:30px;padding:18px 0;color:var
     </div>
     <label style="margin-top:10px">O que deseja comprar?<textarea name="quer" placeholder="Ex.: perfumes árabes, Fino, JBL, quantidades…"></textarea></label>
     <p class="err" id="ferr" hidden>Preencha nome, CNPJ/CPF, WhatsApp, cidade e escolha pelo menos uma seção.</p>
+    <div data-refbox style="margin-top:10px"></div>
     <button class="btn" type="submit" style="width:100%;margin-top:10px">Enviar pelo WhatsApp</button>
     <p class="note">O WhatsApp abre com seus dados preenchidos: é só tocar em enviar. Seus dados não ficam salvos neste site.</p>
   </form>
@@ -138,7 +139,7 @@ var WA='5511992873509',f=document.getElementById('f');
 f.addEventListener('submit',function(e){e.preventDefault();var d=new FormData(f),s=d.getAll('sec'),g=function(k){return (d.get(k)||'').trim()};
  if(!g('nome')||!g('doc')||!g('whats')||!g('cidade')||!s.length){document.getElementById('ferr').hidden=false;return}
  var t='Olá! Quero me cadastrar como revendedor no ATACADO BAGDA.\n\n*Interesse:* '+s.join(' + ')+'\n*Nome:* '+g('nome')+'\n*Empresa:* '+(g('empresa')||'-')+'\n*CNPJ/CPF:* '+g('doc')+'\n*WhatsApp:* '+g('whats')+'\n*Cidade/UF:* '+g('cidade')+'\n*Instagram:* '+(g('insta')||'-')+'\n*O que deseja comprar:* '+(g('quer')||'-');
- location.href='https://wa.me/'+WA+'?text='+encodeURIComponent(t)});
+ location.href='https://wa.me/'+WA+'?text='+encodeURIComponent(window.BGDRef?BGDRef.tag(t):t)});
 var H='d38af6d337fa3fd2f2b98d7c22a080ad0ac192e0858ea5d01a5f8a16beb32fb4',b64=function(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0)})},esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
 async function unlock(code){
  var h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code)))].map(function(x){return x.toString(16).padStart(2,'0')}).join('');
@@ -155,5 +156,6 @@ document.getElementById('uf').addEventListener('submit',function(e){e.preventDef
 try{var c=sessionStorage.getItem('atc');if(c)unlock(c).catch(function(){})}catch(_){}
 })();
 </script>
+<script src="/ref.js?v=20261030r1"></script>
 </body>
 </html>
