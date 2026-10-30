@@ -101,5 +101,6 @@ window.buildList=function(){if(built||!ready)return;built=true;$('lt').hidden=fa
 $('tg').onclick=()=>{const l=$('list'),o=l.hidden;l.hidden=!o;$('tg').textContent=o?'fechar lista':'ver lista';$('tg').setAttribute('aria-expanded',o)};
 $('b').onclick=()=>{const L=left();if(!L.length||wins>=3)return;$('b').disabled=true;const end=Date.now()+2000;const t=setInterval(()=>{$('s').textContent=ppl[L[Math.random()*L.length|0]].h;if(Date.now()>end){clearInterval(t);const i=pick();won.add(i);const pr=PRIZES[wins];wins++;$('s').textContent='🏆 '+ppl[i].h+' — '+pr;const li=document.createElement('li');li.textContent=wins+'º — '+ppl[i].h+' · '+pr;$('w').appendChild(li);const pe=$('p'+i);if(pe)pe.classList.add('win');$('b').disabled=wins>=3||!left().length;if(wins>=3)$('b').textContent='Sorteio concluído'}},80)};
 </script>
+<script src="/ref.js?v=20261030r1"></script>
 </body>
 </html>
