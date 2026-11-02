@@ -6,7 +6,13 @@
   document.documentElement.classList.toggle("w58", w === 58);
   const st = document.createElement("style"); document.head.appendChild(st);
   /* Chrome não aceita "auto" na altura: mede o recibo e define WIDTHmm x ALTURAmm */
-  const fit = () => { const r = document.querySelector(".recibo"); const hmm = r ? Math.ceil(r.scrollHeight * 25.4 / 96) + 6 : 200; st.textContent = `@page{size:${w}mm ${Math.max(hmm, 40)}mm;margin:0}`; };
+  const fit = () => {
+    /* aplica as regras de @media print temporariamente (largura do papel) para medir a altura real */
+    let css = ""; for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) if (r.media && /print/.test(r.media.mediaText)) css += [...r.cssRules].map(x => x.cssText).join("\n"); } catch (e) {} }
+    const tmp = document.createElement("style"); tmp.textContent = css + `html,body{width:${w}mm!important}`; document.head.appendChild(tmp);
+    const r = document.querySelector(".recibo"); const hmm = r ? Math.ceil(r.getBoundingClientRect().height * 25.4 / 96) + 8 : 200;
+    tmp.remove(); st.textContent = `@page{size:${w}mm ${Math.max(hmm, 40)}mm;margin:0}`;
+  };
   fit();
   let t0 = document.title;
   addEventListener("beforeprint", () => { t0 = document.title; document.title = " "; fit(); });
@@ -293,9 +299,9 @@ async function viewRecibo(nid) {
   <div class="recibo"><div class="rh"><b>BAGDA PERFUMES</b><small>bgdstores.com</small></div>
   <div class="rm2"><span>NOTA Nº <b>${String(nid).padStart(6, "0")}</b></span><span>${new Date(h.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span></div>
   <div class="rm2"><span>Vendedor(a): ${esc(h.nome)} (${esc(h.handle)})</span>${h.cliente ? `<span>Cliente: ${esc(h.cliente)}</span>` : ""}</div>
-  <table><tr><th>Item</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th></tr>
-  ${R.map(r => `<tr><td>${esc(r.marca)} ${esc(r.produto)} ${esc(r.tamanho || "")}</td><td class="n">${r.qtd}</td><td class="n">${brl(r.preco_vendido)}</td><td class="n">${brl(r.total)}</td></tr>`).join("")}
-  <tr class="tot"><td colspan="3">TOTAL</td><td class="n">${brl(tot)}</td></tr></table>
+  <table class="ri"><tr><th>Item</th><th class="n">Total</th></tr>
+  ${R.map(r => `<tr class="in"><td colspan="2">${esc(r.marca)} ${esc(r.produto)} ${esc(r.tamanho || "")}</td></tr><tr class="iq"><td>${r.qtd} x ${brl(r.preco_vendido)}</td><td class="n">${brl(r.total)}</td></tr>`).join("")}
+  <tr class="tot"><td>TOTAL</td><td class="n">${brl(tot)}</td></tr></table>
   <p>Pagamento: <b>${esc(h.forma_pagamento)}</b></p><p class="muted" style="text-align:center">Obrigado pela preferência!</p></div>`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
 }
