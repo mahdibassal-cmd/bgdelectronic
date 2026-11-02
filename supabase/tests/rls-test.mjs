@@ -34,6 +34,10 @@ async function suite(label, files) {
   for (const t of ["product_costs", "sale_costs", "purchases", "v_report_seller", "v_report_payment", "v_report_profit", "v_low_stock", "v_admin_products"]) {
     const r = await db.query(`select count(*)::int n from public.${t}`); ok(r.rows[0].n === 0, `seller sees 0 rows in ${t}`);
   }
+  const ev = await db.query("select * from public.estoque_vendedor order by sku");
+  ok(ev.rows.length > 100, "seller reads estoque_vendedor (" + ev.rows.length + " rows)");
+  ok(JSON.stringify(Object.keys(ev.rows[0])) === JSON.stringify(["sku","marca","produto","tamanho","estoque"]), "estoque_vendedor columns: " + Object.keys(ev.rows[0]).join(","));
+  ok(!!(await err(db, "update public.estoque_vendedor set estoque=99 where sku='ARM-001'")) || (await db.query("select estoque from public.products where sku='ARM-001'")).rows[0].estoque !== 99, "seller cannot write via estoque_vendedor");
   ok(!!(await err(db, "insert into public.product_costs values ('ARM-001',1)")), "seller cannot write cost");
   ok(!!(await err(db, "update public.products set preco_venda=1 where sku='ARM-001'")) || (await db.query("select preco_venda from public.products where sku='ARM-001'")).rows[0].preco_venda != 1, "seller cannot change price");
   const n = (await db.query(`select public.criar_nota('PIX', '[{"sku":"ARM-001","qtd":2,"preco_vendido":270},{"sku":"FER-004","qtd":1,"preco_vendido":100}]'::jsonb, 'Cliente') id`)).rows[0].id;
@@ -53,17 +57,20 @@ async function suite(label, files) {
   await db.exec("reset role; select set_config('request.jwt.claims','{}',false); set role anon;");
   ok(!!(await err(db, "select * from public.products")), "anon blocked from products");
   ok(!!(await err(db, "select public.criar_nota('PIX','[]')")), "anon cannot call criar_nota");
+  ok(!!(await err(db, "select * from public.estoque_vendedor")), "anon blocked from estoque_vendedor");
   // MFA
   await db.exec(`reset role; insert into auth.mfa_factors values ('${A}','verified')`);
   await as(db, A, "aal1"); ok((await db.query("select count(*)::int n from public.v_admin_products")).rows[0].n === 0, "admin with 2FA but aal1 sees nothing");
   await as(db, A, "aal2");
   const ap = await db.query("select * from public.v_admin_products where sku='FER-004'");
   ok(ap.rows.length === 1 && Number(ap.rows[0].custo) === 40, "admin export view has cost");
+  ok((await db.query("select count(*)::int n from public.estoque_vendedor")).rows[0].n > 100, "admin still reads estoque_vendedor");
+  ok((await db.query("select count(*)::int n from public.product_costs")).rows[0].n > 0, "admin still reads product_costs");
   ok((await db.query("select sum(lucro)::numeric l from public.v_report_profit")).rows[0].l != null, "admin profit report works");
   ok((await db.query("select count(*)::int n from public.v_report_payment")).rows[0].n === 1, "admin payment report works");
   await db.query("delete from public.notas where id=$1", [n]);
   ok((await db.query("select estoque from public.products where sku='ARM-001'")).rows[0].estoque === 3, "admin deleting nota restores stock");
 }
-await suite("UPGRADE: old schema + seed + migration-002 x2", ["/tmp/pgt/schema-old.sql", "seed-produtos.sql", "migration-002.sql", "migration-002.sql"]);
-await suite("FRESH: new schema + seed (+ migration re-run)", ["schema.sql", "seed-produtos.sql", "migration-002.sql", "schema.sql"]);
+await suite("UPGRADE: old schema + seed + migration-002 x2", ["/tmp/pgt/schema-old.sql", "seed-produtos.sql", "migration-002.sql", "migration-002.sql", "migration-003.sql", "migration-003.sql"]);
+await suite("FRESH: new schema + seed (+ migration re-run)", ["schema.sql", "seed-produtos.sql", "migration-002.sql", "migration-003.sql", "schema.sql"]);
 console.log(fails ? `${fails} FAILURES` : "ALL PASS");

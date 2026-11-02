@@ -405,3 +405,12 @@ where public.is_admin() and public.mfa_ok();
 revoke all on public.v_nota_itens, public.v_admin_products from anon, public;
 grant select on public.v_nota_itens, public.v_admin_products, public.v_report_seller,
               public.v_report_payment, public.v_low_stock to authenticated;
+
+-- ---------- migration-003: estoque somente leitura para vendedores ----------
+-- Nenhuma policy existente é alterada; product_costs/purchases/sale_costs continuam só admin.
+create or replace view public.estoque_vendedor with (security_invoker = true) as
+  select p.sku, p.marca, p.produto, p.tamanho, p.estoque
+  from public.products p
+  where p.ativo and public.mfa_ok() and public.is_active_staff();
+revoke all on public.estoque_vendedor from public, anon;
+grant select on public.estoque_vendedor to authenticated;

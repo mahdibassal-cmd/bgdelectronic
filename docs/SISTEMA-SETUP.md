@@ -87,3 +87,6 @@ insert into public.profiles (id, handle, nome, role) select id, '@novo', 'Novo',
 ### Configurações de Auth necessárias para os links
 - **URL Configuration → Site URL:** `https://bgdstores.com/sistema/`; **Redirect URLs:** `https://bgdstores.com/sistema/` e `https://bgdstores.com/sistema/**`.
 - **Email Templates** (Invite user e Reset password): o link deve usar `{{ .ConfirmationURL }}` (padrão). Validade do link: padrão (24 h).
+
+### Estoque para vendedores (migration-003)
+Rode `supabase/migration-003.sql` no **SQL Editor** (pode rodar mais de uma vez). Cria a view `public.estoque_vendedor` (security_invoker; só SKU, marca, produto, tamanho, estoque de produtos ativos, para equipe ativa). Vendedores veem **Estoque** (somente leitura, com Imprimir / PDF); custo, Compras, Relatório, lucro e CSV continuam só para admin. Nenhuma policy foi alterada.
