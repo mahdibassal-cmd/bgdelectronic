@@ -27,6 +27,13 @@ for (const f of ["schema.sql", "schema.sql", "users.sql", "users.sql"]) {
 }
 ok(await n(db, "select * from public.profiles") === 8, "users.sql maps 8 profiles (idempotent)");
 ok(await n(db, "select * from public.caixas") === 3, "3 caixas seeded once");
+// re-run after a caixa was renamed (e.g. mojibake from a bad paste) and role_perms already present
+await db.exec("update public.caixas set nome = 'MÃ¡quina Loja' where metodo = 'cartao'; update public.caixas set nome = 'Caixa Pix velho' where metodo = 'pix'");
+const cid = (await one(db, "select id from public.caixas where metodo = 'cartao'")).id;
+try { await db.exec(S("schema.sql")); ok(true, "schema re-run after caixa rename"); } catch (e) { ok(false, "schema re-run after rename: " + e.message); }
+ok(await n(db, "select * from public.caixas") === 3, "still 3 caixas after rename + re-run");
+ok((await one(db, "select nome, id from public.caixas where metodo = 'cartao'")).nome === "Máquina Loja" && (await one(db, "select id from public.caixas where metodo = 'cartao'")).id === cid, "renamed caixa restored to UTF-8 name, same id");
+ok(await n(db, "select * from public.role_perms") === 5, "role_perms not duplicated");
 ok(await n(db, "select * from public.products") === 0, "loja starts with no products");
 // produtos de teste (só no PGlite)
 await db.exec("insert into public.products(sku,marca,produto,tamanho,preco_venda,estoque) values ('ARM-001','JBL','Flip 6',null,280,10),('FER-004','Xiaomi','Redmi Buds 5',null,100,10),('CAB-001','Baseus','Cabo USB-C 1m',null,30,0)");

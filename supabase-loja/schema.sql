@@ -2,6 +2,9 @@
 -- BAGDA STORES — Sistema da Loja (eletrônicos) — Supabase / Postgres
 -- Projeto Supabase SEPARADO do quiosque (BAGDA PERFUMES / /sistema).
 -- Rode inteiro no SQL Editor. Idempotente: pode rodar de novo.
+-- IMPORTANTE: copie do arquivo RAW (UTF-8), não de um editor que troque acentos:
+--   https://raw.githubusercontent.com/mahdibassal-cmd/bgdelectronic/main/supabase-loja/schema.sql
+--   depois: https://raw.githubusercontent.com/mahdibassal-cmd/bgdelectronic/main/supabase-loja/security.sql
 -- Segurança: RLS em TODAS as tabelas; custo só admin; caixa só admin/financeiro;
 -- notas/estoque só admin/vendedor. Permissões por papel ficam em public.role_perms (fácil de mudar).
 -- =====================================================================
@@ -122,7 +125,7 @@ create table if not exists public.caixas (
 );
 insert into public.caixas(nome, metodo) values
   ('Caixa Dinheiro','dinheiro'), ('Caixa PIX (HX)','pix'), ('Máquina Loja','cartao')
-on conflict (nome) do nothing;
+on conflict (metodo) do update set nome = excluded.nome;  -- chave = metodo (renomear caixa não quebra re-run)
 
 create table if not exists public.caixa_movimentos (
   id         bigint generated always as identity primary key,
