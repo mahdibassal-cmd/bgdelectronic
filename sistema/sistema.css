@@ -23,6 +23,23 @@ td.n,th.n{text-align:right}.low{color:#c2410c;font-weight:700}.warn{color:#c2410
 .recibo{background:#fff;max-width:420px;margin:0 auto;padding:24px;border:1px solid var(--ln);border-radius:12px;font-size:14px}
 .rh{text-align:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:10px}.rh b{display:block;font-size:22px;letter-spacing:.12em}.rh small{color:var(--dim)}
 .rm2{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}.recibo tr.tot td{font-weight:800;font-size:16px;border-top:2px solid var(--ink)}
-@media print{.top,#mockbar,.noprint,#toast{display:none!important}body{background:#fff}main{margin:0}.recibo{border:0;max-width:none}}
+/* Impressão térmica: largura via --receipt-width (80mm padrão). Para 58mm: abrir /sistema/?w=58 (fica salvo) ou ?w=80 para voltar. app.js injeta o @page correspondente. */
+:root{--receipt-width:80mm;--receipt-pad:3mm}html.w58{--receipt-width:58mm;--receipt-pad:2mm}
+@page{size:80mm 200mm;margin:0}
+@media print{
+html,body{margin:0!important;padding:0!important;background:#fff!important;width:var(--receipt-width)}
+body *{visibility:hidden!important}
+.top,#mockbar,.noprint,#toast,nav,button{display:none!important}
+main{margin:0!important;padding:0!important;max-width:none!important}
+.recibo,.recibo *{visibility:visible!important;color:#000!important;background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.recibo{position:absolute;left:0;top:0;width:var(--receipt-width);max-width:none!important;margin:0!important;padding:var(--receipt-pad)!important;border:0!important;border-radius:0!important;font-family:Arial,Helvetica,sans-serif!important;font-size:13.5px!important;font-weight:700!important;line-height:1.3}
+.recibo .rh{border-bottom:2px solid #000!important}.recibo .rh b{font-size:18px!important;letter-spacing:.06em}.recibo .rh small{font-size:12px!important}
+.recibo .rm2{display:block!important;font-size:12.5px!important}.recibo .rm2 span{display:block}
+.recibo table{width:100%!important;border-collapse:collapse;table-layout:auto}
+.recibo th,.recibo td{font-size:13px!important;font-weight:700!important;padding:2px 1px!important;border-color:#000!important;overflow-wrap:anywhere}
+.recibo tr.tot td{font-size:16px!important;font-weight:900!important;border-top:2px solid #000!important}
+.recibo .n,.recibo th{white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;text-align:right}.recibo td:first-child{width:100%}.recibo p{margin:4px 0;font-size:13px!important}.recibo .muted{opacity:1!important}
+html.w58 .recibo,html.w58 .recibo th,html.w58 .recibo td{font-size:11px!important;padding:2px 0!important}html.w58 .recibo .rh b{font-size:16px!important}html.w58 .recibo tr.tot td{font-size:14px!important}
+}
 [hidden]{display:none!important}
 #rq{list-style:none;padding-left:0!important}

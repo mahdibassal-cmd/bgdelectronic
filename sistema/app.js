@@ -1,3 +1,17 @@
+/* largura do recibo: ?w=58 ou ?w=80 (salvo em localStorage) */
+(function () {
+  const q = new URLSearchParams(location.search).get("w");
+  if (q === "58" || q === "80") localStorage.setItem("recibo_w", q);
+  const w = localStorage.getItem("recibo_w") === "58" ? 58 : 80;
+  document.documentElement.classList.toggle("w58", w === 58);
+  const st = document.createElement("style"); document.head.appendChild(st);
+  /* Chrome não aceita "auto" na altura: mede o recibo e define WIDTHmm x ALTURAmm */
+  const fit = () => { const r = document.querySelector(".recibo"); const hmm = r ? Math.ceil(r.scrollHeight * 25.4 / 96) + 6 : 200; st.textContent = `@page{size:${w}mm ${Math.max(hmm, 40)}mm;margin:0}`; };
+  fit();
+  let t0 = document.title;
+  addEventListener("beforeprint", () => { t0 = document.title; document.title = " "; fit(); });
+  addEventListener("afterprint", () => { document.title = t0; });
+})();
 (() => {
 "use strict";
 const C = window.SISTEMA_CONFIG || {};
