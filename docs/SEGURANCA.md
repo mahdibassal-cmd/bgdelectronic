@@ -34,3 +34,6 @@ Também: só o dono pode, pelo app/API, criar/remover/desativar admins (SQL Edit
 | 9 | Nenhum log de login falho/mudança de função; sem trava | Corrigido (migration-004) |
 | 10 | Sessão em sessionStorage, CSP restrita, frame-ancestors none, robots Disallow | OK |
 | 11 | Recomendado no Dashboard: Auth › Rate limits (já), "Leaked password protection" ON, 2FA obrigatório para admins (ativar no app), JWT expiry 3600 s ou menos | Manual |
+
+## Loja (bagda-loja)
+Rodar `supabase-loja/security.sql` depois de `schema.sql`/`users.sql` — e de novo sempre que rodar `schema.sql`. Mesma trava, log e RPCs; o app /loja ainda não tem os botões (por SQL/RPC).
