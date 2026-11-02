@@ -1,0 +1,51 @@
+:root{--blue:#1747d6;--gold:#ff8a1f;--ink:#1a1a1a;--dim:#5b6475;--ln:rgba(30,40,70,.14);--soft:#f2f6ff;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--soft)}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 20px;background:#fff;border-bottom:1px solid var(--ln)}
+.brand{font-weight:800;letter-spacing:.08em;color:var(--blue)}.brand span{color:var(--gold)}
+nav{display:flex;flex-wrap:wrap;gap:6px}nav button{border:1px solid var(--ln);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+nav button.on{background:var(--blue);color:#fff;border-color:var(--blue)}#who{font-size:13px;color:var(--dim)}
+#mockbar{background:var(--gold);color:#fff;text-align:center;font-size:12px;font-weight:700;padding:4px;letter-spacing:.05em}
+main{max-width:1000px;margin:24px auto;padding:0 16px}
+.card{background:#fff;border:1px solid var(--ln);border-radius:14px;padding:20px;margin-bottom:16px}
+h2{margin:0 0 14px;font-size:20px}h3{margin:16px 0 8px;font-size:15px;color:var(--dim)}
+label{display:block;font-size:13px;color:var(--dim);margin:10px 0 4px}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--ln);border-radius:10px;font:inherit;background:#fff}
+input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(23,71,214,.15)}
+.btn{margin-top:14px;background:var(--blue);color:#fff;border:0;border-radius:999px;padding:11px 22px;font:inherit;font-weight:700;cursor:pointer}
+.btn.gold{background:var(--gold)}.btn.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--ln)}th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase}
+td.n,th.n{text-align:right}.low{color:#c2410c;font-weight:700}.warn{color:#c2410c;font-size:12px}
+.kpi{background:var(--soft);border-radius:12px;padding:14px}.kpi b{display:block;font-size:22px;color:var(--blue)}.kpi small{color:var(--dim)}
+.login{max-width:380px;margin:60px auto}.muted{color:var(--dim);font-size:13px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;display:none}
+.qr{background:#fff;padding:10px;border:1px solid var(--ln);border-radius:10px;width:200px}
+.recibo{background:#fff;max-width:420px;margin:0 auto;padding:24px;border:1px solid var(--ln);border-radius:12px;font-size:14px}
+.rh{text-align:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:10px}.rh b{display:block;font-size:22px;letter-spacing:.12em}.rh small{color:var(--dim)}
+.rm2{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}.recibo tr.tot td{font-weight:800;font-size:16px;border-top:2px solid var(--ink)}
+/* Impressão térmica: página = largura do papel (80mm padrão; /sistema/?w=58 para 58mm, ?w=80 volta). Recibo ocupa 100% da área imprimível. */
+:root{--rf:23px}html.w58{--rf:17px}
+@page{size:80mm 200mm;margin:0}
+@media print{
+html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;max-width:none!important;overflow:visible!important}
+.top,#mockbar,.noprint,#toast,nav,button,header{display:none!important}
+main{margin:0!important;padding:0!important;max-width:none!important;width:100%!important}
+.recibo,.recibo *{color:#000!important;background:#fff!important;font-weight:700!important;opacity:1!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.recibo{position:static!important;width:100%!important;max-width:none!important;margin:0!important;padding:0 1.5mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-family:Arial,Helvetica,sans-serif!important;font-size:var(--rf)!important;line-height:1.25}
+.recibo .rh{border-bottom:3px solid #000!important}.recibo .rh b{font-size:calc(var(--rf)*1.3)!important;letter-spacing:.03em}.recibo .rh small{font-size:calc(var(--rf)*.85)!important}
+.recibo .rm2{display:block!important;font-size:calc(var(--rf)*.9)!important}.recibo .rm2 span{display:block}
+.recibo table{width:100%!important;max-width:100%!important;border-collapse:collapse;table-layout:auto}
+.recibo th,.recibo td{font-size:calc(var(--rf)*.95)!important;padding:3px 0!important;border-color:#000!important;overflow-wrap:anywhere;vertical-align:top}
+.recibo tr.in td{border-bottom:0!important;padding-bottom:0!important}.recibo tr.iq td{padding-top:0!important;border-bottom:1px solid #000!important}
+.recibo .n{text-align:right;overflow-wrap:normal!important;white-space:nowrap}
+.recibo tr.tot td{font-size:calc(var(--rf)*1.2)!important;font-weight:900!important;border-top:3px solid #000!important}
+.recibo p{margin:4px 0;font-size:var(--rf)!important}
+}
+
+.recibo tr.in td{border-bottom:0;padding-bottom:0}.recibo tr.iq td{padding-top:0}
+.sug{list-style:none;margin:4px 0 10px;padding:0;max-height:340px;overflow:auto;border-radius:8px}.sug li{padding:8px 10px;border:1px solid var(--ln);border-top:0;cursor:pointer;background:#fff}.sug li:first-child{border-top:1px solid var(--ln)}.sug li.hi{background:#fff4d6;outline:2px solid #c9a227}.sug li.off{opacity:.55}.sug small{display:block;color:var(--dim)}
+.stk tr.sep th{background:#eee;text-align:left;padding-top:14px;border-top:2px solid var(--ink)}
+@media print{.stk,.stk *{color:#000!important}.stk tr.sep th{background:#fff!important;border-top:2px solid #000!important}h2 .btn{display:none!important}}
+.cxk small{display:block;margin-top:4px}.cxa{display:flex;gap:6px;margin-top:8px}.cxa input{margin:0}.cxa .btn{margin:0}.pgrow{align-items:center}.pgrow>div{margin:0}
+[hidden]{display:none!important}
+#rq{list-style:none;padding-left:0!important}

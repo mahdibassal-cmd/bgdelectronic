@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'">
+<title>Sistema - BAGDA STORES</title>
+<link rel="stylesheet" href="loja.css?v=20261102a">
+</head>
+<body>
+<header class="top">
+  <div class="brand">BAGDA <span>STORES</span></div>
+  <nav id="nav" hidden>
+    <button data-v="nota" data-p="vendas">Nova nota</button>
+    <button data-v="notas" data-p="vendas">Notas</button>
+    <button data-v="estoque" data-p="vendas">Estoque</button>
+    <button data-v="caixa" data-p="caixa">Caixa</button>
+    <button data-v="relatorio" data-p="admin">Relatório</button>
+    <button data-v="compras" data-p="admin">Compras</button>
+    <button data-v="produtos" data-p="admin">Produtos</button>
+    <button data-v="usuarios" data-p="admin">Usuários</button>
+    <button data-v="seguranca">2FA</button>
+    <button id="sair">Sair</button>
+  </nav>
+  <div id="who"></div>
+</header>
+<div id="mockbar" hidden>MODO DEMONSTRAÇÃO — dados fictícios, nada é salvo</div>
+<main id="app"></main>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
+<script src="config.js?v=20261102a"></script>
+<script src="app.js?v=20261102a"></script>
+</body>
+</html>

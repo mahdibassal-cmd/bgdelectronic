@@ -3,5 +3,6 @@ Allow: /
 Disallow: /atacado/
 Disallow: /sorteio/ganhadores/
 Disallow: /sistema/
+Disallow: /loja/
 
 Sitemap: https://bgdstores.com/sitemap.xml
