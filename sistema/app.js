@@ -37,7 +37,7 @@ const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase()
   const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   return n ? n + "@sistema.bgdstores.local" : ""; };
 const toast = m => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3500); };
-let me = null;
+let me = null, isOwner = false, lockedNow = false;
 // ---------- Links de convite / recuperação do Supabase ----------
 const H = new URLSearchParams(location.hash.slice(1));
 const AUTH = { type: H.get("type") || qs.get("type"), access_token: H.get("access_token"), refresh_token: H.get("refresh_token"),
@@ -74,6 +74,13 @@ if (!MOCK) {
     async enroll() { return ok(await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "BAGDA " + Date.now() })); },
     async verify(factorId, code) { ok(await sb.auth.mfa.challengeAndVerify({ factorId, code })); },
     async unenroll(factorId) { ok(await sb.auth.mfa.unenroll({ factorId })); },
+    async status() { const { data, error } = await sb.rpc("system_status"); if (error) return null; return data; },
+    async lock(r) { ok(await sb.rpc("lock_system", { p_reason: r })); },
+    async unlock() { ok(await sb.rpc("unlock_system")); },
+    async signoutAll() { return ok(await sb.rpc("signout_all")); },
+    async reportFail(e) { try { await sb.rpc("report_failed_login", { p_email: e }); } catch {} },
+    async events() { const { data, error } = await sb.from("security_events").select("at,kind,email,detail").order("at", { ascending: false }).limit(50); return error ? null : data; },
+    async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
     async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("handle,nome,role,ativo").eq("id", u.id).single()); },
     async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
@@ -114,6 +121,8 @@ if (!MOCK) {
     async aal() { return { currentLevel: "aal1", nextLevel: "aal1" }; }, async factors() { return []; },
     async enroll() { return { id: "f1", totp: { qr_code: "", secret: "DEMO-SECRET-XXXX" } }; },
     async verify() { toast("Demonstração: 2FA ativado"); }, async unenroll() {},
+    async status() { return { locked: qs.has("locked"), is_owner: role === "admin" }; }, async lock() { toast("Demonstração: nada bloqueado"); }, async unlock() {}, async signoutAll() { return 0; }, async reportFail() {},
+    async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@x.com", detail: {} }]; }, async dumpTable(t) { return t === "products" ? P : []; },
     async profile() { return role === "admin" ? { handle: "@mb", nome: "MB", role } : { handle: "@kaio", nome: "Kaio", role }; },
     async products() { await ready; return P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
     async addSale(s) { const p = P.find(x => x.sku === s.sku); if (!p || p.estoque < s.qtd) throw new Error("Estoque insuficiente ou produto inativo"); p.estoque -= s.qtd; S.unshift({ id: id++, data: today(), ...s, marca: p.marca, produto: p.produto, preco_tabela: p.preco_venda, total: s.qtd * s.preco_vendido, handle: me.handle, nome: me.nome, custo: K[p.sku], aviso: s.preco_vendido < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date().toISOString() }); },
@@ -144,6 +153,9 @@ async function boot() {
   const a = await api.aal();
   if (a.nextLevel === "aal2" && a.currentLevel !== "aal2") return viewMfaChallenge();
   if (needPassword) return viewCriarSenha();
+  const st = await api.status().catch(() => null);   // null = migration-004 ainda não rodada
+  if (st && st.locked && !st.is_owner) return viewBloqueado();
+  isOwner = !!(st && st.is_owner); lockedNow = !!(st && st.locked);
   try { me = await api.profile(); } catch { me = null; }
   if (!me || me.ativo === false) { await api.logout(); return viewLogin("Conta sem perfil ativo. Fale com o MB."); }
   $("#who").textContent = `${me.nome} (${me.handle}) · ${me.role === "admin" ? "Admin" : "Vendedor(a)"}`;
@@ -162,6 +174,40 @@ function go(v) {
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
 $("#sair").onclick = async () => { await api.logout(); location.hash = ""; location.reload(); };
 
+function viewBloqueado() {
+  $("#nav").hidden = true; $("#who").textContent = "";
+  app.innerHTML = `<div class="card login"><h2>Sistema bloqueado</h2><p class="muted">O sistema foi bloqueado por segurança. Fale com o MB.</p><button class="btn ghost" id="x">Sair</button></div>`;
+  $("#x").onclick = async () => { await api.logout(); location.reload(); };
+}
+const BK_TABLES = ["profiles", "products", "product_costs", "purchases", "notas", "sales", "sale_costs", "security_events"];
+async function backupAgora(b) {
+  b.disabled = true; const out = { exportado_em: new Date().toISOString(), por: me.handle, tabelas: {} };
+  try { for (const t of BK_TABLES) { b.textContent = "Exportando " + t + "…"; out.tabelas[t] = await api.dumpTable(t); }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+    a.download = `backup-sistema-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); toast("Backup baixado ✓ guarde em local seguro");
+  } catch (e) { toast(e.message); } b.disabled = false; b.textContent = "Backup agora";
+}
+async function secAdmin() {
+  if (me.role !== "admin") return "";
+  const ev = await api.events().catch(() => null);
+  const L = { failed_login: "Login falho", role_change: "Mudança de função", admin_added: "Novo admin", profile_added: "Novo usuário", profile_removed: "Usuário removido", lock: "Bloqueio", unlock: "Desbloqueio", signout_all: "Sessões encerradas" };
+  return `<div class="card"><h2>Segurança do sistema</h2>
+  <p class="muted">Backup agora baixa um arquivo JSON com todas as tabelas (inclui custos). Guarde fora do computador da loja.</p>
+  <button class="btn" id="bk">Backup agora</button>
+  ${ev === null ? `<p class="muted">Bloqueio e log de segurança ainda não ativados no banco (migration-004).</p>` : `
+  ${lockedNow ? `<p class="warn"><b>Sistema BLOQUEADO</b> (só o dono acessa)</p>` : `<button class="btn gold" id="lk" style="background:#b91c1c;color:#fff">Bloquear sistema</button>`}
+  ${isOwner ? `${lockedNow ? `<button class="btn" id="ul">Desbloquear sistema</button>` : ""} <button class="btn ghost" id="so">Encerrar todas as sessões</button>` : ""}
+  <h3>Eventos recentes</h3><table class="stk"><tr><th>Quando</th><th>Evento</th><th>Detalhe</th></tr>
+  ${ev.map(e => `<tr><td>${esc(new Date(e.at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }))}</td><td>${esc(L[e.kind] || e.kind)}</td><td>${esc(e.email || e.detail?.handle || e.detail?.reason || "")}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Nenhum evento.</td></tr>`}</table>`}</div>`;
+}
+function wireSec() {
+  const b = $("#bk"); if (b) b.onclick = () => backupAgora(b);
+  const lk = $("#lk"); if (lk) lk.onclick = async () => { const r = prompt("BLOQUEAR o sistema para todos (exceto o MB)? Escreva o motivo e confirme:"); if (r === null) return;
+    if (!confirm("Confirmar bloqueio? Vendedores e admins perdem o acesso até o MB desbloquear.")) return;
+    try { await api.lock(r); toast("Sistema bloqueado"); location.reload(); } catch (e) { toast(e.message); } };
+  const ul = $("#ul"); if (ul) ul.onclick = async () => { if (!confirm("Desbloquear o sistema?")) return; try { await api.unlock(); toast("Desbloqueado ✓"); location.reload(); } catch (e) { toast(e.message); } };
+  const so = $("#so"); if (so) so.onclick = async () => { if (!confirm("Encerrar TODAS as sessões (inclusive a sua)? Todos terão que entrar de novo em até 1 hora.")) return; try { const n = await api.signoutAll(); toast(n + " sessões encerradas"); await api.logout(); location.reload(); } catch (e) { toast(e.message); } };
+}
 function viewCriarSenha() {
   $("#nav").hidden = true; $("#who").textContent = "";
   app.innerHTML = `<div class="card login"><h2>Criar sua senha</h2>
@@ -190,7 +236,7 @@ function viewLogin(msg) {
   let fails = 0;
   $("#f").onsubmit = async ev => { ev.preventDefault(); const b = ev.submitter; b.disabled = true;
     try { await api.login(toEmail($("#e").value), $("#p").value); await boot(); }
-    catch (e) { fails++; $("#m").textContent = "Nome ou senha inválidos."; setTimeout(() => b.disabled = false, Math.min(30000, 1000 * 2 ** fails)); } };
+    catch (e) { fails++; if (/invalid/i.test(e.message)) api.reportFail(toEmail($("#e").value)); $("#m").textContent = "Nome ou senha inválidos."; setTimeout(() => b.disabled = false, Math.min(30000, 1000 * 2 ** fails)); } };
 }
 async function viewMfaChallenge() {
   const f = (await api.factors()).find(x => x.status === "verified");
@@ -272,6 +318,7 @@ async function viewSeguranca() {
   app.innerHTML = `<div class="card"><h2>Verificação em 2 etapas (2FA)</h2>
   <p class="muted">Recomendado. Use Google Authenticator, Microsoft Authenticator ou similar. Depois de ativar, o código é pedido a cada login.</p>
   ${F.length ? `<p><b>2FA ativo ✓</b></p><button class="btn ghost" id="rm">Desativar 2FA</button>` : `<button class="btn" id="en">Ativar 2FA</button><div id="q"></div>`}</div>`;
+  app.insertAdjacentHTML("beforeend", await secAdmin()); wireSec();
   if (F.length) $("#rm").onclick = async () => { if (confirm("Desativar 2FA?")) { await api.unenroll(F[0].id); viewSeguranca(); } };
   else $("#en").onclick = async () => { const r = await api.enroll();
     $("#q").innerHTML = `<h3>1. Escaneie o QR code</h3>${r.totp.qr_code ? `<img class="qr" alt="QR" src="${esc(r.totp.qr_code)}">` : ""}<p class="muted">Ou digite a chave: <code>${esc(r.totp.secret)}</code></p>

@@ -6,11 +6,12 @@ create role anon nologin; create role authenticated nologin;
 create schema auth; grant usage on schema auth to anon, authenticated; grant usage on schema public to anon, authenticated;
 create table auth.users(id uuid primary key, email text);
 create table auth.mfa_factors(user_id uuid, status text);
+create table auth.sessions(id uuid primary key, user_id uuid); create table auth.refresh_tokens(id bigserial primary key, session_id uuid);
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb $$;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(auth.jwt()->>'sub','')::uuid $$;
 grant execute on all functions in schema auth to anon, authenticated;
 insert into auth.users values ('00000000-0000-0000-0000-00000000000a','mahdibassal@icloud.com'),('00000000-0000-0000-0000-00000000000b','kaio@sistema.bgdstores.local'),('00000000-0000-0000-0000-00000000000c','suelen@sistema.bgdstores.local');`;
-const R = "/workspace/sistema/supabase/";
+const R = process.env.R || new URL("../", import.meta.url).pathname;
 let fails = 0;
 const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++; };
 async function as(db, uid, aal = "aal1") {
@@ -70,7 +71,48 @@ async function suite(label, files) {
   ok((await db.query("select count(*)::int n from public.v_report_payment")).rows[0].n === 1, "admin payment report works");
   await db.query("delete from public.notas where id=$1", [n]);
   ok((await db.query("select estoque from public.products where sku='ARM-001'")).rows[0].estoque === 3, "admin deleting nota restores stock");
+  // ---------- migration-004: trava, log, sessões ----------
+  if (!files.some(f => f.includes("migration-004"))) return;
+  await db.exec(`reset role; delete from auth.mfa_factors; insert into auth.sessions values ('00000000-0000-0000-0000-0000000000f1','${K}'); insert into auth.refresh_tokens(session_id) values ('00000000-0000-0000-0000-0000000000f1');`);
+  await as(db, K);
+  ok(!!(await err(db, "select public.lock_system('x')")), "seller cannot lock");
+  ok(!!(await err(db, "select public.signout_all()")), "seller cannot sign out all");
+  ok(!!(await err(db, "select * from public.system_settings")), "staff cannot read system_settings directly");
+  ok((await db.query("select count(*)::int n from public.security_events")).rows[0].n === 0, "seller sees 0 security_events");
+  await db.exec("reset role; insert into auth.users values ('00000000-0000-0000-0000-00000000000d','samer@x.com'); insert into public.profiles(id,handle,nome,role) values ('00000000-0000-0000-0000-00000000000d','@samer','Samer','admin')");
+  const D = "00000000-0000-0000-0000-00000000000d";
+  ok((await db.query("select count(*)::int n from public.security_events where kind='admin_added'")).rows[0].n >= 1, "new admin logged as admin_added");
+  await as(db, D);
+  ok(!!(await err(db, `update public.profiles set role='seller' where id='${A}'`)), "non-owner admin cannot demote owner");
+  ok(!(await err(db, `update public.profiles set ativo=false where id='${U}'`)), "admin can deactivate seller");
+  await db.exec("reset role"); ok((await db.query("select count(*)::int n from public.security_events where kind='role_change'")).rows[0].n === 1, "role/ativo change logged by trigger");
+  await db.exec(`update public.profiles set ativo=true where id='${U}'`);
+  await as(db, D);
+  await db.query("select public.lock_system('teste')");
+  ok((await db.query("select public.system_status() s")).rows[0].s.locked === true, "non-owner admin locked the system");
+  ok(!!(await err(db, "select public.unlock_system()")), "non-owner admin cannot unlock");
+  for (const [who, uid] of [["admin", D], ["seller", K]]) { await as(db, uid);
+    for (const t of ["products", "estoque_vendedor", "notas", "v_nota_itens", "profiles", "product_costs", "security_events"]) {
+      const r = await db.query(`select count(*)::int n from public.${t}`); ok(r.rows[0].n === 0, `LOCKED: ${who} sees 0 rows in ${t}`); }
+    ok(!!(await err(db, `select public.criar_nota('PIX','[{"sku":"FER-004","qtd":1,"preco_vendido":100}]'::jsonb)`)), `LOCKED: ${who} cannot create nota`);
+  }
+  await as(db, D); ok(!!(await err(db, "insert into public.purchases(sku,qtd,custo_unit) values ('FER-004',1,1)")), "LOCKED: admin cannot insert purchase");
+  await as(db, A);
+  ok((await db.query("select count(*)::int n from public.products")).rows[0].n > 100, "LOCKED: owner still reads products");
+  ok((await db.query("select count(*)::int n from public.product_costs")).rows[0].n > 0, "LOCKED: owner still reads costs");
+  ok((await db.query("select public.system_status() s")).rows[0].s.is_owner === true, "owner detected");
+  ok((await db.query("select public.signout_all() n")).rows[0].n === 1, "owner signs out all sessions");
+  await db.exec("reset role"); ok((await db.query("select count(*)::int n from auth.refresh_tokens")).rows[0].n === 0, "refresh tokens deleted");
+  await as(db, A); await db.query("select public.unlock_system()");
+  await as(db, K); ok((await db.query("select count(*)::int n from public.estoque_vendedor")).rows[0].n > 100, "UNLOCKED: seller reads stock again");
+  await db.exec("reset role; select set_config('request.jwt.claims','{}',false); set role anon;");
+  for (let i = 0; i < 8; i++) await db.query("select public.report_failed_login('x@y.com')");
+  ok(!!(await err(db, "select * from public.security_events")), "anon cannot read security_events");
+  ok(!!(await err(db, "select public.lock_system('x')")), "anon cannot lock");
+  await db.exec("reset role"); ok((await db.query("select count(*)::int n from public.security_events where kind='failed_login'")).rows[0].n === 5, "failed_login rate limited to 5/min per email");
+  const kinds = (await db.query("select string_agg(distinct kind, ',' order by kind) k from public.security_events")).rows[0].k;
+  ok(/lock/.test(kinds) && /unlock/.test(kinds) && /signout_all/.test(kinds), "lock/unlock/signout logged: " + kinds);
 }
-await suite("UPGRADE: old schema + seed + migration-002 x2", ["/tmp/pgt/schema-old.sql", "seed-produtos.sql", "migration-002.sql", "migration-002.sql", "migration-003.sql", "migration-003.sql"]);
-await suite("FRESH: new schema + seed (+ migration re-run)", ["schema.sql", "seed-produtos.sql", "migration-002.sql", "migration-003.sql", "schema.sql"]);
+await suite("UPGRADE: old schema + seed + migration-002 x2", ["/tmp/pgt/schema-old.sql", "seed-produtos.sql", "migration-002.sql", "migration-002.sql", "migration-003.sql", "migration-003.sql", "migration-004.sql", "migration-004.sql"]);
+await suite("FRESH: new schema + seed (+ migration re-run)", ["schema.sql", "seed-produtos.sql", "migration-002.sql", "migration-003.sql", "migration-004.sql", "schema.sql", "migration-002.sql", "migration-003.sql", "migration-004.sql"]);
 console.log(fails ? `${fails} FAILURES` : "ALL PASS");
