@@ -73,3 +73,17 @@ Para desativar alguém: `update public.profiles set ativo = false where handle =
 - Entrar como MB: vê tudo, lucro e margem; Produtos → Exportar CSV.
 - Testes automáticos do SQL (opcional): `cd /tmp/pgt && node supabase/tests/rls-test.mjs` (PGlite).
 - Tentar criar conta pela API pública → deve falhar (signup desligado).
+
+## Adicionar um novo usuário (convite por e-mail real)
+1. **Authentication → Users → Invite user** → e-mail real da pessoa. Ela recebe o link, abre `https://bgdstores.com/sistema/`, vê **"Criar sua senha"** (12+ caracteres, maiúscula, minúscula, número e símbolo) e já entra.
+   (Alternativa sem e-mail: *Create new user* com `<nome>@sistema.bgdstores.local` + Auto Confirm + senha definida pelo MB.)
+2. No SQL Editor, rode **uma linha** (troque e-mail, handle e nome; handle = `@` + 2–20 letras minúsculas/números/_):
+```sql
+insert into public.profiles (id, handle, nome, role) select id, '@novo', 'Novo', 'seller' from auth.users where lower(email) = 'novo@exemplo.com' on conflict (id) do update set handle = excluded.handle, nome = excluded.nome, role = excluded.role, ativo = true;
+```
+   Para admin, troque `'seller'` por `'admin'`. Ela faz login digitando o **e-mail completo** no campo "Nome ou e-mail".
+3. (Opcional) adicione a mesma linha no `supabase/users.sql` para manter a lista em dia.
+
+### Configurações de Auth necessárias para os links
+- **URL Configuration → Site URL:** `https://bgdstores.com/sistema/`; **Redirect URLs:** `https://bgdstores.com/sistema/` e `https://bgdstores.com/sistema/**`.
+- **Email Templates** (Invite user e Reset password): o link deve usar `{{ .ConfirmationURL }}` (padrão). Validade do link: padrão (24 h).

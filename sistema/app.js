@@ -13,16 +13,37 @@ const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase()
   const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   return n ? n + "@sistema.bgdstores.local" : ""; };
 const toast = m => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3500); };
-let me = null; // {handle, nome, role}
+let me = null;
+// ---------- Links de convite / recuperação do Supabase ----------
+const H = new URLSearchParams(location.hash.slice(1));
+const AUTH = { type: H.get("type") || qs.get("type"), access_token: H.get("access_token"), refresh_token: H.get("refresh_token"),
+  code: qs.get("code"), token_hash: qs.get("token_hash"), error: H.get("error") || qs.get("error"),
+  error_code: H.get("error_code") || qs.get("error_code"), error_description: H.get("error_description") || qs.get("error_description") };
+let needPassword = ["invite", "recovery"].includes(AUTH.type);
+const cleanUrl = () => history.replaceState(null, "", location.pathname + (MOCK ? "?mock=" + (qs.get("mock") || "admin") + (qs.has("auto") || needPassword ? "&auto=1" : "") : ""));
+const authErrorMsg = () => {
+  const c = (AUTH.error_code || AUTH.error || "").toLowerCase();
+  if (c.includes("expired") || /expired|invalid/i.test(AUTH.error_description || "")) return "Este link expirou ou já foi usado. Peça ao MB um novo convite.";
+  if (c.includes("access_denied")) return "Acesso negado pelo link. Peça ao MB um novo convite.";
+  return "Não foi possível abrir o link. Peça ao MB um novo convite.";
+};
+const strongPw = p => p.length >= 12 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p); // {handle, nome, role}
 
 // ---------------- Camada de dados ----------------
 let api;
 if (!MOCK) {
-  const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage } });
+  const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, detectSessionInUrl: false, flowType: "pkce" } });
+  sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") needPassword = true; });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
   api = {
     async login(email, pw) { if (!email) throw new Error("x"); ok(await sb.auth.signInWithPassword({ email, password: pw })); },
     async logout() { await sb.auth.signOut(); },
+    async consumeUrl() {
+      if (AUTH.access_token && AUTH.refresh_token) ok(await sb.auth.setSession({ access_token: AUTH.access_token, refresh_token: AUTH.refresh_token }));
+      else if (AUTH.code) ok(await sb.auth.exchangeCodeForSession(AUTH.code));
+      else if (AUTH.token_hash && AUTH.type) ok(await sb.auth.verifyOtp({ token_hash: AUTH.token_hash, type: AUTH.type }));
+    },
+    async setPassword(p) { ok(await sb.auth.updateUser({ password: p })); },
     async session() { return (await sb.auth.getSession()).data.session; },
     async aal() { return ok(await sb.auth.mfa.getAuthenticatorAssuranceLevel()); },
     async factors() { return ok(await sb.auth.mfa.listFactors()).totp || []; },
@@ -64,7 +85,7 @@ if (!MOCK) {
   const grp = (rows, key) => Object.values(rows.reduce((a, r) => { const k = r[key]; a[k] ||= { [key]: k, nome: r.nome, vendas: 0, itens: 0, faturamento: 0, custo: 0 }; a[k].vendas++; a[k].itens += r.qtd; a[k].faturamento += r.total; a[k].custo += r.qtd * r.custo; return a; }, {}));
   api = {
     async login(e, pw) { if (!e || !pw) throw new Error("Preencha e-mail e senha"); logged = true; },
-    async logout() { logged = false; }, async session() { await ready; return logged ? {} : null; },
+    async logout() { logged = false; }, async consumeUrl() { if (AUTH.access_token || AUTH.code || AUTH.token_hash) logged = true; }, async setPassword() {}, async session() { await ready; return logged ? {} : null; },
     async aal() { return { currentLevel: "aal1", nextLevel: "aal1" }; }, async factors() { return []; },
     async enroll() { return { id: "f1", totp: { qr_code: "", secret: "DEMO-SECRET-XXXX" } }; },
     async verify() { toast("Demonstração: 2FA ativado"); }, async unenroll() {},
@@ -83,11 +104,20 @@ if (!MOCK) {
 }
 
 // ---------------- Telas ----------------
+let urlDone = false;
 async function boot() {
+  if (!urlDone) { urlDone = true;
+    if (AUTH.error) { cleanUrl(); return viewLogin(authErrorMsg()); }
+    if (AUTH.access_token || AUTH.code || AUTH.token_hash) {
+      try { await api.consumeUrl(); } catch (e) { needPassword = false; cleanUrl(); return viewLogin(authErrorMsg()); }
+      cleanUrl();
+    }
+  }
   const s = await api.session();
   if (!s) return viewLogin();
   const a = await api.aal();
   if (a.nextLevel === "aal2" && a.currentLevel !== "aal2") return viewMfaChallenge();
+  if (needPassword) return viewCriarSenha();
   try { me = await api.profile(); } catch { me = null; }
   if (!me || me.ativo === false) { await api.logout(); return viewLogin("Conta sem perfil ativo. Fale com o MB."); }
   $("#who").textContent = `${me.nome} (${me.handle}) · ${me.role === "admin" ? "Admin" : "Vendedor(a)"}`;
@@ -106,11 +136,29 @@ function go(v) {
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
 $("#sair").onclick = async () => { await api.logout(); location.hash = ""; location.reload(); };
 
+function viewCriarSenha() {
+  $("#nav").hidden = true; $("#who").textContent = "";
+  app.innerHTML = `<div class="card login"><h2>Criar sua senha</h2>
+  <p class="muted">Bem-vindo(a) ao Sistema BAGDA. Crie uma senha com pelo menos 12 caracteres, incluindo letra maiúscula, minúscula, número e símbolo.</p>
+  <form id="f"><label>Nova senha</label><input id="p1" type="password" autocomplete="new-password" minlength="12" required>
+  <label>Confirmar senha</label><input id="p2" type="password" autocomplete="new-password" minlength="12" required>
+  <ul class="muted" id="rq" style="padding-left:18px;margin:10px 0 0"></ul>
+  <button class="btn">Salvar senha e entrar</button></form><p class="warn" id="m"></p></div>`;
+  const rules = [["12+ caracteres", p => p.length >= 12], ["Letra maiúscula", p => /[A-Z]/.test(p)], ["Letra minúscula", p => /[a-z]/.test(p)], ["Número", p => /[0-9]/.test(p)], ["Símbolo (!@#…)", p => /[^A-Za-z0-9]/.test(p)]];
+  const draw = () => { const p = $("#p1").value; $("#rq").innerHTML = rules.map(([l, f]) => `<li style="color:${f(p) ? "#15803d" : "inherit"}">${f(p) ? "✓" : "•"} ${l}</li>`).join(""); };
+  $("#p1").oninput = draw; draw();
+  $("#f").onsubmit = async ev => { ev.preventDefault(); const p = $("#p1").value;
+    if (!strongPw(p)) return $("#m").textContent = "A senha não atende aos requisitos.";
+    if (p !== $("#p2").value) return $("#m").textContent = "As senhas não conferem.";
+    ev.submitter.disabled = true;
+    try { await api.setPassword(p); needPassword = false; toast("Senha criada ✓"); boot(); }
+    catch (e) { ev.submitter.disabled = false; $("#m").textContent = /weak|leaked|pwned/i.test(e.message) ? "Senha fraca ou já vazada na internet. Escolha outra." : "Não foi possível salvar: " + e.message; } };
+}
 function viewLogin(msg) {
   $("#nav").hidden = true; $("#who").textContent = "";
   app.innerHTML = `<div class="card login"><h2>Entrar no Sistema</h2>
   <p class="muted">Acesso restrito à equipe BAGDA. Digite seu nome e senha. Contas são criadas pelo administrador.</p>
-  <form id="f"><label>Nome</label><input id="e" autocomplete="username" autocapitalize="words" placeholder="Seu nome (ex.: Kaio)" required>
+  <form id="f"><label>Nome ou e-mail</label><input id="e" autocomplete="username" autocapitalize="none" placeholder="Seu nome (ex.: Kaio) ou e-mail" required>
   <label>Senha</label><input id="p" type="password" autocomplete="current-password" minlength="10" required>
   <button class="btn">Entrar</button></form><p class="warn" id="m">${esc(msg || "")}</p></div>`;
   let fails = 0;

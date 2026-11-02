@@ -10,10 +10,11 @@ from (values
   ('bianca@sistema.bgdstores.local',    '@bianca',   'Bianca',   'seller'),
   ('fernanda@sistema.bgdstores.local',  '@fernanda', 'Fernanda', 'seller'),
   ('pamela@sistema.bgdstores.local',    '@pamela',   'Pamela',   'seller'),
-  ('abdo@sistema.bgdstores.local',      '@abdo',     'Abdo',     'seller')
+  ('abdo@sistema.bgdstores.local',      '@abdo',     'Abdo',     'seller'),
+  ('bassalhadi36@gmail.com',            '@hadi',     'Hadi',     'seller')   -- vendedor com e-mail real (convite)
 ) as v(email, handle, nome, role)
 join auth.users u on lower(u.email) = v.email
 on conflict (id) do update set handle = excluded.handle, nome = excluded.nome, role = excluded.role, ativo = true;
 
--- Conferência: deve listar 8 linhas.
+-- Conferência: deve listar 9 linhas (quem ainda não foi criado em Auth não aparece).
 select p.handle, p.role, u.email from public.profiles p join auth.users u on u.id = p.id order by p.role, p.handle;
