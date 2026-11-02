@@ -9,6 +9,9 @@ const app = $("#app");
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase();
+  const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return n ? n + "@sistema.bgdstores.local" : ""; };
 const toast = m => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3500); };
 let me = null; // {handle, nome, role}
 
@@ -18,7 +21,7 @@ if (!MOCK) {
   const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage } });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
   api = {
-    async login(email, pw) { ok(await sb.auth.signInWithPassword({ email, password: pw })); },
+    async login(email, pw) { if (!email) throw new Error("x"); ok(await sb.auth.signInWithPassword({ email, password: pw })); },
     async logout() { await sb.auth.signOut(); },
     async session() { return (await sb.auth.getSession()).data.session; },
     async aal() { return ok(await sb.auth.mfa.getAuthenticatorAssuranceLevel()); },
@@ -34,6 +37,10 @@ if (!MOCK) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
+    async criarNota(forma, items, cliente) { return ok(await sb.rpc("criar_nota", { p_forma: forma, p_items: items, p_cliente: cliente || null })); },
+    async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
+    async notas() { return ok(await sb.from("v_nota_itens").select("nota_id,data,created_at,forma_pagamento,handle,total").order("nota_id", { ascending: false }).limit(300)); },
+    async adminProducts() { return ok(await sb.from("v_admin_products").select("*").order("sku")); },
     async purchases() { return ok(await sb.from("purchases").select("*").order("id", { ascending: false }).limit(100)); },
     async addPurchase(p) { ok(await sb.from("purchases").insert(p)); },
     async saveProduct(p, custo) {
@@ -66,6 +73,10 @@ if (!MOCK) {
     async addSale(s) { const p = P.find(x => x.sku === s.sku); if (!p || p.estoque < s.qtd) throw new Error("Estoque insuficiente ou produto inativo"); p.estoque -= s.qtd; S.unshift({ id: id++, data: today(), ...s, marca: p.marca, produto: p.produto, preco_tabela: p.preco_venda, total: s.qtd * s.preco_vendido, handle: me.handle, nome: me.nome, custo: K[p.sku], aviso: s.preco_vendido < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date().toISOString() }); },
     async sales() { return S; }, async repSeller() { return grp(S, "handle"); }, async repPay() { return grp(S, "forma_pagamento"); },
     async repProfit() { return role === "admin" ? grp(S, "handle").map(r => ({ ...r, lucro: r.faturamento - r.custo })) : []; },
+    async criarNota(forma, items, cliente) { const nid = 1000 + id++; for (const it of items) { await this.addSale({ ...it, forma_pagamento: forma }); S[0].nota_id = nid; S[0].cliente = cliente; } return nid; },
+    async nota(nid) { return S.filter(s => s.nota_id === nid); },
+    async notas() { return S.filter(s => s.nota_id); },
+    async adminProducts() { return P.map(p => ({ ...p, custo: K[p.sku] })); },
     async purchases() { return PU; }, async addPurchase(p) { PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
@@ -82,13 +93,14 @@ async function boot() {
   $("#who").textContent = `${me.nome} (${me.handle}) · ${me.role === "admin" ? "Admin" : "Vendedor(a)"}`;
   $("#nav").hidden = false;
   document.querySelectorAll("nav .adm").forEach(b => b.hidden = me.role !== "admin");
-  go(location.hash.slice(1) || "venda");
+  if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota("PIX", [{ sku: "ARM-001", qtd: 1, preco_vendido: 270 }, { sku: "FER-004", qtd: 2, preco_vendido: 100 }], "Cliente Teste"));
+  go(location.hash.slice(1) || "nota");
 }
 function go(v) {
-  if (["compras", "produtos"].includes(v) && me.role !== "admin") v = "venda";
+  if (["compras", "produtos", "estoque", "relatorio", "vendas"].includes(v) && me.role !== "admin") v = "nota";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ venda: viewVenda, vendas: viewVendas, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca }[v] || viewVenda)()
+  ({ nota: viewNota, notas: viewNotas, venda: viewNota, vendas: viewVendas, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca }[v] || viewNota)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -97,14 +109,14 @@ $("#sair").onclick = async () => { await api.logout(); location.hash = ""; locat
 function viewLogin(msg) {
   $("#nav").hidden = true; $("#who").textContent = "";
   app.innerHTML = `<div class="card login"><h2>Entrar no Sistema</h2>
-  <p class="muted">Acesso restrito à equipe BAGDA. Contas são criadas pelo administrador.</p>
-  <form id="f"><label>E-mail</label><input id="e" type="email" autocomplete="username" required>
+  <p class="muted">Acesso restrito à equipe BAGDA. Digite seu nome e senha. Contas são criadas pelo administrador.</p>
+  <form id="f"><label>Nome</label><input id="e" autocomplete="username" autocapitalize="words" placeholder="Seu nome (ex.: Kaio)" required>
   <label>Senha</label><input id="p" type="password" autocomplete="current-password" minlength="10" required>
   <button class="btn">Entrar</button></form><p class="warn" id="m">${esc(msg || "")}</p></div>`;
   let fails = 0;
   $("#f").onsubmit = async ev => { ev.preventDefault(); const b = ev.submitter; b.disabled = true;
-    try { await api.login($("#e").value.trim(), $("#p").value); await boot(); }
-    catch (e) { fails++; $("#m").textContent = "E-mail ou senha inválidos."; setTimeout(() => b.disabled = false, Math.min(30000, 1000 * 2 ** fails)); } };
+    try { await api.login(toEmail($("#e").value), $("#p").value); await boot(); }
+    catch (e) { fails++; $("#m").textContent = "Nome ou senha inválidos."; setTimeout(() => b.disabled = false, Math.min(30000, 1000 * 2 ** fails)); } };
 }
 async function viewMfaChallenge() {
   const f = (await api.factors()).find(x => x.status === "verified");
@@ -171,9 +183,10 @@ async function viewCompras() {
 }
 async function viewProdutos() {
   const [P, K] = await Promise.all([api.products(), api.costs()]); const cm = Object.fromEntries(K.map(k => [k.sku, k.custo]));
-  app.innerHTML = `<div class="card"><h2>Produtos e custos (admin)</h2><table><tr><th>SKU</th><th>Produto</th><th class="n">Custo</th><th class="n">Venda</th><th class="n">Margem</th><th class="n">Estoque</th></tr>
+  app.innerHTML = `<div class="card"><h2>Produtos e custos (admin) <button class="btn" id="csv" style="float:right;margin:0">Exportar CSV</button></h2><table><tr><th>SKU</th><th>Produto</th><th class="n">Custo</th><th class="n">Venda</th><th class="n">Margem</th><th class="n">Estoque</th></tr>
   ${P.map(p => { const c = cm[p.sku]; return `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</td><td class="n">${c != null ? brl(c) : "—"}</td><td class="n">${brl(p.preco_venda)}</td><td class="n">${c ? ((p.preco_venda - c) / p.preco_venda * 100).toFixed(0) + "%" : "—"}</td><td class="n">${p.estoque}</td></tr>`; }).join("")}</table></div>
   <div class="card"><h2>Adicionar / editar produto</h2><form id="f"><div class="grid"><div><label>SKU</label><input id="sku" required pattern="[A-Z0-9-]{3,20}"></div><div><label>Marca</label><input id="ma" required></div><div><label>Produto</label><input id="pr" required></div><div><label>Tamanho</label><input id="ta"></div><div><label>Preço de venda</label><input id="pv" type="number" step="0.01" required></div><div><label>Custo (só admin vê)</label><input id="cu" type="number" step="0.01"></div><div><label>Estoque mínimo</label><input id="em" type="number" value="2"></div></div><button class="btn">Salvar</button></form></div>`;
+  $("#csv").onclick = () => exportCSV().catch(e => toast(e.message));
   $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.saveProduct({ sku: $("#sku").value, marca: $("#ma").value, produto: $("#pr").value, tamanho: $("#ta").value || null, preco_venda: +$("#pv").value, estoque_minimo: +$("#em").value, ativo: true }, $("#cu").value); toast("Produto salvo ✓"); viewProdutos(); } catch (e) { toast(e.message); } };
 }
 async function viewSeguranca() {
@@ -186,6 +199,58 @@ async function viewSeguranca() {
     $("#q").innerHTML = `<h3>1. Escaneie o QR code</h3>${r.totp.qr_code ? `<img class="qr" alt="QR" src="${esc(r.totp.qr_code)}">` : ""}<p class="muted">Ou digite a chave: <code>${esc(r.totp.secret)}</code></p>
     <h3>2. Digite o código</h3><form id="vf"><input id="c" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required style="max-width:160px"><button class="btn">Confirmar</button></form>`;
     $("#vf").onsubmit = async ev => { ev.preventDefault(); try { await api.verify(r.id, $("#c").value); toast("2FA ativado ✓"); viewSeguranca(); } catch { toast("Código inválido"); } }; };
+}
+async function viewNota() {
+  const P = (await api.products()).filter(p => p.ativo); let items = [];
+  app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
+  <label>Produto</label><select id="sku" required><option value="">Escolha…</option>${P.map(p => `<option value="${esc(p.sku)}" ${p.estoque < 1 ? "disabled" : ""}>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")} — ${brl(p.preco_venda)} (${p.estoque} disp.)</option>`).join("")}</select>
+  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="50" value="1" required></div>
+  <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
+  <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
+  <h3>Itens da nota</h3><table id="it"></table>
+  <div class="grid"><div><label>Forma de pagamento</label><select id="fp">${PAY.map(x => `<option>${x}</option>`).join("")}</select></div>
+  <div><label>Cliente (opcional)</label><input id="cl" maxlength="120"></div></div>
+  <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
+  const draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0))}</th><th></th></tr>`;
+    document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
+  const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = p && v && v < p.preco_venda ? `Atenção: abaixo do preço de tabela (${brl(p.preco_venda)})` : ""; };
+  $("#sku").onchange = chk; $("#pv").oninput = chk;
+  $("#f").onsubmit = ev => { ev.preventDefault(); const p = P.find(x => x.sku === $("#sku").value), q = +$("#q").value;
+    const ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
+    if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
+    items.push({ sku: p.sku, qtd: q, preco_vendido: +$("#pv").value, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); $("#f").reset(); $("#w").textContent = ""; draw(); };
+  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item"); $("#fin").disabled = true;
+    try { const nid = await api.criarNota($("#fp").value, items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), $("#cl").value); toast("Nota gerada ✓"); viewRecibo(nid); }
+    catch (e) { toast(e.message); $("#fin").disabled = false; } };
+  draw();
+}
+async function viewRecibo(nid) {
+  const R = await api.nota(nid); if (!R.length) return toast("Nota não encontrada");
+  const h = R[0], tot = R.reduce((a, r) => a + Number(r.total), 0);
+  app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
+  <div class="recibo"><div class="rh"><b>BAGDA PERFUMES</b><small>bgdstores.com</small></div>
+  <div class="rm2"><span>NOTA Nº <b>${String(nid).padStart(6, "0")}</b></span><span>${new Date(h.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span></div>
+  <div class="rm2"><span>Vendedor(a): ${esc(h.nome)} (${esc(h.handle)})</span>${h.cliente ? `<span>Cliente: ${esc(h.cliente)}</span>` : ""}</div>
+  <table><tr><th>Item</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th></tr>
+  ${R.map(r => `<tr><td>${esc(r.marca)} ${esc(r.produto)} ${esc(r.tamanho || "")}</td><td class="n">${r.qtd}</td><td class="n">${brl(r.preco_vendido)}</td><td class="n">${brl(r.total)}</td></tr>`).join("")}
+  <tr class="tot"><td colspan="3">TOTAL</td><td class="n">${brl(tot)}</td></tr></table>
+  <p>Pagamento: <b>${esc(h.forma_pagamento)}</b></p><p class="muted" style="text-align:center">Obrigado pela preferência!</p></div>`;
+  $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
+}
+async function viewNotas() {
+  const R = await api.notas(), by = {};
+  R.forEach(r => { by[r.nota_id] ||= { ...r, total: 0 }; by[r.nota_id].total += Number(r.total); });
+  const L = Object.values(by).sort((a, b) => b.nota_id - a.nota_id);
+  app.innerHTML = `<div class="card"><h2>${me.role === "admin" ? "Notas" : "Minhas notas"}</h2><table><tr><th>Nº</th><th>Data</th><th>Pagamento</th>${me.role === "admin" ? "<th>Vendedor</th>" : ""}<th class="n">Total</th><th></th></tr>
+  ${L.map(n => `<tr><td>${String(n.nota_id).padStart(6, "0")}</td><td>${esc(n.data)}</td><td>${esc(n.forma_pagamento)}</td>${me.role === "admin" ? `<td>${esc(n.handle)}</td>` : ""}<td class="n">${brl(n.total)}</td><td><button class="ver" data-n="${n.nota_id}">Ver / imprimir</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma nota.</td></tr>'}</table></div>`;
+  document.querySelectorAll(".ver").forEach(b => b.onclick = () => viewRecibo(+b.dataset.n));
+}
+async function exportCSV() {
+  const R = await api.adminProducts(), cols = ["sku", "marca", "produto", "tamanho", "fornecedor", "custo", "preco_venda", "margem_pct", "estoque", "estoque_minimo", "ativo"];
+  const cell = v => { let s = String(v ?? ""); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+  const csv = "\ufeff" + cols.join(";") + "\n" + R.map(r => cols.map(c => cell(r[c])).join(";")).join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `produtos-custo-${today()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 boot().catch(e => { console.error(e); viewLogin("Erro ao conectar."); });
 })();

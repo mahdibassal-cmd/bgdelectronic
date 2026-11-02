@@ -20,3 +20,7 @@ td.n,th.n{text-align:right}.low{color:#c2410c;font-weight:700}.warn{color:#c2410
 .login{max-width:380px;margin:60px auto}.muted{color:var(--dim);font-size:13px}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;display:none}
 .qr{background:#fff;padding:10px;border:1px solid var(--ln);border-radius:10px;width:200px}
+.recibo{background:#fff;max-width:420px;margin:0 auto;padding:24px;border:1px solid var(--ln);border-radius:12px;font-size:14px}
+.rh{text-align:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:10px}.rh b{display:block;font-size:22px;letter-spacing:.12em}.rh small{color:var(--dim)}
+.rm2{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}.recibo tr.tot td{font-weight:800;font-size:16px;border-top:2px solid var(--ink)}
+@media print{.top,#mockbar,.noprint,#toast{display:none!important}body{background:#fff}main{margin:0}.recibo{border:0;max-width:none}}

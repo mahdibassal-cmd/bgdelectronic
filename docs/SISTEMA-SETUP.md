@@ -25,31 +25,51 @@ Enquanto `sistema/config.js` tiver os placeholders, a página roda em **modo dem
 - **Site URL**: `https://bgdstores.com/sistema/`
 - **Redirect URLs**: `https://bgdstores.com/sistema/**` (só isso).
 
-## 5. Rodar o banco
-**SQL Editor → New query**, cole e rode **nesta ordem**:
-1. `supabase/schema.sql` (tabelas, RLS, triggers, views)
+## 5. Rodar o banco (SQL Editor → New query, nesta ordem)
+**Projeto que JÁ rodou o schema antigo** (caso atual):
+1. `supabase/migration-002.sql` — notas/recibos, relatórios e custo só admin, export. Pode rodar de novo sem problema.
+
+**Instalação nova do zero:**
+1. `supabase/schema.sql` (já inclui a 002)
 2. `supabase/seed-produtos.sql` (112 produtos da planilha; estoque começa 0)
 
-Depois, no **Table Editor**, confirme que todas as tabelas mostram **RLS enabled**.
-Em **Database → Advisors → Security Advisor**, rode e verifique que não há alertas.
+Depois: Table Editor → todas as tabelas com **RLS enabled**; Database → Advisors → **Security Advisor** sem alertas.
 
-## 6. Criar os usuários (só o MB)
-**Authentication → Users → Add user → Create new user**, marque **Auto Confirm User**, um para cada:
-MB (admin), Kaio, Suelen, Leticia, Bianca, Fernanda, Pamela, Abdo.
-Use e-mails reais de cada um e senhas fortes geradas (cada pessoa troca depois, se quiser). Não mande senhas por chat aberto.
+## 6. Criar os 8 usuários (só o MB)
+**Authentication → Users → Add user → Create new user**, marque **Auto Confirm User** em todos.
+Senhas fortes (12+ caracteres) definidas pelo MB, geradas num gerenciador de senhas; entregue a cada vendedor pessoalmente — nunca por chat aberto.
 
-Depois edite `supabase/users.sql`, troque `EMAIL_DO_MB`, `EMAIL_DA_KAIO`… pelos e-mails reais e rode no SQL Editor.
-Isso cria os perfis com handle e **define o MB como admin**. Quem não tiver perfil não vê nada.
+| Login na tela (campo "Nome") | E-mail para criar no Supabase | Papel |
+|---|---|---|
+| mahdibassal@icloud.com | `mahdibassal@icloud.com` | admin |
+| Kaio | `kaio@sistema.bgdstores.local` | vendedor |
+| Suelen | `suelen@sistema.bgdstores.local` | vendedor |
+| Leticia | `leticia@sistema.bgdstores.local` | vendedor |
+| Bianca | `bianca@sistema.bgdstores.local` | vendedor |
+| Fernanda | `fernanda@sistema.bgdstores.local` | vendedor |
+| Pamela | `pamela@sistema.bgdstores.local` | vendedor |
+| Abdo | `abdo@sistema.bgdstores.local` | vendedor |
+
+Os vendedores digitam só o **nome** (sem acento/maiúscula importa: "Letícia" = "leticia") + senha. Os e-mails `.local` não existem de verdade — por isso **Auto Confirm** é obrigatório e "esqueci a senha" não funciona para eles (o MB redefine em Users → ⋯ → *Reset password*/editar).
+O MB entra digitando o e-mail completo.
+
+Depois rode `supabase/users.sql` (já tem os 8 e-mails; idempotente). A última consulta deve listar **8 linhas** (1 admin + 7 vendedores). Quem não tiver perfil não vê nada.
 
 Para desativar alguém: `update public.profiles set ativo = false where handle = '@fulano';` (e em Users → *Ban user*).
+
+## O que cada um vê
+- **Vendedor:** só *Nova nota* (produto, qtd, preço vendido, pagamento) → recibo para imprimir/salvar PDF, e *Notas* (as próprias). Vê nome, preço e quantidade disponível dos produtos. **Nunca** vê custo, compras, relatórios ou export — bloqueado no banco (RLS), não só na tela.
+- **Admin:** tudo + Estoque, Relatório, Compras, Produtos com custo e **Exportar CSV**.
+- Cada item da nota baixa o estoque automaticamente; se faltar estoque a nota inteira é recusada.
 
 ## 7. Ligar o site ao projeto
 **Project Settings → API**: copie **Project URL** e a chave **anon / publishable**.
 ⚠️ **Nunca** use a chave `service_role` / `secret` no site.
-Passe os dois valores ao GODaddy Covers (a chave anon é pública por design; a segurança vem do RLS), que coloca em `sistema/config.js` e publica após seu OK.
+(Já configurado em `sistema/config.js`.) A chave publishable é pública por design; a segurança vem do RLS.
 
 ## 8. Teste final (antes de entregar à equipe)
-- Entrar como vendedor: vê só as próprias vendas, não vê Compras/Produtos/custo/lucro.
-- Registrar uma venda: estoque baixa 1; venda abaixo da tabela mostra aviso.
-- Entrar como MB: vê tudo, lucro e margem.
+- Entrar como vendedor (ex.: `Kaio`): só Nova nota e Notas; gerar uma nota e imprimir.
+- Conferir que o estoque baixou; tentar vender mais do que tem → recusado.
+- Entrar como MB: vê tudo, lucro e margem; Produtos → Exportar CSV.
+- Testes automáticos do SQL (opcional): `cd /tmp/pgt && node supabase/tests/rls-test.mjs` (PGlite).
 - Tentar criar conta pela API pública → deve falhar (signup desligado).
