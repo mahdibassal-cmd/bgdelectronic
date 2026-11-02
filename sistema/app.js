@@ -85,7 +85,7 @@ if (!MOCK) {
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
     async criarNota(forma, items, cliente) { return ok(await sb.rpc("criar_nota", { p_forma: forma, p_items: items, p_cliente: cliente || null })); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
-    async notas() { return ok(await sb.from("v_nota_itens").select("nota_id,data,created_at,forma_pagamento,handle,total").order("nota_id", { ascending: false }).limit(300)); },
+    async notas() { return ok(await sb.from("v_nota_itens").select("nota_id,data,created_at,forma_pagamento,handle,total").order("created_at", { ascending: false }).order("nota_id", { ascending: false }).limit(300)); },
     async adminProducts() { return ok(await sb.from("v_admin_products").select("*").order("sku")); },
     async purchases() { return ok(await sb.from("purchases").select("*").order("id", { ascending: false }).limit(100)); },
     async addPurchase(p) { ok(await sb.from("purchases").insert(p)); },
@@ -104,7 +104,7 @@ if (!MOCK) {
     const sellers = [["@kaio", "Kaio"], ["@suelen", "Suelen"], ["@leticia", "Leticia"], ["@bianca", "Bianca"]];
     for (let i = 0; i < 14; i++) {
       const p = P[(i * 5) % P.length], s = role === "seller" ? ["@kaio", "Kaio"] : sellers[i % 4], pv = p.preco_venda - (i % 3 === 0 ? 10 : 0);
-      S.push({ id: id++, data: today(), sku: p.sku, marca: p.marca, produto: p.produto, qtd: 1 + (i % 2), preco_tabela: p.preco_venda, preco_vendido: pv, total: pv * (1 + (i % 2)), forma_pagamento: PAY[i % 4], handle: s[0], nome: s[1], custo: K[p.sku], aviso: pv < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date(Date.now() - i * 3e6).toISOString() });
+      S.push({ id: id++, data: today(), sku: p.sku, marca: p.marca, produto: p.produto, qtd: 1 + (i % 2), preco_tabela: p.preco_venda, preco_vendido: pv, total: pv * (1 + (i % 2)), forma_pagamento: PAY[i % 4], handle: s[0], nome: s[1], custo: K[p.sku], aviso: pv < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date(Date.now() - Math.floor(i / 2) * 9e6 - (i > 7 ? 864e5 * (i - 6) : 0)).toISOString(), nota_id: 1 + (6 - Math.floor(i / 2)), cliente: null });
     }
   });
   const grp = (rows, key) => Object.values(rows.reduce((a, r) => { const k = r[key]; a[k] ||= { [key]: k, nome: r.nome, vendas: 0, itens: 0, faturamento: 0, custo: 0 }; a[k].vendas++; a[k].itens += r.qtd; a[k].faturamento += r.total; a[k].custo += r.qtd * r.custo; return a; }, {}));
@@ -328,11 +328,19 @@ async function viewRecibo(nid) {
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
 }
 async function viewNotas() {
-  const R = await api.notas(), by = {};
+  const R = await api.notas(), by = {}, adm = me.role === "admin", TZ = "America/Sao_Paulo";
   R.forEach(r => { by[r.nota_id] ||= { ...r, total: 0 }; by[r.nota_id].total += Number(r.total); });
-  const L = Object.values(by).sort((a, b) => b.nota_id - a.nota_id);
-  app.innerHTML = `<div class="card"><h2>${me.role === "admin" ? "Notas" : "Minhas notas"}</h2><table><tr><th>Nº</th><th>Data</th><th>Pagamento</th>${me.role === "admin" ? "<th>Vendedor</th>" : ""}<th class="n">Total</th><th></th></tr>
-  ${L.map(n => `<tr><td>${String(n.nota_id).padStart(6, "0")}</td><td>${esc(n.data)}</td><td>${esc(n.forma_pagamento)}</td>${me.role === "admin" ? `<td>${esc(n.handle)}</td>` : ""}<td class="n">${brl(n.total)}</td><td><button class="ver" data-n="${n.nota_id}">Ver / imprimir</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma nota.</td></tr>'}</table></div>`;
+  const L = Object.values(by).sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (b.nota_id - a.nota_id));
+  const dkey = d => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
+  const dt = d => new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(d).replace(",", "");
+  const hoje = dkey(new Date()), ontem = dkey(new Date(Date.now() - 864e5));
+  const label = d => { const k = dkey(d); return k === hoje ? "Hoje" : k === ontem ? "Ontem" : new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).format(d); };
+  const cols = adm ? 6 : 5; let last = "", rows = "";
+  for (const n of L) { const d = new Date(n.created_at), k = dkey(d);
+    if (k !== last) { rows += `<tr class="sep"><th colspan="${cols}">${esc(label(d))}</th></tr>`; last = k; }
+    rows += `<tr><td>${String(n.nota_id).padStart(6, "0")}</td><td>${esc(dt(d))}</td><td>${esc(n.forma_pagamento)}</td>${adm ? `<td>${esc(n.handle)}</td>` : ""}<td class="n">${brl(n.total)}</td><td><button class="ver" data-n="${n.nota_id}">Ver / imprimir</button></td></tr>`; }
+  app.innerHTML = `<div class="card"><h2>${adm ? "Notas" : "Minhas notas"}</h2><table class="stk"><tr><th>Nº</th><th>Data / hora</th><th>Pagamento</th>${adm ? "<th>Vendedor</th>" : ""}<th class="n">Total</th><th></th></tr>
+  ${rows || `<tr><td colspan="${cols}" class="muted">Nenhuma nota.</td></tr>`}</table></div>`;
   document.querySelectorAll(".ver").forEach(b => b.onclick = () => viewRecibo(+b.dataset.n));
 }
 async function exportCSV() {
