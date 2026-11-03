@@ -42,21 +42,21 @@ const printBtns = () => { const pr = $("#pr"); if (!pr) return; pr.textContent =
 const rnum = v => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); /* sem "R$" nem U+00A0 (o driver térmico imprime o NBSP como lixo) */
 /* cupom térmico em texto puro (ASCII, colunas com espaços): o driver da Bematech ignora CSS e não usa UTF-8 */
 const asc = s => String(s ?? "").replace(/º/g, "o").replace(/ª/g, "a").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\u00a0\u202f]/g, " ").replace(/[^\x20-\x7e]/g, "");
-const rcW = () => document.documentElement.classList.contains("w58") ? 32 : 42;
+const rcW = () => document.documentElement.classList.contains("w58") ? 32 : 40;
 const rcL = (a, b, W = rcW()) => { a = asc(a); b = asc(b); const n = W - a.length - b.length; return n >= 1 ? a + " ".repeat(n) + b : a + "\n" + " ".repeat(Math.max(0, W - b.length)) + b; };
-const rcC = (s, W = rcW()) => { s = asc(s); return s.length >= W ? s : " ".repeat(Math.floor((W - s.length) / 2)) + s; };
+const rcC = (s, W = rcW()) => { s = asc(s).slice(0, W); return s.length >= W ? s : " ".repeat(Math.floor((W - s.length) / 2)) + s; };
 const rcWrap = (s, W = rcW()) => { const o = []; let l = ""; for (const w of asc(s).split(/\s+/).filter(Boolean)) { if (!l) l = w; else if ((l + " " + w).length <= W) l += " " + w; else { o.push(l); l = w; } while (l.length > W) { o.push(l.slice(0, W)); l = l.slice(W); } } if (l) o.push(l); return o.join("\n"); };
-const rc3 = (a, b, c, W = rcW()) => { const cw = W >= 42 ? 14 : 11; a = asc(a); return a + " ".repeat(Math.max(1, W - 2 * cw - a.length)) + asc(b).padStart(cw) + asc(c).padStart(cw); };
+const rc3 = (a, b, c, W = rcW()) => { const cw = W >= 40 ? 13 : 11; a = asc(a); return a + " ".repeat(Math.max(1, W - 2 * cw - a.length)) + asc(b).padStart(cw) + asc(c).padStart(cw); };
 const rcEsc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
-  const head = [rcC(store), rcC("bgdstores.com"), E].join("\n");
+  const head = [rcC(store), rcC("bgdstores.com"), E].join("\n") + "\n";
   const L = ["PEDIDO DE VENDA", rcL("Data: " + dt.toLocaleDateString("pt-BR", { timeZone: TZ }), dt.toLocaleTimeString("pt-BR", { timeZone: TZ })),
     ...(h.cliente ? [rcWrap("Cliente: " + h.cliente)] : []), rcWrap("Vendedor: " + h.nome + " (" + h.handle + ")"), "Nota No.: " + String(nid).padStart(6, "0"), E,
     "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
     ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
     rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot)), D,
     ...pays.map(p => rcWrap("Pago: " + p)), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
-  return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.join("\n"))}</pre></div>`; };
+  return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
