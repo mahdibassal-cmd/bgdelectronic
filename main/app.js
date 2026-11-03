@@ -203,6 +203,7 @@ if (!MOCK && !CONFIGURED) {
     async caixaResumo(c, d) { return ok(await sb.rpc("caixa_resumo", { p_caixa: c, p_data: d })); },
     async caixaSessoes(d) { return ok(await sb.from("caixa_sessoes").select("*").eq("data", d)); },
     async caixaLancar(m) { ok(await sb.from("caixa_movimentos").insert(m)); },
+    async estornarMov(mid, m, cn) { const r = await sb.rpc("estornar_movimento_caixa", { p_mov: mid, p_motivo: m, p_cancelar_nota: !!cn }); if (r.error && /PGRST202|42883|estornar_movimento_caixa/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Estornar movimento de caixa ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
     async caixaAbrir(c, v) { return ok(await sb.rpc("caixa_abrir", { p_caixa: c, p_valor: v })); },
     async caixaFechar(c, v) { return ok(await sb.rpc("caixa_fechar", { p_caixa: c, p_contado: v })); },
     async usuarios() { return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").order("nome")); },
@@ -263,7 +264,7 @@ if (!MOCK && !CONFIGURED) {
     N.filter(n => n.nota_id !== 3).forEach(n => PG.filter(g => g.nota_id === n.nota_id && !["prazo", "credito"].includes(g.metodo)).forEach(g => mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", g.valor, "Nota " + String(n.nota_id).padStart(6, "0"), n.nota_id, meU, n.created_at)));
     FO.push({ id: 1, nome: "Distribuidora Tech SP", cnpj: "11222333000181", contato: "Ana", telefone: "(11) 3333-0000", email: "vendas@tech.com", obs: "", ativo: true });
     CP.push({ id: 1, fornecedor_id: 1, valor: 3200, vencimento: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), descricao: "Lote fones JBL" }, { id: 2, fornecedor_id: 1, valor: 450, vencimento: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), descricao: "Frete" });
-    mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2));
+    mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2)); mov(3, "entrada", 28600, "DANIEL IPHONE DUO", null, U.find(u => /pamela/i.test(u.handle || "")) || U[0], H(0.2)); MV[MV.length - 1].forma = "cartao";
   });
   const crOk = k => !k.nota_id || (N.find(n => n.nota_id === k.nota_id) || {}).status === "ativa";
   const crSaldo = cid => CR.filter(k => k.cliente_id === cid && crOk(k)).reduce((a, k) => a + (k.tipo === "entrada" ? k.valor : -k.valor), 0);
@@ -364,7 +365,7 @@ if (!MOCK && !CONFIGURED) {
     async extrato(d) { const ns = vis().filter(n => n.data === d), ids = ns.map(n => n.nota_id), lucro = {}; const itens = IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...ns.find(n => n.nota_id === i.nota_id), ...i }));
       if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo); return { itens, pags: PG.filter(g => ids.includes(g.nota_id)), lucro }; },
     async caixaSaldos() { await ready; needCx(); return CX.map(c => ({ ...c, saldo: saldo(c.caixa_id), movimento_hoje: MV.filter(m => m.caixa_id === c.caixa_id && m.data === today()).reduce((a, m) => a + sv(m), 0) })); },
-    async caixaExtrato(d) { needCx(); return MV.filter(m => m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => ({ ...m, valor_assinado: sv(m) })); },
+    async caixaExtrato(d) { needCx(); return MV.filter(m => m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => ({ ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id) })); },
     async caixaResumo(c, d) { needCx(); if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão");
       const cx = CX.find(x => x.caixa_id === c), ini = MV.filter(m => m.caixa_id === c && m.data < d).reduce((a, m) => a + sv(m), 0);
       const mv = MV.filter(m => m.caixa_id === c && m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id);
@@ -373,6 +374,13 @@ if (!MOCK && !CONFIGURED) {
       return { caixa: cx.nome, data: d, saldo_inicial: ini, saldo_final: ini + mv.reduce((a, m) => a + m.assinado, 0), sessao: s ? { abertura_valor: s.abertura_valor, aberto_por: meU.nome, aberto_em: new Date(s.aberto_em).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }), fechamento_contado: s.fechamento_contado ?? null, diferenca: s.diferenca ?? null } : null,
         movimentos: mv, por_forma: pf, entradas: mv.filter(m => m.assinado > 0).reduce((a, m) => a + m.valor, 0), saidas: mv.filter(m => m.assinado < 0).reduce((a, m) => a + m.valor, 0) }; },
     async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d); },
+    async estornarMov(mid, m, cn) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar movimento de caixa"); if (!m || m.trim().length < 3) throw new Error("Informe o motivo do estorno"); const o = MV.find(x => x.id === mid); if (!o) throw new Error("Movimento não encontrado");
+      const e = MV.find(x => x.estorno_de === mid); if (e) return { ja_estornado: true, estorno_id: e.id }; if (o.estorno_de || o.tipo === "estorno") throw new Error("Este movimento já é um estorno");
+      if (o.tipo === "venda") { const n = N.find(x => x.nota_id === o.nota_id), liq = MV.filter(x => x.nota_id === o.nota_id && x.caixa_id === o.caixa_id).reduce((a, x) => a + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0), 0);
+        if (liq <= 0) throw new Error("Nota sem valor neste caixa"); mov(o.caixa_id, "estorno", liq, `${cn ? "Cancelamento nota" : "Estorno caixa nota"} ${String(o.nota_id).padStart(6, "0")}${cn ? "" : " (volta p/ lançar)"}: ${m}`, o.nota_id, meU);
+        if (n) { n.caixa_lancada_id = null; if (cn) { n.status = "cancelada"; IT.filter(i => i.nota_id === n.nota_id).forEach(i => { const p = P.find(x => x.sku === i.sku); if (p) p.estoque += i.qtd; }); } } }
+      else mov(o.caixa_id, o.tipo === "entrada" ? "saida" : "entrada", o.valor, `Estorno mov #${o.id} (${o.motivo || ""}): ${m}`, null, meU);
+      const nw = MV[MV.length - 1]; nw.estorno_de = mid; nw.forma = o.forma; return { estorno_id: nw.id, acao: o.tipo === "venda" ? (cn ? "nota_cancelada" : "nota_volta_a_lancar") : "manual" }; },
     async caixaLancar(m) { needCx(); if (!m.motivo || m.motivo.trim().length < 3) throw new Error("Informe o motivo"); mov(m.caixa_id, m.tipo, Number(m.valor), m.motivo, null, meU); },
     async caixaAbrir(c, v) { needCx(); if (SE.some(x => x.caixa_id === c && x.data === today())) throw new Error("Caixa já aberto hoje"); SE.push({ caixa_id: c, data: today(), abertura_valor: v, abertura_sistema: saldo(c), aberto_em: new Date().toISOString() }); },
     async caixaFechar(c, v) { needCx(); const x = SE.find(y => y.caixa_id === c && y.data === today() && !y.fechado_em); if (!x) throw new Error("Caixa não está aberto hoje (ou já foi fechado)"); Object.assign(x, { fechamento_contado: v, fechamento_sistema: saldo(c), diferenca: v - saldo(c), fechado_em: new Date().toISOString() }); return x.diferenca; },
@@ -869,12 +877,27 @@ async function viewNotas() {
   document.querySelectorAll(".cx").forEach(b => b.onclick = async () => { const m = prompt(`Cancelar nota ${String(b.dataset.n).padStart(6, "0")}? Informe o motivo (estoque volta e o valor é estornado do caixa):`);
     if (!m || m.trim().length < 3) return; try { await api.cancelarNota(+b.dataset.n, m.trim()); toast("Nota cancelada ✓"); viewNotas(); } catch (e) { toast(e.message); } });
 }
+// Estornar movimento de caixa (admin): motivo obrigatório + confirmação; nada é apagado (movimento inverso).
+function estornarMovBox(m, after) { if (!m) return; const nota = m.tipo === "venda" && m.nota_id, nn = nota ? String(m.nota_id).padStart(6, "0") : "";
+  const o = document.createElement("div"); o.className = "nmodal"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99";
+  o.innerHTML = `<div class="card" style="max-width:520px;margin:0;border:2px solid #b91c1c"><h2 style="color:#b91c1c">Estornar movimento de caixa</h2>
+  <p><b>${esc({ venda: "Venda", entrada: "Entrada", saida: "Saída" }[m.tipo] || m.tipo)}</b> · ${esc(m.caixa)} · <b>${brl(m.valor)}</b><br>${esc(m.motivo || "")}${m.handle ? ` · por ${esc(m.handle)}` : ""}</p>
+  <p class="muted">Nada é apagado: entra um movimento inverso no mesmo caixa, ligado a este, e fica no log.${nota ? ` A nota <b>${nn}</b> volta para <b>Notas a lançar</b> (venda e estoque continuam).` : m.tipo === "entrada" ? " Se for recebimento de cliente, a dívida dele reabre." : ""}</p>
+  ${nota ? `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="emc" style="width:auto;margin-top:4px"> <span>Também <b>cancelar a nota ${nn}</b> (devolve o estoque; Paga Depois e crédito Caixa Geral voltam)</span></label>` : ""}
+  <label>Motivo *</label><input id="emm" maxlength="200" placeholder="Ex.: lançado errado / cliente desistiu"><p class="warn" id="emw" style="min-height:1em"></p>
+  <button class="btn ghost" id="emn">Voltar</button> <button class="btn danger" id="emy">Continuar</button></div>`;
+  document.body.append(o); const i = o.querySelector("#emm"), y = o.querySelector("#emy"), w = o.querySelector("#emw"); let step = 0; i.focus();
+  o.querySelector("#emn").onclick = () => o.remove();
+  y.onclick = async () => { const mot = i.value.trim(), cn = !!(o.querySelector("#emc") || {}).checked; if (mot.length < 3) { w.textContent = "Informe o motivo (mín. 3 letras)."; return i.focus(); }
+    if (!step) { step = 1; w.textContent = `Confirma estornar ${brl(m.valor)}${cn ? ` e CANCELAR a nota ${nn}` : ""}? Clique de novo para confirmar.`; y.textContent = "Confirmar estorno"; return; }
+    y.disabled = true; try { const r = await api.estornarMov(m.id, mot, cn); o.remove(); toast(r && r.ja_estornado ? "Já estava estornado" : cn ? `Estornado ✓ nota ${nn} cancelada` : nota ? `Estornado ✓ nota ${nn} voltou para lançar` : "Movimento estornado ✓"); after && after(); }
+    catch (e) { w.textContent = e.message; y.disabled = false; } }; }
 async function viewCaixa(d = today()) {
   const [SA, EX, SE] = await Promise.all([api.caixaSaldos(), api.caixaExtrato(d), api.caixaSessoes(d)]), hoje = d === today();
   const TZ = "America/Sao_Paulo", hm = t => new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" };
   const ses = c => SE.find(x => x.caixa_id === c.caixa_id);
-  const fin = me.role === "admin" || me.role === "financeiro";
+  const fin = me.role === "admin" || me.role === "financeiro", adm = me.role === "admin";
   const card = c => { const x = ses(c); return `<div class="kpi cxk"><small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small><b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>
     <small>${x ? (x.fechado_em ? `Fechado: contado ${brl(x.fechamento_contado)} · diferença <b class="${+x.diferenca ? "warn" : ""}">${brl(x.diferenca)}</b>` : `Aberto ${hm(x.aberto_em)} com ${brl(x.abertura_valor)}`) : "Não aberto hoje"}</small>
     ${hoje ? `<div class="noprint cxa">${!x ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="va"><button class="btn ghost ab" data-c="${c.caixa_id}">Abrir</button>` : !x.fechado_em ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="vf"><button class="btn ghost fe" data-c="${c.caixa_id}">Fechar</button>` : ""}</div>` : ""}</div>`; };
@@ -887,10 +910,11 @@ async function viewCaixa(d = today()) {
     <div><label>Tipo</label><select id="lt"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
     <div><label>Valor (R$)</label><input id="lv" type="number" min="0.01" step="0.01" required></div></div>
     <label>Motivo (obrigatório)</label><input id="lm" minlength="3" maxlength="300" required><button class="btn">Lançar</button></form></div>` : ""}
-  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
-  ${EX.map(m => `<tr><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Sem movimentos.</td></tr>'}
+  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2><div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
+  ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Sem movimentos.</td></tr>'}
   ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="5">${esc(c.nome)} — movimento do dia</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
-  <tr class="tot"><th colspan="5">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div>`;
+  <tr class="tot"><th colspan="5">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div></div>`;
+  document.querySelectorAll(".emv").forEach(b => b.onclick = () => estornarMovBox(EX.find(m => m.id === +b.dataset.m), () => viewCaixa(d)));
   $("#d").onchange = e => viewCaixa(e.target.value); $("#pe").onclick = () => window.print();
   document.querySelectorAll(".so").forEach(b => b.onclick = () => viewResumo(d, +b.dataset.c, true));
   document.querySelectorAll(".ab").forEach(b => b.onclick = async () => { const v = document.querySelector(`.va[data-c="${b.dataset.c}"]`).value; if (v === "") return toast("Informe o valor contado");
