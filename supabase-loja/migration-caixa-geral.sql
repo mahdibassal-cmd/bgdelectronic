@@ -99,7 +99,7 @@ end $$;
 revoke all on function public.cliente_credito_saldo(bigint), public.lancar_credito(bigint, text, numeric, text) from public, anon;
 grant execute on function public.cliente_credito_saldo(bigint), public.lancar_credito(bigint, text, numeric, text) to authenticated;
 
--- ---------- criar_nota (mesma de migration-clientes.sql + forma 'credito' sem caixa, só via criar_nota_local) ----------
+-- ---------- criar_nota (base: migration-clientes.sql; 'credito' só via criar_nota_local; NÃO lança em caixa) ----------
 create or replace function public.criar_nota(p_items jsonb, p_pagamentos jsonb, p_cliente text default null, p_cliente_id bigint default null)
 returns bigint language plpgsql security definer set search_path = '' as $$
 declare v_id bigint; it jsonb; pg jsonb; v_tot numeric := 0; v_pag numeric := 0; v_cx smallint; v_nome text; v_prazo boolean := false;
@@ -128,12 +128,7 @@ begin
   for pg in select * from jsonb_array_elements(p_pagamentos) loop
     if coalesce((pg->>'valor')::numeric, 0) <= 0 then raise exception 'Valor de pagamento inválido' using errcode = 'P0001'; end if;
     insert into public.nota_pagamentos(nota_id, metodo, valor) values (v_id, (pg->>'metodo')::public.pay_method, (pg->>'valor')::numeric);
-    if pg->>'metodo' not in ('prazo','credito') then   -- Paga Depois / Caixa Geral: sem entrada no caixa
-      select id into v_cx from public.caixas where metodo = (pg->>'metodo')::public.pay_method and ativo;
-      if v_cx is null then raise exception 'Sem caixa para %', pg->>'metodo' using errcode = 'P0001'; end if;
-      insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id)
-      values (v_cx, 'venda', (pg->>'valor')::numeric, 'Nota ' || lpad(v_id::text, 6, '0'), v_id, auth.uid());
-    end if;
+    -- Sem movimento de caixa aqui: a nota fica PENDENTE até o financeiro lançar (lancar_nota_caixa).
     v_pag := v_pag + (pg->>'valor')::numeric;
   end loop;
   if round(v_pag, 2) <> round(v_tot, 2) then
@@ -208,4 +203,86 @@ begin
 end $$;
 revoke all on function public.registrar_recebimento_credito(bigint, numeric, smallint, text, date, text) from public, anon;
 grant execute on function public.registrar_recebimento_credito(bigint, numeric, smallint, text, date, text) to authenticated;
+
+-- =====================================================================
+-- LANÇAR NOTA NO CAIXA (financeiro/admin escolhe o caixa).
+-- Antes: criar_nota punha cada pagamento direto no caixa do método (dinheiro→Caixa Dinheiro, pix→PIX, cartão→Máquina).
+-- Agora: a nota nasce PENDENTE (sem movimento). lancar_nota_caixa põe o valor (sem 'prazo' e 'credito') no caixa escolhido.
+-- Rodar de novo no mesmo caixa = nada muda. Em outro caixa = estorno no antigo + venda no novo (fica o rastro).
+-- Notas antigas (já com movimento) contam como lançadas e também podem ser movidas.
+-- =====================================================================
+alter table public.notas add column if not exists caixa_lancada_id smallint references public.caixas(id);
+alter table public.notas add column if not exists lancada_em timestamptz;
+alter table public.notas add column if not exists lancada_por uuid references public.profiles(id);
+
+create or replace function public.lancar_nota_caixa(p_nota bigint, p_caixa smallint)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare n record; v_cx text; r record; pg record; v_val numeric := 0; v_nn text := lpad(p_nota::text, 6, '0');
+begin
+  if not public.can('financas') then raise exception 'Sem permissão (financeiro/admin)' using errcode = '42501'; end if;
+  select * into n from public.notas where id = p_nota for update;
+  if not found then raise exception 'Nota não encontrada' using errcode = 'P0001'; end if;
+  if n.status <> 'ativa' then raise exception 'Nota cancelada não pode ser lançada' using errcode = 'P0001'; end if;
+  select nome into v_cx from public.caixas where id = p_caixa and ativo;
+  if v_cx is null then raise exception 'Caixa inválido' using errcode = 'P0001'; end if;
+  select coalesce(sum(valor), 0) into v_val from public.nota_pagamentos where nota_id = p_nota and metodo::text not in ('prazo','credito');
+  if v_val <= 0 then raise exception 'Nota sem valor para caixa (Paga Depois / Caixa Geral)' using errcode = 'P0001'; end if;
+  if n.caixa_lancada_id = p_caixa then
+    return jsonb_build_object('nota_id', p_nota, 'caixa_id', p_caixa, 'valor', v_val, 'mudou', false); end if;
+  -- tira de onde estiver (saldo líquido da nota por caixa)
+  for r in select caixa_id, sum(case when tipo = 'venda' then valor when tipo = 'estorno' then -valor else 0 end) liq
+             from public.caixa_movimentos where nota_id = p_nota group by caixa_id loop
+    if r.liq > 0 then
+      insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id)
+      values (r.caixa_id, 'estorno', r.liq, left('Nota ' || v_nn || ' transferida para ' || v_cx, 300), p_nota, auth.uid());
+    end if;
+  end loop;
+  for pg in select metodo::text m, valor from public.nota_pagamentos where nota_id = p_nota and metodo::text not in ('prazo','credito') order by id loop
+    insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id, forma)
+    values (p_caixa, 'venda', pg.valor, 'Nota ' || v_nn, p_nota, auth.uid(), pg.m);
+  end loop;
+  update public.notas set caixa_lancada_id = p_caixa, lancada_em = now(), lancada_por = auth.uid() where id = p_nota;
+  perform public.fin_log('nota_lancada', jsonb_build_object('nota_id', p_nota, 'caixa', p_caixa, 'valor', v_val, 'antes', n.caixa_lancada_id));
+  return jsonb_build_object('nota_id', p_nota, 'caixa_id', p_caixa, 'valor', v_val, 'mudou', true);
+end $$;
+revoke all on function public.lancar_nota_caixa(bigint, smallint) from public, anon;
+grant execute on function public.lancar_nota_caixa(bigint, smallint) to authenticated;
+
+-- Lista para o financeiro: notas ativas com valor de caixa (pendentes e já lançadas).
+create or replace view public.v_notas_lancar with (security_invoker = true) as
+select n.id as nota_id, n.data, n.created_at, n.cliente, n.local_pagamento, n.obs_pagamento, pr.handle, n.total,
+       (select coalesce(sum(valor), 0) from public.nota_pagamentos g where g.nota_id = n.id and g.metodo::text not in ('prazo','credito')) as valor_caixa,
+       (select string_agg(g.metodo::text || ':' || g.valor, '+' order by g.id) from public.nota_pagamentos g where g.nota_id = n.id) as pagamentos,
+       n.caixa_lancada_id, n.lancada_em,
+       exists (select 1 from public.caixa_movimentos m where m.nota_id = n.id) as tem_movimento,
+       (select string_agg(x.nome, ', ') from (select c.nome from public.caixa_movimentos m join public.caixas c on c.id = m.caixa_id
+         where m.nota_id = n.id group by c.nome having sum(case when m.tipo = 'venda' then m.valor when m.tipo = 'estorno' then -m.valor else 0 end) > 0) x) as caixas_mov
+from public.notas n left join public.profiles pr on pr.id = n.seller_id
+where public.can('financas') and n.status = 'ativa';
+revoke all on public.v_notas_lancar from anon, public;
+grant select on public.v_notas_lancar to authenticated;
+
+-- cancelar_nota: estorna o saldo líquido que a nota tem em cada caixa (pendente = nada a estornar).
+create or replace function public.cancelar_nota(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare n record; r record;
+begin
+  if not public.can('admin') then raise exception 'Só admin cancela nota' using errcode = '42501'; end if;
+  if length(trim(coalesce(p_motivo, ''))) < 3 then raise exception 'Informe o motivo' using errcode = 'P0001'; end if;
+  select * into n from public.notas where id = p_id for update;
+  if not found then raise exception 'Nota não encontrada' using errcode = 'P0001'; end if;
+  if n.status = 'cancelada' then raise exception 'Nota já cancelada' using errcode = 'P0001'; end if;
+  update public.products p set estoque = p.estoque + s.qtd, updated_at = now()
+    from (select sku, sum(qtd) qtd from public.sales where nota_id = p_id group by sku) s where p.sku = s.sku;
+  for r in select caixa_id, sum(case when tipo = 'venda' then valor when tipo = 'estorno' then -valor else 0 end) liq
+             from public.caixa_movimentos where nota_id = p_id group by caixa_id loop
+    if r.liq > 0 then
+      insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id)
+      values (r.caixa_id, 'estorno', r.liq, left('Cancelamento nota ' || lpad(p_id::text, 6, '0') || ': ' || trim(p_motivo), 300), p_id, auth.uid());
+    end if;
+  end loop;
+  update public.notas set status = 'cancelada', cancelada_em = now(), cancelada_por = auth.uid(), motivo_cancel = trim(p_motivo) where id = p_id;
+end $$;
+revoke all on function public.cancelar_nota(bigint, text) from public, anon;
+grant execute on function public.cancelar_nota(bigint, text) to authenticated;
 notify pgrst, 'reload schema';

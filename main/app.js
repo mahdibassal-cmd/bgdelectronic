@@ -140,6 +140,8 @@ if (!MOCK && !CONFIGURED) {
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
     async criarNota(items, pagamentos, cliente, clienteId, local, obs) { return ok(await sb.rpc("criar_nota_local", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null })); },
+    async notasLancar() { return ok(await sb.from("v_notas_lancar").select("*").order("created_at", { ascending: false }).limit(300)); },
+    async lancarNota(nid, cx) { return ok(await sb.rpc("lancar_nota_caixa", { p_nota: nid, p_caixa: cx })); },
     async notasInfo(ids) { if (!ids.length) return []; const r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
     async creditos() { return ok(await sb.from("v_cliente_credito").select("*").order("nome")); },
     async creditoMov(cid) { let q = sb.from("v_cliente_creditos_mov").select("*").order("id", { ascending: false }).limit(200); if (cid) q = q.eq("cliente_id", cid); return ok(await q); },
@@ -211,7 +213,7 @@ if (!MOCK && !CONFIGURED) {
     const nid = id++, ts = at || new Date().toISOString();
     for (const it of items) { const p = P.find(x => x.sku === it.sku); p.estoque -= it.qtd; IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo: K[p.sku] }); }
     N.push({ local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
-    for (const g of pags) { PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); if (!["prazo", "credito"].includes(g.metodo)) mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", Number(g.valor), "Nota " + String(nid).padStart(6, "0"), nid, user, ts); }
+    for (const g of pags) PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); /* pendente: o financeiro lança no caixa */
     return nid; };
   const ready = Promise.resolve().then(() => {
     const kaio = U.find(u => u.handle === "@kaio") || meU, bia = U.find(u => u.handle === "@bianca");
@@ -222,6 +224,7 @@ if (!MOCK && !CONFIGURED) {
     CL.push({ id: 1, nome: "Maria Souza", doc: "52998224725", telefone: "(11) 99999-0000", email: "maria@exemplo.com", endereco: "Rua das Flores, 10", obs: "", ativo: true }, { id: 2, nome: "João Lima", doc: null, telefone: "(11) 98888-1111", email: "", endereco: "", obs: "", ativo: true });
     mkNota([{ sku: "XIA-002", qtd: 1, preco_vendido: 1199 }], [{ metodo: "prazo", valor: 899 }, { metodo: "pix", valor: 300 }], null, kaio, H(26), 1);
     CR.push({ id: id++, cliente_id: 1, tipo: "entrada", valor: 1500, obs: "Crédito antigo (sistema anterior)", nota_id: null, handle: "@mb", created_at: H(48) }, { id: id++, cliente_id: 2, tipo: "entrada", valor: 320, obs: "Troca de produto", nota_id: null, handle: "@mb", created_at: H(20) }, { id: id++, cliente_id: 1, tipo: "uso", valor: 250, obs: "Usado no balcão", nota_id: null, handle: "@mb", created_at: H(4) });
+    N.filter(n => n.nota_id !== 3).forEach(n => PG.filter(g => g.nota_id === n.nota_id && !["prazo", "credito"].includes(g.metodo)).forEach(g => mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", g.valor, "Nota " + String(n.nota_id).padStart(6, "0"), n.nota_id, meU, n.created_at)));
     FO.push({ id: 1, nome: "Distribuidora Tech SP", cnpj: "11222333000181", contato: "Ana", telefone: "(11) 3333-0000", email: "vendas@tech.com", obs: "", ativo: true });
     CP.push({ id: 1, fornecedor_id: 1, valor: 3200, vencimento: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), descricao: "Lote fones JBL" }, { id: 2, fornecedor_id: 1, valor: 450, vencimento: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), descricao: "Frete" });
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2));
@@ -276,13 +279,19 @@ if (!MOCK && !CONFIGURED) {
       if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
         const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
       return mkNota(items, pags, cliente, meU, null, clienteId, local, obs); },
+    async notasLancar() { await ready; needFin(); return N.filter(n => n.status === "ativa").map(n => { const liq = {}; MV.filter(m => m.nota_id === n.nota_id).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0));
+        return { ...n, valor_caixa: PG.filter(g => g.nota_id === n.nota_id && !["prazo", "credito"].includes(g.metodo)).reduce((a, g) => a + g.valor, 0), pagamentos: PG.filter(g => g.nota_id === n.nota_id).map(g => g.metodo + ":" + g.valor).join("+"), caixa_lancada_id: n.caixa_lancada_id || null, tem_movimento: MV.some(m => m.nota_id === n.nota_id), caixas_mov: Object.entries(liq).filter(([, v]) => v > 0.001).map(([k]) => CX.find(c => c.caixa_id === +k).nome).join(", ") }; }).reverse(); },
+    async lancarNota(nid, cx) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada não pode ser lançada"); const P2 = PG.filter(g => g.nota_id === nid && !["prazo", "credito"].includes(g.metodo)); if (!P2.length) throw new Error("Nota sem valor para caixa (Paga Depois / Caixa Geral)");
+      if (n.caixa_lancada_id === cx) return { mudou: false }; const liq = {}; MV.filter(m => m.nota_id === nid).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0)); const nn = String(nid).padStart(6, "0"), nm = CX.find(c => c.caixa_id === cx).nome;
+      Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, `Nota ${nn} transferida para ${nm}`, nid, meU); }); P2.forEach(g => mov(cx, "venda", g.valor, "Nota " + nn, nid, meU)); n.caixa_lancada_id = cx; return { mudou: true }; },
     async notasInfo(ids) { return N.filter(n => ids.includes(n.nota_id)).map(n => ({ id: n.nota_id, local_pagamento: n.local_pagamento, obs_pagamento: n.obs_pagamento })); },
     async creditos() { await ready; needFin(); return [...new Set(CR.map(k => k.cliente_id))].map(cid => { const c = CL.find(x => x.id === cid), L = CR.filter(k => k.cliente_id === cid && crOk(k)); return { cliente_id: cid, nome: c.nome, telefone: c.telefone, doc: c.doc, total_entradas: L.filter(k => k.tipo === "entrada").reduce((a, k) => a + k.valor, 0), total_usos: L.filter(k => k.tipo === "uso").reduce((a, k) => a + k.valor, 0), saldo: crSaldo(cid), ultimo_mov: L.length ? L[L.length - 1].created_at : null }; }).sort((a, b) => a.nome.localeCompare(b.nome)); },
     async creditoMov(cid) { needFin(); return CR.filter(k => !cid || k.cliente_id === cid).map(k => ({ ...k, cliente: CL.find(c => c.id === k.cliente_id).nome, nota_status: k.nota_id ? (N.find(n => n.nota_id === k.nota_id) || {}).status : null })).reverse(); },
     async lancarCredito(cid, tipo, v, obs) { needFin(); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (tipo === "uso" && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); CR.push({ id: id++, cliente_id: cid, tipo, valor: v, obs: obs || null, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); },
     async cancelarNota(nid, motivo) { if (role !== "admin") throw new Error("Só admin cancela nota"); const n = N.find(x => x.nota_id === nid); if (n.status === "cancelada") throw new Error("Nota já cancelada");
       IT.filter(i => i.nota_id === nid).forEach(i => P.find(p => p.sku === i.sku).estoque += i.qtd);
-      PG.filter(g => g.nota_id === nid).forEach(g => mov(CX.find(c => c.metodo === g.metodo).caixa_id, "estorno", g.valor, `Cancelamento nota ${String(nid).padStart(6, "0")}: ${motivo}`, nid, meU));
+      const liq = {}; MV.filter(m => m.nota_id === nid).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0));
+      Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, `Cancelamento nota ${String(nid).padStart(6, "0")}: ${motivo}`, nid, meU); });
       n.status = "cancelada"; },
     async nota(nid) { const n = vis().find(x => x.nota_id === nid); return n ? IT.filter(i => i.nota_id === nid).map(i => ({ ...n, ...i })) : []; },
     async notaPag(nid) { return vis().some(x => x.nota_id === nid) ? PG.filter(g => g.nota_id === nid) : []; },
@@ -343,12 +352,12 @@ async function boot() {
   go(location.hash.slice(1) || (can("vendas") ? "nota" : "caixa"));
 }
 function go(v) {
-  const need = { caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", caixa: "caixa" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", caixa: "caixa" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : "seguranca";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -797,6 +806,27 @@ async function viewCaixaGeral(sel) {
   $("#f").onsubmit = async ev => { ev.preventDefault(); const cid = +$("#c").value, v = Math.round(+$("#v").value * 100) / 100, tp = $("#tp").value; if (!cid) return toast("Escolha o cliente"); if (!(v > 0)) return toast("Informe o valor");
     const nome = $("#c").selectedOptions[0].textContent; if (!confirm(`${tp === "entrada" ? "Adicionar" : "Baixar"} ${brl(v)} ${tp === "entrada" ? "de crédito para" : "do crédito de"} ${nome}?`)) return; const b = ev.submitter; b.disabled = true;
     try { await api.lancarCredito(cid, tp, v, val("o")); toast("Crédito salvo ✓"); viewCaixaGeral(cid); } catch (e) { toast(e.message); b.disabled = false; } };
+}
+// ---------- Notas a lançar: o financeiro escolhe em qual caixa entra o dinheiro de cada nota ----------
+async function viewLancar(todas) {
+  const [L, CX] = await Promise.all([api.notasLancar(), api.caixasLista()]);
+  const V = L.filter(n => +n.valor_caixa > 0), pend = V.filter(n => !n.caixa_lancada_id && !n.tem_movimento), show = todas ? V : pend, nn = id => String(id).padStart(6, "0");
+  const dh = t => new Date(t).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const pgs = n => String(n.pagamentos || "").split("+").filter(Boolean).map(x => { const [m, v] = x.split(":"); return `${PAYL[m] || m} ${brl(v)}`; }).join(" + ");
+  const onde = n => n.caixa_lancada_id ? (CX.find(c => c.caixa_id === n.caixa_lancada_id) || {}).nome : n.caixas_mov || "";
+  app.innerHTML = `<div class="card"><h2>Notas a lançar no caixa</h2><div class="grid"><div class="kpi"><small>Pendentes</small><b>${pend.length}</b></div><div class="kpi"><small>Valor pendente</small><b>${brl(pend.reduce((a, n) => a + Number(n.valor_caixa), 0))}</b></div></div>
+  <p class="muted">A nota do vendedor fica pendente até você escolher o caixa. Paga Depois e Caixa Geral (crédito) nunca entram em caixa. Errou o caixa? Mostre as lançadas e lance de novo no caixa certo (estorna o antigo).</p>
+  <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="tod" ${todas ? "checked" : ""} style="width:auto"> Mostrar também as já lançadas</label></div>
+  <div class="card"><table class="stk"><tr><th>Nº</th><th>Data</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th>Local</th><th class="n">Valor p/ caixa</th><th>Situação</th><th>Caixa</th><th></th></tr>
+  ${show.map(n => { const ld = n.caixa_lancada_id || n.tem_movimento; return `<tr><td>${nn(n.nota_id)}</td><td>${esc(dh(n.created_at))}</td><td>${esc(n.handle || "")}</td><td>${esc(n.cliente || "—")}</td><td>${esc(pgs(n))}</td><td>${esc(n.local_pagamento || "")}</td><td class="n"><b>${brl(n.valor_caixa)}</b></td>
+    <td>${ld ? `<span class="ok-r">Lançada${onde(n) ? ": " + esc(onde(n)) : ""}</span>` : '<b class="warn">Pendente</b>'}</td>
+    <td><select class="lcx" data-n="${n.nota_id}"><option value="">— caixa —</option>${CX.map(c => `<option value="${c.caixa_id}" ${n.caixa_lancada_id === c.caixa_id ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select></td>
+    <td><button class="btn ${ld ? "ghost" : "gold"} lok" data-n="${n.nota_id}" style="margin:0">${ld ? "Mover" : "Lançar"}</button></td></tr>`; }).join("") || `<tr><td colspan="10" class="muted">${todas ? "Nenhuma nota." : "Nenhuma nota pendente ✓"}</td></tr>`}</table></div>`;
+  $("#tod").onchange = e => viewLancar(e.target.checked);
+  document.querySelectorAll(".lok").forEach(b => b.onclick = async () => { const n = show.find(x => x.nota_id === +b.dataset.n), sel = document.querySelector(`.lcx[data-n="${b.dataset.n}"]`), cx = +sel.value; if (!cx) return toast("Escolha o caixa");
+    const nm = sel.selectedOptions[0].textContent, mv = n.caixa_lancada_id || n.tem_movimento;
+    if (!(await confirmBox(`${mv ? "Mover" : "Lançar"} a nota <b>${nn(n.nota_id)}</b> (${brl(n.valor_caixa)}) ${mv ? "para" : "no"} <b>${esc(nm)}</b>?${mv && onde(n) ? `<br><small>Sai de: ${esc(onde(n))} (estorno)</small>` : ""}`))) return; b.disabled = true;
+    try { const r = await api.lancarNota(n.nota_id, cx); toast(r && r.mudou === false ? "Já estava neste caixa ✓" : `Nota ${nn(n.nota_id)} lançada no ${nm} ✓`); viewLancar(todas); } catch (e) { toast(e.message); b.disabled = false; } });
 }
 boot().catch(e => { console.error(e); viewLogin("Erro ao conectar."); });
 })();
