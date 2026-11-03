@@ -145,7 +145,9 @@ if (!MOCK && !CONFIGURED) {
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
     async criarNota(items, pagamentos, cliente, clienteId, local, obs) { return ok(await sb.rpc("criar_nota_local", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null })); },
-    async notasLancar() { return ok(await sb.from("v_notas_lancar").select("*").order("created_at", { ascending: false }).limit(300)); },
+    async notasLancar() { const r = await sb.rpc("notas_lancar_financas", { p_limit: 300 }); /* RPC definer: financeiro não tem 'vendas' e a view (security_invoker) voltava vazia */
+      if (!r.error) return r.data || []; if (!/PGRST202|42883|notas_lancar_financas/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error(r.error.message);
+      return ok(await sb.from("v_notas_lancar").select("*").order("created_at", { ascending: false }).limit(300)); },
     async lancarNota(nid, cx) { return ok(await sb.rpc("lancar_nota_caixa", { p_nota: nid, p_caixa: cx })); },
     async notasInfo(ids) { if (!ids.length) return []; const r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
     async creditos() { return ok(await sb.from("v_cliente_credito").select("*").order("nome")); },
