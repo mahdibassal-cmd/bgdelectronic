@@ -1,0 +1,13 @@
+
+# arquivos de trabalho locais (nunca publicar)
+loja/*.xlsx
+loja/*.b64
+loja/*.txt
+loja/mb-admin.sql
+main/*.xlsx
+main/*.b64
+main/*.txt
+main/mb-admin.sql
+*.xlsx
+*.b64
+loja-db-password.txt
