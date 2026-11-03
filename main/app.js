@@ -86,7 +86,7 @@ if (!MOCK && !CONFIGURED) {
   const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, storageKey: (window.BGDSwitch ? BGDSwitch.storageKey(C.SUPABASE_URL) : undefined), detectSessionInUrl: false, flowType: "pkce" } });
   sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") needPassword = true; });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
-  api = {
+  api = { ...BGDUsers.realApi(sb),
     async login(email, pw) { if (!email) throw new Error("x"); ok(await sb.auth.signInWithPassword({ email, password: pw })); },
     async logout() { await sb.auth.signOut(); },
     async consumeUrl() {
@@ -109,7 +109,7 @@ if (!MOCK && !CONFIGURED) {
     async events() { const { data, error } = await sb.from("security_events").select("at,kind,email,detail").order("at", { ascending: false }).limit(50); return error ? null : data; },
     async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
     async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
-    async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("handle,nome,role,ativo").eq("id", u.id).single()); },
+    async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").eq("id", u.id).single()); },
     async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
@@ -259,6 +259,7 @@ if (!MOCK && !CONFIGURED) {
     async purchases() { return PU; }, async addPurchase(p) { PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
+  Object.assign(api, BGDUsers.mockApi(qs, U, meU.id));
 }
 
 // ---------------- Telas ----------------
@@ -280,6 +281,7 @@ async function boot() {
   const st = await api.status().catch(() => null);   // null = security.sql ainda não rodado
   if (st && st.locked && !st.is_owner) return viewBloqueado();
   isOwner = !!(st && st.is_owner); lockedNow = !!(st && st.locked);
+  if (!(await BGDUsers.guard(api, m => viewLogin(m)))) return;
   try { me = await api.profile(); } catch { me = null; }
   if (!me || me.ativo === false) { await api.logout(); return viewLogin("Conta sem perfil ativo. Fale com o administrador."); }
   $("#who").textContent = `${me.nome} (${me.handle}) · ${ROLEL[me.role] || me.role}`;
@@ -570,15 +572,7 @@ async function viewCaixa(d = today()) {
   if ($("#lf")) $("#lf").onsubmit = async ev => { ev.preventDefault(); const m = $("#lm").value.trim(); if (m.length < 3) return toast("Informe o motivo");
     try { await api.caixaLancar({ caixa_id: +$("#lc").value, tipo: $("#lt").value, valor: +$("#lv").value, motivo: m }); toast("Lançado ✓"); viewCaixa(d); } catch (e) { toast(e.message); } };
 }
-async function viewUsuarios() {
-  const L = await api.usuarios();
-  app.innerHTML = `<div class="card"><h2>Usuários</h2><p class="muted">Novos usuários: convide em Supabase → Authentication → Users e rode <code>supabase-loja/users.sql</code> (veja docs/LOJA-SETUP.md). Aqui você muda papel e ativa/desativa.</p>
-  <table><tr><th>Nome</th><th>Handle</th><th>Papel</th><th>Ativo</th><th></th></tr>
-  ${L.map(u => `<tr><td>${esc(u.nome)}</td><td>${esc(u.handle)}</td><td><select class="ur" data-id="${esc(u.id)}">${Object.entries(ROLEL).map(([v, l]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
-    <td><input type="checkbox" class="ua" data-id="${esc(u.id)}" ${u.ativo ? "checked" : ""} style="width:auto"></td><td><button class="btn ghost us" data-id="${esc(u.id)}" style="margin:0">Salvar</button></td></tr>`).join("")}</table></div>`;
-  document.querySelectorAll(".us").forEach(b => b.onclick = async () => { const i = b.dataset.id;
-    try { await api.salvarUsuario(i, { role: document.querySelector(`.ur[data-id="${i}"]`).value, ativo: document.querySelector(`.ua[data-id="${i}"]`).checked }); toast("Salvo ✓"); } catch (e) { toast(e.message); } });
-}
+async function viewUsuarios() { return BGDUsers.view(app, api, me, { roles: ROLEL, toast, store: "BAGDA STORES", myId: me.id }); }
 
 const PAYF = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["transferencia", "Transferência"], ["boleto", "Boleto"]];
 const STL = { aberta: "Aberta", parcial: "Parcial", paga: "Paga", vencida: "Vencida" };

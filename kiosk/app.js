@@ -72,7 +72,7 @@ if (!MOCK) {
   const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, storageKey: (window.BGDSwitch ? BGDSwitch.storageKey(C.SUPABASE_URL) : undefined), detectSessionInUrl: false, flowType: "pkce" } });
   sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") needPassword = true; });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
-  api = {
+  api = { ...BGDUsers.realApi(sb),
     async login(email, pw) { if (!email) throw new Error("x"); ok(await sb.auth.signInWithPassword({ email, password: pw })); },
     async logout() { await sb.auth.signOut(); },
     async consumeUrl() {
@@ -95,7 +95,7 @@ if (!MOCK) {
     async events() { const { data, error } = await sb.from("security_events").select("at,kind,email,detail").order("at", { ascending: false }).limit(50); return error ? null : data; },
     async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
     async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
-    async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("handle,nome,role,ativo").eq("id", u.id).single()); },
+    async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").eq("id", u.id).single()); },
     async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
@@ -137,7 +137,7 @@ if (!MOCK) {
     async verify() { toast("Demonstração: 2FA ativado"); }, async unenroll() {},
     async status() { return { locked: qs.has("locked"), is_owner: role === "admin" }; }, async lock() { toast("Demonstração: nada bloqueado"); }, async unlock() {}, async signoutAll() { return 0; }, async reportFail() {},
     async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@x.com", detail: {} }]; }, async dumpTable(t) { return t === "products" ? P : []; },
-    async profile() { return role === "admin" ? { handle: "@mb", nome: "MB", role } : { handle: "@kaio", nome: "Kaio", role }; },
+    async profile() { return role === "admin" ? { id: "u-me", handle: "@mb", nome: "MB", role } : { id: "u-me", handle: "@kaio", nome: "Kaio", role }; },
     async products() { await ready; return P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
     async addSale(s) { const p = P.find(x => x.sku === s.sku); if (!p || p.estoque < s.qtd) throw new Error("Estoque insuficiente ou produto inativo"); p.estoque -= s.qtd; S.unshift({ id: id++, data: today(), ...s, marca: p.marca, produto: p.produto, preco_tabela: p.preco_venda, total: s.qtd * s.preco_vendido, handle: me.handle, nome: me.nome, custo: K[p.sku], aviso: s.preco_vendido < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date().toISOString() }); },
     async sales() { return S; }, async repSeller() { return grp(S, "handle"); }, async repPay() { return grp(S, "forma_pagamento"); },
@@ -150,6 +150,8 @@ if (!MOCK) {
     async purchases() { return PU; }, async addPurchase(p) { PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
+  const KU = [{ id: "u-me", handle: role === "admin" ? "@mb" : "@kaio", nome: role === "admin" ? "MB" : "Kaio", role: role === "admin" ? "admin" : "vendedor", ativo: true }, { id: "u@sam", handle: "@sam", nome: "Sam", role: "admin", ativo: true }, { id: "u@bianca", handle: "@bianca", nome: "Bianca", role: "vendedor", ativo: true }, { id: "u@suelen", handle: "@suelen", nome: "Suelen", role: "vendedor", ativo: false }];
+  Object.assign(api, BGDUsers.mockApi(qs, KU, "u-me"));
 }
 
 // ---------------- Telas ----------------
@@ -170,6 +172,7 @@ async function boot() {
   const st = await api.status().catch(() => null);   // null = migration-004 ainda não rodada
   if (st && st.locked && !st.is_owner) return viewBloqueado();
   isOwner = !!(st && st.is_owner); lockedNow = !!(st && st.locked);
+  if (!(await BGDUsers.guard(api, m => viewLogin(m)))) return;
   try { me = await api.profile(); } catch { me = null; }
   if (!me || me.ativo === false) { await api.logout(); return viewLogin("Conta sem perfil ativo. Fale com o MB."); }
   $("#who").textContent = `${me.nome} (${me.handle}) · ${me.role === "admin" ? "Admin" : "Vendedor(a)"}`;
@@ -180,15 +183,16 @@ async function boot() {
   go(location.hash.slice(1) || "nota");
 }
 function go(v) {
-  if (["compras", "produtos", "relatorio", "vendas"].includes(v) && me.role !== "admin") v = "nota";
+  if (["compras", "produtos", "relatorio", "vendas", "usuarios"].includes(v) && me.role !== "admin") v = "nota";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, venda: viewNota, vendas: viewVendas, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca }[v] || viewNota)()
+  ({ nota: viewNota, notas: viewNotas, venda: viewNota, vendas: viewVendas, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, usuarios: viewUsuarios }[v] || viewNota)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
 $("#sair").onclick = async () => { await api.logout(); location.hash = ""; location.reload(); };
 
+async function viewUsuarios() { if (me.role !== "admin") return viewNota(); return BGDUsers.view(app, api, me, { roles: { vendedor: "Vendedor(a)", admin: "Admin" }, toast, store: "Kiosk", myId: me.id }); }
 function viewBloqueado() {
   $("#nav").hidden = true; $("#who").textContent = "";
   app.innerHTML = `<div class="card login"><h2>Sistema bloqueado</h2><p class="muted">O sistema foi bloqueado por segurança. Fale com o MB.</p><button class="btn ghost" id="x">Sair</button></div>`;
