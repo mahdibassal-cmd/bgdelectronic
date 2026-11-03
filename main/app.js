@@ -143,6 +143,7 @@ if (!MOCK && !CONFIGURED) {
     async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
     async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").eq("id", u.id).single()); },
     async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
+    async productsFull() { return ok(await sb.from("products").select("*").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
@@ -221,8 +222,10 @@ if (!MOCK && !CONFIGURED) {
   if (role !== "vendedor") U.push({ id: "u@kaio", handle: "@kaio", nome: "Kaio", role: "vendedor", ativo: true });
   const P = [["JBL-001", "JBL", "Flip 6", "Azul", 799], ["JBL-002", "JBL", "Go 4", "Preto", 349], ["XIA-001", "Xiaomi", "Redmi Buds 5", null, 199], ["XIA-002", "Xiaomi", "Redmi Note 13", "128GB", 1499],
     ["SAM-001", "Samsung", "Galaxy A15", "128GB", 1199], ["APL-001", "Apple", "AirPods 4", null, 1299], ["BAS-001", "Baseus", "Cabo USB-C 1m", null, 49.9], ["BAS-002", "Baseus", "Carregador 30W", null, 129],
-    ["ANK-001", "Anker", "Power Bank 10000mAh", null, 199], ["LEN-001", "Lenovo", "Fone LP40", null, 89.9], ["MUL-001", "Multilaser", "Mouse sem fio", null, 59.9], ["KAP-001", "Kapbom", "Suporte veicular", null, 39.9]]
-    .map(([sku, marca, produto, tamanho, preco_venda], i) => ({ sku, marca, produto, tamanho, preco_venda, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4][i], estoque_minimo: 2, ativo: true }));
+    ["ANK-001", "Anker", "Power Bank 10000mAh", null, 199], ["LEN-001", "Lenovo", "Fone LP40", null, 89.9], ["MUL-001", "Multilaser", "Mouse sem fio", null, 59.9], ["KAP-001", "Kapbom", "Suporte veicular", null, 39.9],
+    ["BS-APL-270", "Apple", "iPhone 18 Duo (iPhone Duo)", "256GB", 9999, "Preto"], ["BS-APL-271", "Apple", "iPhone 18 Duo (iPhone Duo)", "256GB", 9999, "Azul-céu"], ["BS-APL-272", "Apple", "iPhone 18 Duo (iPhone Duo)", "512GB", 11999, "Branco"], ["BS-APL-273", "Apple", "iPhone 18 Duo (iPhone Duo)", null, 9999, null],
+    ["BS-APL-280", "Apple", "MacBook Air M5", "13\" 16GB RAM 512GB", 12999, "Meia-noite"], ["BS-APL-281", "Apple", "MacBook Air M5", "15\" 24GB RAM 1TB", 16999, "Prateado"]]
+    .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }];
   const AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = []; let id = 1, logged = qs.has("auto");
@@ -275,7 +278,7 @@ if (!MOCK && !CONFIGURED) {
     async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@loja.bgdstores.local", detail: {} }]; },
     async dumpTable(t) { return ({ clientes: CL, fornecedores: FO, contas_pagar: CP, conta_pagamentos: CPG, cliente_recebimentos: RC, products: P, notas: N, nota_pagamentos: PG, caixas: CX, caixa_movimentos: MV, caixa_sessoes: SE, purchases: PU })[t] || []; },
     async profile() { return meU; },
-    async products() { await ready; return role === "financeiro" ? [] : P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
+    async products() { await ready; return role === "financeiro" ? [] : P; }, async productsFull() { await ready; return role === "financeiro" ? [] : P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
     async estoqueVendedor() { await ready; return role === "financeiro" ? [] : P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
     async repSeller(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...i, ...N.find(n => n.nota_id === i.nota_id), total: i.total })), "handle", (g, r) => { g.itens += r.qtd; g.faturamento += r.total; g.custo += r.qtd * r.custo; g._n = (g._n || new Set()).add(r.nota_id); g.vendas = g._n.size; }); },
     async repPay(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(PG.filter(g => ids.includes(g.nota_id)), "metodo", (g, r) => { g.vendas++; g.faturamento += r.valor; }).map(g => ({ ...g, forma_pagamento: g.metodo })); },
@@ -566,14 +569,49 @@ async function viewExtrato(d, adm, K, cfg) {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + out.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `extrato-vendas-${d}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 }
+// Variante (cor / armazenamento / RAM / tamanho) a partir de tamanho + notas + variante/cor/armazenamento (se existirem)
+const CORES = /\b(preto|preta|branco|branca|azul(?:-c[eé]u)?|verde|rosa|roxo|lil[aá]s|amarelo|vermelho|cinza|prata|prateado|dourado|ouro|grafite|meia-noite|estelar|titanio(?: natural| preto| branco| deserto)?|tit[aâ]nio(?: natural| preto| branco| deserto)?|black|white|blue|silver|gold|space gray|midnight|starlight|natural|lavanda|creme|bege|laranja|coral)\b/i;
+const variante = p => { const raw = [p.variante, p.cor, p.armazenamento, p.memoria, p.ram, p.tamanho, p.notas].filter(Boolean).map(String).join(" · ").replace(/\s+/g, " ").trim();
+  const all = `${p.produto || ""} ${raw}`, cor = p.cor || (raw.match(CORES) || [])[0] || "", gb = [...new Set((all.match(/\b\d+\s?(?:GB|TB)\b(?:\s?RAM)?/gi) || []).map(x => x.replace(/\s+(?=GB|TB)/i, "").toUpperCase()))];
+  return { raw, cor, gb, txt: raw || "" }; };
 async function viewCompras() {
-  const [P, PU] = await Promise.all([api.products(), api.purchases()]);
-  app.innerHTML = `<div class="card"><h2>Registrar compra</h2><form id="f"><label>Produto</label><select id="sku" required>${P.map(p => `<option value="${esc(p.sku)}">${esc(p.sku)} · ${esc(p.marca)} ${esc(p.produto)}</option>`).join("")}</select>
-  <div class="grid"><div><label>Fornecedor</label><input id="fo"></div><div><label>Qtd</label><input id="q" type="number" min="1" required></div><div><label>Custo unitário (R$)</label><input id="c" type="number" min="0" step="0.01" required></div></div>
+  const adm = me.role === "admin", [P, PU, K] = await Promise.all([(api.productsFull || api.products)().catch(() => api.products()), api.purchases(), adm ? api.costs().catch(() => []) : []]);
+  const cm = Object.fromEntries((K || []).map(k => [k.sku, k.custo])), vsku = Object.fromEntries(P.map(p => [p.sku, variante(p)]));
+  const hay = p => `${p.sku} ${p.marca} ${p.produto} ${vsku[p.sku].raw} ${vsku[p.sku].gb.join(" ")}`;
+  const nome = p => `${p.marca} ${p.produto}${vsku[p.sku].raw ? " — " + vsku[p.sku].raw : ""}`;
+  app.innerHTML = `<div class="card"><h2>Registrar compra</h2><form id="f"><label>Produto</label>
+  <input id="bq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Digite nome, marca, cor, GB ou SKU… (↑↓ Enter)" autofocus>
+  <ul id="sug" class="sug" role="listbox"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
+  <div class="grid"><div><label>Fornecedor</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div><div><label>Qtd</label><input id="q" type="number" min="1" required></div><div><label>Custo unitário (R$)</label><input id="c" type="number" min="0" step="0.01" required></div></div>
   <label>Observação</label><input id="ob"><button class="btn">Salvar compra (soma ao estoque)</button></form></div>
   <div class="card"><h2>Últimas compras</h2><table><tr><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
   ${PU.map(p => `<tr><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra.</td></tr>'}</table></div>`;
-  $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.addPurchase({ sku: $("#sku").value, fornecedor: $("#fo").value || null, qtd: +$("#q").value, custo_unit: +$("#c").value, observacao: $("#ob").value || null }); toast("Compra salva ✓"); viewCompras(); } catch (e) { toast(e.message); } };
+  const FT = await api.fornecedores().catch(() => []), fk = x => norm(x).replace(/\s+/g, " ").trim(), FN = new Map();
+  [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = String(n ?? "").replace(/\s+/g, " ").trim(); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
+  const inTab = new Set(FT.map(f => fk(f.nome))); let fhi = 0, FM = [];
+  const drawF = () => { const q = $("#fo").value.trim(); FM = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30); const nw = q.length >= 2 && !FN.has(fk(q)); if (nw) FM.push(null); fhi = Math.min(fhi, Math.max(FM.length - 1, 0));
+    $("#fsug").innerHTML = FM.map((n, i) => `<li data-i="${i}" class="${i === fhi ? "hi" : ""}">${n == null ? `<b>+ novo fornecedor:</b> ${esc(q)}` : esc(n)}</li>`).join(""); const h = $("#fsug li.hi"); if (h) h.scrollIntoView({ block: "nearest" });
+    document.querySelectorAll("#fsug li[data-i]").forEach(li => li.onmousedown = e => { e.preventDefault(); pickF(+li.dataset.i); }); };
+  const pickF = i => { const n = FM[i]; $("#fo").value = n == null ? $("#fo").value.replace(/\s+/g, " ").trim() : n; $("#fsug").innerHTML = ""; FM = []; $("#q").focus(); };
+  $("#fo").oninput = () => { fhi = 0; drawF(); }; $("#fo").onfocus = drawF; $("#fo").onblur = () => setTimeout(() => { $("#fsug").innerHTML = ""; }, 150);
+  $("#fo").onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); fhi = Math.min(fhi + 1, FM.length - 1); drawF(); } else if (e.key === "ArrowUp") { e.preventDefault(); fhi = Math.max(fhi - 1, 0); drawF(); } else if (e.key === "Enter") { e.preventDefault(); if (FM.length) pickF(fhi); } else if (e.key === "Escape") { e.preventDefault(); $("#fsug").innerHTML = ""; FM = []; } };
+  let hi = 0, M = [];
+  const line = p => { const v = vsku[p.sku], tags = [v.cor && `🎨 ${v.cor}`, v.gb.length && `💾 ${v.gb.join(" / ")}`].filter(Boolean).join(" · ");
+    return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
+  const drawS = () => { const q = $("#bq").value.trim(); M = (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40); hi = Math.min(hi, Math.max(M.length - 1, 0));
+    $("#sug").innerHTML = M.map((p, i) => `<li role="option" data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""}">${line(p)}</li>`).join("") || '<li class="off">Nada encontrado</li>';
+    const h = $("#sug li.hi"); if (h) h.scrollIntoView({ block: "nearest" });
+    document.querySelectorAll("#sug li[data-s]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(li.dataset.s); }); };
+  const pick = sku => { const p = P.find(x => x.sku === sku); if (!p) return; $("#sku").value = p.sku; $("#bq").value = nome(p); M = []; hi = 0; $("#sug").innerHTML = "";
+    $("#sel").innerHTML = `Selecionado: ${line(p)}`; if (adm && cm[p.sku] != null && !$("#c").value) $("#c").placeholder = cm[p.sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = String(p.fornecedor).replace(/\s+/g, " ").trim(); $("#q").focus(); };
+  $("#bq").oninput = () => { hi = 0; $("#sku").value = ""; $("#sel").innerHTML = ""; drawS(); };
+  $("#bq").onfocus = () => { if (!$("#sku").value) drawS(); };
+  $("#bq").onblur = () => setTimeout(() => { if (document.activeElement !== $("#bq")) $("#sug").innerHTML = ""; }, 150);
+  $("#bq").onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); if (!M.length) drawS(); hi = Math.min(hi + 1, M.length - 1); drawS(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); drawS(); } else if (e.key === "Enter") { e.preventDefault(); if (M[hi]) pick(M[hi].sku); } else if (e.key === "Escape") { e.preventDefault(); if ($("#sug").innerHTML) $("#sug").innerHTML = ""; else { $("#bq").value = ""; $("#sku").value = ""; $("#sel").innerHTML = ""; } M = []; } };
+  $("#f").onsubmit = async ev => { ev.preventDefault(); if (!$("#sku").value) { if (M[hi]) pick(M[hi].sku); else toast("Escolha o produto na lista"); return; }
+    const fo = $("#fo").value.replace(/\s+/g, " ").trim(), fx = fo && FN.get(fk(fo)) || fo;
+    if (fx.length >= 2 && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {}); // cadastra p/ reuso; se falhar, segue com o nome digitado
+    try { await api.addPurchase({ sku: $("#sku").value, fornecedor: fx || null, qtd: +$("#q").value, custo_unit: +$("#c").value, observacao: $("#ob").value || null }); toast("Compra salva ✓"); viewCompras(); } catch (e) { toast(e.message); } };
 }
 const DEPT = { entrada: "Entrada", ajuste: "Ajuste", para_loja: "→ Loja", da_loja: "← Loja" };
 async function viewDepEsp() {
