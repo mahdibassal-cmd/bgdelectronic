@@ -46,6 +46,7 @@ const confirmNota = (items, total, pag) => new Promise(res => { const o = docume
 const printVia = via => { let v = document.querySelector(".recibo .via"); if (!v) { v = document.createElement("div"); v.className = "via"; v.style.cssText = "text-align:center;font-weight:700;letter-spacing:.12em;border:1px dashed #000;padding:3px;margin:6px 0"; const r = document.querySelector(".recibo .rh"); r ? r.after(v) : document.querySelector(".recibo")?.prepend(v); } v.textContent = "*** " + via + " ***"; window.print(); };
 const printBtns = () => { const pr = $("#pr"); if (!pr) return; pr.textContent = "🖨️ Imprimir de novo"; pr.onclick = () => printVia("VIA DA LOJA");
   const c = document.createElement("button"); c.className = "btn gold"; c.id = "prc"; c.textContent = "🧾 Imprimir via do cliente"; c.style.marginLeft = "6px"; c.onclick = () => printVia("VIA DO CLIENTE"); pr.after(c); setTimeout(() => printVia("VIA DA LOJA"), 350); };
+const rnum = v => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); /* sem "R$" nem U+00A0 (o driver térmico imprime o NBSP como lixo) */
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
@@ -574,13 +575,15 @@ async function viewRecibo(nid) {
   const [R, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]); if (!R.length) return toast("Nota não encontrada");
   const h = R[0], tot = R.reduce((a, r) => a + Number(r.total), 0);
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
-  <div class="recibo"><div class="rh"><b>BAGDA STORES</b><small>bgdstores.com</small></div>
-  <div class="rm2"><span>NOTA Nº <b>${String(nid).padStart(6, "0")}</b></span><span>${new Date(h.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span></div>
-  <div class="rm2"><span>Vendedor(a): ${esc(h.nome)} (${esc(h.handle)})</span>${h.cliente ? `<span>Cliente: <b>${esc(h.cliente)}</b></span>` : ""}</div>
-  <table class="ri"><tr><th>Item</th><th class="n">Total</th></tr>
-  ${R.map(r => `<tr class="in"><td colspan="2">${esc(r.marca)} ${esc(r.produto)} ${esc(r.tamanho || "")}</td></tr><tr class="iq"><td>${r.qtd} x ${brl(r.preco_vendido)}</td><td class="n">${brl(r.total)}</td></tr>`).join("")}
-  <tr class="tot"><td>TOTAL</td><td class="n">${brl(tot)}</td></tr></table>
-  ${PGN.map(g => `<p class="rm2"><span>${esc(PAYL[g.metodo] || g.metodo)}</span><span>${brl(g.valor)}</span></p>`).join("")}${h.status === "cancelada" ? '<p style="text-align:center;font-size:1.2em"><b>*** NOTA CANCELADA ***</b></p>' : ""}<p class="muted" style="text-align:center">Obrigado pela preferência!</p></div>`;
+  ${(() => { const dt = new Date(h.created_at), TZ = "America/Sao_Paulo", qt = R.reduce((a, r) => a + Number(r.qtd), 0);
+  return `<div class="recibo"><div class="rc rh"><div class="rb">BAGDA STORES</div><div>bgdstores.com</div></div><hr class="r2">
+  <div>PEDIDO DE VENDA</div><div class="rl"><span>Data: ${dt.toLocaleDateString("pt-BR", { timeZone: TZ })}</span><span>${dt.toLocaleTimeString("pt-BR", { timeZone: TZ })}</span></div>
+  ${h.cliente ? `<div><span class="rk">Cliente</span>: ${esc(h.cliente)}</div>` : ""}<div><span class="rk">Vendedor</span>: ${esc(h.nome)} (${esc(h.handle)})</div><div><span class="rk">Nota nº</span>: ${String(nid).padStart(6, "0")}</div><hr class="r2">
+  <div>Código Descrição</div><div class="rg"><span>Qtd</span><span>Preço</span><span>Total</span></div><hr class="r1">
+  ${R.map(r => `<div class="rnm">${esc([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" "))}</div><div class="rg"><span>${r.qtd} Un</span><span>${rnum(r.preco_vendido)}</span><span>${rnum(r.total)}</span></div>`).join("")}<hr class="r1">
+  <div class="rl"><span>Total: ${qt}</span><span>Itens: ${R.length}</span></div><hr class="r1">
+  <div class="rs"><span>Subtotal:</span><span>${rnum(tot)}</span><span>Desc.:</span><span>0,00</span><span class="rtot">Total:</span><span class="rtot">R$ ${rnum(tot)}</span></div><hr class="r1">
+  ${PGN.map(g => `<div>Pago: ${esc(PAYL[g.metodo] || g.metodo)}${PGN.length > 1 ? " " + rnum(g.valor) : ""}</div>`).join("")} ${h.status === "cancelada" ? '<p class="rc"><b>*** NOTA CANCELADA ***</b></p>' : ""}<hr class="r2"><p class="rc">&gt;&gt;&gt; CONFIRA SUAS MERCADORIAS &lt;&lt;&lt;</p><p class="rc">Obrigado pela preferência!</p></div>`; })()}`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
 }
 async function viewNotas() {
