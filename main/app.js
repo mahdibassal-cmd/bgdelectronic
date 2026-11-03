@@ -44,6 +44,9 @@ const confirmNota = (items, total, pag) => new Promise(res => { const o = docume
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
   document.body.append(o); o.querySelector("#nmv").onclick = () => done(false); o.querySelector("#nmc").onclick = () => done(true); document.addEventListener("keydown", k); o.querySelector("#nmc").focus(); });
+const confirmBox = html => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99";
+  o.innerHTML = `<div class="card" style="max-width:440px;margin:0"><h2>Confirmar</h2><p>${html}</p><button class="btn ghost" id="cbn">Voltar</button> <button class="btn gold" id="cby">Confirmar</button></div>`;
+  const done = v => { o.remove(); res(v); }; document.body.append(o); o.querySelector("#cbn").onclick = () => done(false); o.querySelector("#cby").onclick = () => done(true); o.querySelector("#cby").focus(); });
 const printVia = via => { let v = document.querySelector(".recibo .via"); if (!v) { v = document.createElement("pre"); v.className = "via rpre"; const r = document.querySelector(".recibo .rh"); r ? r.after(v) : document.querySelector(".recibo")?.prepend(v); } v.textContent = rcC("*** " + via + " ***"); window.print(); };
 const printBtns = () => { const pr = $("#pr"); if (!pr) return; pr.textContent = "🖨️ Imprimir de novo"; pr.onclick = () => printVia("VIA DA LOJA");
   const c = document.createElement("button"); c.className = "btn gold"; c.id = "prc"; c.textContent = "🧾 Imprimir via do cliente"; c.style.marginLeft = "6px"; c.onclick = () => printVia("VIA DO CLIENTE"); pr.after(c); setTimeout(() => printVia("VIA DA LOJA"), 350); };
@@ -155,7 +158,7 @@ if (!MOCK && !CONFIGURED) {
     async pagarConta(id, v, cx, forma, data) { return ok(await sb.rpc("pagar_conta", { p_conta: id, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null })); },
     async contaPagamentos() { return ok(await sb.from("conta_pagamentos").select("*").order("id", { ascending: false }).limit(100)); },
     async recebimentos() { return ok(await sb.from("v_recebimentos").select("*").order("id", { ascending: false }).limit(100)); },
-    async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
+    async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento_credito", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
     async caixasLista() { return ok(await sb.from("caixas").select("id,nome,metodo").eq("ativo", true).order("id")).map(c => ({ caixa_id: c.id, nome: c.nome, metodo: c.metodo })); },
     async cancelarNota(id, motivo) { ok(await sb.rpc("cancelar_nota", { p_id: id, p_motivo: motivo })); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
@@ -260,7 +263,9 @@ if (!MOCK && !CONFIGURED) {
     async pagarConta(kid, v, cx, forma, data) { needFin(); const k = CP.find(x => x.id === kid); if (pago(kid) + v > k.valor + 0.001) throw new Error("Pagamento maior que o saldo da conta"); CPG.unshift({ id: id++, conta_id: kid, valor: v, caixa_id: cx, forma, data: data || today() }); mov(cx, "saida", v, `Pagamento fornecedor ${(FO.find(f => f.id === k.fornecedor_id) || {}).nome} — conta ${kid}`, null, meU); },
     async contaPagamentos() { needFin(); return CPG; },
     async recebimentos() { needFin(); return RC.map(r => ({ ...r, cliente: CL.find(c => c.id === r.cliente_id).nome, caixa: CX.find(c => c.caixa_id === r.caixa_id).nome, handle: meU.handle })); },
-    async receber(cli, v, cx, forma, data, obs) { needFin(); const sd = fiado(cli) - recebido(cli); if (v > sd + 0.001) throw new Error(`Valor maior que o saldo do cliente (${brl(sd)})`); RC.unshift({ id: id++, cliente_id: cli, valor: v, caixa_id: cx, forma, data: data || today(), obs }); mov(cx, "entrada", v, "Recebimento cliente " + CL.find(c => c.id === cli).nome, null, meU);
+    async receber(cli, v0, cx, forma, data, obs) { needFin(); const sd = Math.max(fiado(cli) - recebido(cli), 0), v = Math.min(v0, sd), ex = Math.round((v0 - v) * 100) / 100;
+      if (ex > 0) { mov(cx, "entrada", ex, "Crédito Caixa Geral (excedente) " + CL.find(c => c.id === cli).nome, null, meU); const ln = N.filter(x => x.cliente_id === cli).map(x => x.nota_id).sort((a, b) => b - a)[0]; CR.push({ id: id++, cliente_id: cli, tipo: "entrada", valor: ex, obs: v > 0 && ln ? "Excedente pagamento nota " + String(ln).padStart(6, "0") : "Excedente pagamento (sem dívida em aberto)", nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); }
+      if (!(v > 0)) return; RC.unshift({ id: id++, cliente_id: cli, valor: v, caixa_id: cx, forma, data: data || today(), obs }); mov(cx, "entrada", v, "Recebimento cliente " + CL.find(c => c.id === cli).nome, null, meU);
       const mm = MV[MV.length - 1]; mm.forma = forma; mm.cliente = CL.find(c => c.id === cli).nome; let rest = v; const al = [];
       for (const n of N.filter(x => x.cliente_id === cli && x.status === "ativa").sort((a, b) => a.nota_id - b.nota_id)) { if (rest <= 0) break;
         const open = PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0) - AL.filter(x => x.nota_id === n.nota_id).reduce((a, x) => a + x.valor, 0);
@@ -733,8 +738,10 @@ async function viewReceber() {
   <div class="card"><h2>Últimos recebimentos</h2><table class="stk"><tr><th>Data</th><th>Cliente</th><th>Caixa</th><th>Por</th><th class="n">Valor</th></tr>
   ${RC.map(r => `<tr><td>${dBR(r.data)}</td><td>${esc(r.cliente)}</td><td>${esc(r.caixa)}</td><td>${esc(r.handle || "")}</td><td class="n">${brl(r.valor)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum recebimento.</td></tr>'}</table></div>`;
   const sc = () => { const c = dev.find(x => x.id === +$("#c").value); if (c) $("#v").value = Number(c.saldo).toFixed(2); }; if ($("#c")) { $("#c").onchange = sc; sc(); }
-  $("#f").onsubmit = async ev => { ev.preventDefault(); if (!dev.length) return; const b = ev.submitter; b.disabled = true; const o = $("#cx").selectedOptions[0];
-    try { await api.receber(+$("#c").value, Math.round(+$("#v").value * 100) / 100, +$("#cx").value, o.dataset.m, $("#d").value, val("o")); toast("Recebimento registrado ✓ (entrada no caixa)"); viewReceber(); } catch (e) { toast(e.message); b.disabled = false; } };
+  $("#f").onsubmit = async ev => { ev.preventDefault(); if (!dev.length) return; const c = dev.find(x => x.id === +$("#c").value), vv = Math.round(+$("#v").value * 100) / 100, ex = Math.round((vv - Number(c.saldo)) * 100) / 100;
+    if (ex > 0 && !(await confirmBox(`Valor maior que a dívida (${brl(c.saldo)}).<br><b>${brl(ex)}</b> vira crédito na Caixa Geral de <b>${esc(c.nome)}</b>.<br>Confirmar?`))) return;
+    const b = ev.submitter; b.disabled = true; const o = $("#cx").selectedOptions[0];
+    try { await api.receber(+$("#c").value, Math.round(+$("#v").value * 100) / 100, +$("#cx").value, o.dataset.m, $("#d").value, val("o")); toast(ex > 0 ? `Dívida quitada ✓ · ${brl(ex)} virou crédito na Caixa Geral` : "Recebimento registrado ✓ (entrada no caixa)"); viewReceber(); } catch (e) { toast(e.message); b.disabled = false; } };
 }
 async function exportCSV() {
   const R = stockSort(await api.adminProducts()), cols = ["sku", "marca", "produto", "tamanho", "fornecedor", "custo", "preco_venda", "margem_pct", "estoque", "estoque_minimo", "ativo"];

@@ -174,4 +174,38 @@ begin
 end $$;
 revoke all on function public.criar_nota(jsonb, jsonb, text, bigint), public.criar_nota_local(jsonb, jsonb, text, bigint, text, text) from public, anon;
 grant execute on function public.criar_nota(jsonb, jsonb, text, bigint), public.criar_nota_local(jsonb, jsonb, text, bigint, text, text) to authenticated;
+
+-- ---------- Recebimento com excedente: quita a dívida e o resto vira crédito na Caixa Geral (atômico) ----------
+-- Requer migration-caixa-resumo.sql (alocação nas notas via trigger). O dinheiro todo entra no caixa escolhido.
+create or replace function public.registrar_recebimento_credito(p_cliente bigint, p_valor numeric, p_caixa smallint,
+  p_forma text default null, p_data date default null, p_obs text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_nome text; v_saldo numeric; v_rec bigint; v_exc numeric := 0; v_nota bigint; v_met text; v_cred bigint;
+begin
+  if not public.can('financas') then raise exception 'Sem permissão (financeiro/admin)' using errcode = '42501'; end if;
+  if coalesce(p_valor, 0) <= 0 then raise exception 'Valor inválido' using errcode = 'P0001'; end if;
+  select nome into v_nome from public.clientes where id = p_cliente for update;
+  if v_nome is null then raise exception 'Cliente não encontrado' using errcode = 'P0001'; end if;
+  v_saldo := greatest(round(public.cliente_saldo_calc(p_cliente), 2), 0);
+  if round(p_valor, 2) <= v_saldo then
+    v_rec := public.registrar_recebimento(p_cliente, round(p_valor, 2), p_caixa, p_forma, p_data, p_obs);
+    return jsonb_build_object('recebimento_id', v_rec, 'quitado', round(p_valor, 2), 'credito', 0);
+  end if;
+  v_exc := round(p_valor, 2) - v_saldo;
+  if v_saldo > 0 then
+    v_rec := public.registrar_recebimento(p_cliente, v_saldo, p_caixa, p_forma, p_data, p_obs);
+    select max(nota_id) into v_nota from public.recebimento_notas where recebimento_id = v_rec;
+  end if;
+  select metodo::text into v_met from public.caixas where id = p_caixa and ativo;
+  if v_met is null then raise exception 'Caixa inválido' using errcode = 'P0001'; end if;
+  insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, user_id)
+  values (p_caixa, 'entrada', v_exc, left('Crédito Caixa Geral (excedente) ' || v_nome, 300), auth.uid());
+  insert into public.cliente_creditos(cliente_id, tipo, valor, obs)
+  values (p_cliente, 'entrada', v_exc, case when v_nota is not null then 'Excedente pagamento nota ' || lpad(v_nota::text, 6, '0')
+                                           else 'Excedente pagamento (sem dívida em aberto)' end) returning id into v_cred;
+  perform public.fin_log('credito_excedente', jsonb_build_object('cliente_id', p_cliente, 'valor', v_exc, 'recebimento_id', v_rec));
+  return jsonb_build_object('recebimento_id', v_rec, 'quitado', v_saldo, 'credito', v_exc, 'credito_id', v_cred);
+end $$;
+revoke all on function public.registrar_recebimento_credito(bigint, numeric, smallint, text, date, text) from public, anon;
+grant execute on function public.registrar_recebimento_credito(bigint, numeric, smallint, text, date, text) to authenticated;
 notify pgrst, 'reload schema';
