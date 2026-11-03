@@ -118,6 +118,7 @@ if (!MOCK && !CONFIGURED) {
   const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, storageKey: (window.BGDSwitch ? BGDSwitch.storageKey(C.SUPABASE_URL) : undefined), detectSessionInUrl: false, flowType: "pkce" } });
   sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") needPassword = true; });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
+  const allRows = async q => { const out = []; for (let i = 0; ; i += 1000) { const d = ok(await q().range(i, i + 999)); out.push(...d); if (d.length < 1000) return out; } }; // PostgREST corta em 1000 linhas
   api = { ...BGDUsers.realApi(sb),
     async login(email, pw) { if (!email) throw new Error("x"); ok(await sb.auth.signInWithPassword({ email, password: pw })); },
     async logout() { await sb.auth.signOut(); },
@@ -142,8 +143,8 @@ if (!MOCK && !CONFIGURED) {
     async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
     async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
     async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").eq("id", u.id).single()); },
-    async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
-    async productsFull() { return ok(await sb.from("products").select("*").order("sku")); },
+    async products() { return allRows(() => sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
+    async productsFull() { return allRows(() => sb.from("products").select("*").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
@@ -181,6 +182,7 @@ if (!MOCK && !CONFIGURED) {
     async estornarCredito(kid, m) { return ok(await sb.rpc("estornar_credito", { p_id: kid, p_motivo: m })); },
     async depEsp() { return ok(await sb.from("v_deposito_especial").select("*").order("sku")); },
     async depEspMov() { return ok(await sb.from("v_deposito_especial_mov").select("*").order("id", { ascending: false }).limit(100)); },
+    async depEspLote(h, itens) { return ok(await sb.rpc("dep_esp_entrada_lote", { p_header: h, p_itens: itens })); },
     async depEspEntrada(sku, q, c, m) { return ok(await sb.rpc("dep_esp_entrada", { p_sku: sku, p_qtd: q, p_custo: c, p_motivo: m })); },
     async depEspAjuste(sku, q, m) { return ok(await sb.rpc("dep_esp_ajuste", { p_sku: sku, p_nova: q, p_motivo: m })); },
     async depEspTransf(sku, q, d, m) { return ok(await sb.rpc("dep_esp_transferir", { p_sku: sku, p_qtd: q, p_direcao: d, p_motivo: m })); },
@@ -302,7 +304,8 @@ if (!MOCK && !CONFIGURED) {
       RC.splice(RC.indexOf(r), 1); for (let i = AL.length - 1; i >= 0; i--) if (AL[i].rec === rid) AL.splice(i, 1); return { recebimento_id: rid }; },
     async depEsp() { if (meU.role !== "admin") throw new Error("Somente admin"); if (qs.has("depna")) throw new Error("PGRST205 v_deposito_especial schema cache"); return DE.map(d => { const p = P.find(x => x.sku === d.sku); return { ...d, marca: p.marca, produto: p.produto, tamanho: p.tamanho, total: d.qtd * d.custo, estoque_loja: p.estoque }; }); },
     async depEspMov() { return DEM.map(m => { const p = P.find(x => x.sku === m.sku); return { ...m, marca: p.marca, produto: p.produto, handle: "mb" }; }); },
-    async depEspEntrada(sku, q, c, m) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: 0 }); const a = d.qtd; d.custo = Math.round((d.qtd * d.custo + q * c) / (d.qtd + q) * 100) / 100; d.qtd += q; DEM.unshift({ id: id++, sku, tipo: "entrada", qtd: q, qtd_antes: a, qtd_depois: d.qtd, custo_unit: c, motivo: m || "Entrada", created_at: new Date().toISOString() }); return d; },
+    async depEspLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function dep_esp_entrada_lote (demo)"); for (const x of itens) await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, h.motivo); return { itens: itens.length }; },
+    async depEspEntrada(sku, q, c, m) { if (qs.has("failsku") && sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); if (meU.role !== "admin") throw new Error("Somente admin"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: 0 }); const a = d.qtd; d.custo = Math.round((d.qtd * d.custo + q * c) / (d.qtd + q) * 100) / 100; d.qtd += q; DEM.unshift({ id: id++, sku, tipo: "entrada", qtd: q, qtd_antes: a, qtd_depois: d.qtd, custo_unit: c, motivo: m || "Entrada", created_at: new Date().toISOString() }); return d; },
     async depEspAjuste(sku, q, m) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!m || m.length < 3) throw new Error("Informe o motivo"); const d = DE.find(x => x.sku === sku); if (!d) throw new Error("Produto não está no Depósito Especial"); if (!(q >= 0)) throw new Error("Quantidade inválida"); DEM.unshift({ id: id++, sku, tipo: "ajuste", qtd: q - d.qtd, qtd_antes: d.qtd, qtd_depois: q, custo_unit: d.custo, motivo: m, created_at: new Date().toISOString() }); d.qtd = q; return d; },
     async depEspTransf(sku, q, dir, m) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); const p = P.find(x => x.sku === sku); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: K[sku] || 0 }); const a = d.qtd;
       if (dir === "para_loja") { if (d.qtd < q) throw new Error(`Depósito Especial só tem ${d.qtd} un.`); d.qtd -= q; p.estoque += q; } else { if (p.estoque < q) throw new Error(`Loja só tem ${p.estoque} un.`); p.estoque -= q; d.qtd += q; }
@@ -587,7 +590,8 @@ const combo = (inp, ul, itens, onPick) => { let hi = 0, M = [];
   inp.onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); if (!M.length) draw(); hi = Math.min(hi + 1, M.length - 1); draw(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); draw(); }
     else if (e.key === "Enter") { e.preventDefault(); if (M.length) pick(hi); } else if (e.key === "Escape") { e.preventDefault(); if (ul.innerHTML) { ul.innerHTML = ""; M = []; } else { inp.value = ""; inp.dispatchEvent(new Event("typed")); } } };
   return { pick: () => M.length && pick(hi), open: draw }; };
-async function viewCompras() {
+async function viewCompras(o = {}) {
+  const root = o.root || app, emb = !!o.root, again = x => o.onSaved ? o.onSaved(x) : viewCompras(o);
   const adm = me.role === "admin", [P, PU, K, FT] = await Promise.all([(api.productsFull ? api.productsFull() : api.products()).catch(() => api.products()), api.purchases(), adm ? api.costs().catch(() => []) : [], api.fornecedores ? api.fornecedores().catch(() => []) : []]);
   const cm = Object.fromEntries((K || []).map(k => [k.sku, k.custo])), V = Object.fromEntries(P.map(p => [p.sku, variante(p)])), PS = Object.fromEntries(P.map(p => [p.sku, p]));
   const hay = p => `${p.sku} ${p.marca} ${p.produto} ${V[p.sku].raw} ${V[p.sku].gb.join(" ")}`, nome = p => `${p.marca} ${p.produto}${V[p.sku].raw ? " — " + V[p.sku].raw : ""}`;
@@ -596,14 +600,16 @@ async function viewCompras() {
   const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
   [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
   const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "" }], busy = false;
-  app.innerHTML = `<div class="card"><h2>Registrar compra</h2>
-  <div class="grid"><div><label>Fornecedor</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
-  <div><label>Data</label><input id="dt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
+  root.innerHTML = `<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2>
+  ${emb ? '<p class="muted">Vários itens de uma vez · NÃO soma ao estoque da loja.</p>' : adm ? `<label>Destino</label><select id="dst"><option value="loja">Loja (soma ao estoque da loja)</option><option value="esp" ${o.dest === "esp" ? "selected" : ""}>Depósito Especial (só admin · não aparece na loja)</option></select>` : ""}
+  <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
+  <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
-  <button class="btn" id="sv">Salvar compra (soma ao estoque)</button></div>
-  <div class="card"><h2>Últimas compras</h2><table><tr><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
-  ${PU.map(p => `<tr><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra.</td></tr>'}</table></div>`;
+  <button class="btn" id="sv">Salvar</button></div>
+  ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
+  ${PU.map(p => `<tr><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
+  const dest = () => emb ? "esp" : ($("#dst") || {}).value || "loja", sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; }; if ($("#dst")) $("#dst").onchange = sb0; sb0();
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
   const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
@@ -625,37 +631,42 @@ async function viewCompras() {
   $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" ), w = $("#pw");
     for (const [i, l] of it.entries()) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`; if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
     if (!it.length) return w.textContent = "Adicione pelo menos um item";
-    const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#dt").value || today(), ob = $("#ob").value.trim() || null;
+    const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#cdt").value || today(), ob = $("#ob").value.trim() || null;
     const itens = it.map(l => ({ sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) })), total = itens.reduce((a, x) => a + x.qtd * x.custo_unit, 0);
     busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
     if (fx.length >= 2 && api.salvarFornecedor && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {});
+    if (dest() === "esp") { const mot = ["Compra", fx, dt !== today() ? dt : "", ob].filter(Boolean).join(" · ").slice(0, 200);
+      try { if (!api.depEspLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.depEspLote({ fornecedor: fx || null, data: dt, observacao: ob, motivo: mot }, itens); toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
+      catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
+      const fl = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length} no Depósito Especial…`; try { await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, mot); } catch (er) { fl.push({ ...x, erro: er.message }); } }
+      busy = false; $("#sv").disabled = false; if (!fl.length) { toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
+      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob };
-    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.compraLote(hd, itens); toast(`Compra salva ✓ ${itens.length} item(ns)`); return viewCompras(); }
+    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.compraLote(hd, itens); toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
     catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
     const fail = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
       try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
     busy = false; $("#sv").disabled = false;
-    if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return viewCompras(); }
+    if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
     L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL();
     w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
 }
 const DEPT = { entrada: "Entrada", ajuste: "Ajuste", para_loja: "→ Loja", da_loja: "← Loja" };
-async function viewDepEsp() {
+async function viewDepEsp(o = {}) {
   if (me.role !== "admin") return viewSeguranca();
-  let D, M; try { [D, M] = await Promise.all([api.depEsp(), api.depEspMov()]); }
+  let D, M, eD = "", eM = ""; try { [D, M] = await Promise.all([api.depEsp().catch(e => { if (/PGRST20[25]|schema cache|does not exist|could not find/i.test(e.message)) throw e; eD = e.message; return []; }), api.depEspMov().catch(e => { eM = e.message; return []; })]); }
   catch (e) { if (/PGRST20[25]|schema cache|does not exist|could not find/i.test(e.message)) { app.innerHTML = `<div class="card"><h2>Depósito Especial</h2><p class="warn">Depósito Especial ainda não instalado no banco (falta rodar migration-deposito-especial.sql).</p></div>`; return; } throw e; }
-  const P = (await api.products()).filter(p => p.ativo), opt = L => L.map(p => `<option value="${esc(p.sku)}">${esc(p.sku)} · ${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</option>`).join("");
+  const P = (await api.products()).filter(p => p.ativo !== false), sv = new Set((o.saved || []).map(x => x.sku));
   const tq = D.reduce((a, d) => a + +d.qtd, 0), tv = D.reduce((a, d) => a + d.qtd * d.custo, 0);
   app.innerHTML = `<div class="card"><h2>Depósito Especial <span class="muted" style="font-size:.6em">(só admin · não aparece no Estoque da loja nem na Nova nota)</span></h2>
-  <input id="b" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…"><table id="dt"></table><p class="muted">Total: <b>${tq}</b> un. · Valor a custo: <b>${brl(tv)}</b></p></div>
-  <div class="card"><h2>Entrada no Depósito Especial</h2><form id="fe"><label>Produto</label><select id="es" required>${opt(P)}</select>
-  <div class="grid"><div><label>Qtd</label><input id="eq" type="number" min="1" required></div><div><label>Custo unitário (R$)</label><input id="ec" type="number" min="0" step="0.01" required></div><div><label>Observação</label><input id="eo" maxlength="200"></div></div><button class="btn">Salvar entrada</button></form></div>
-  <div class="card"><h2>Transferir</h2><form id="ft"><label>Produto</label><select id="ts" required>${opt(P)}</select>
+  <input id="b" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…">${eD ? `<p class="warn">Erro ao carregar o Depósito Especial: ${esc(eD)}</p>` : ""}${sv.size ? `<p class="ok" style="color:#1a7f37"><b>✓ Entrada salva:</b> ${o.saved.map(x => `${esc(x.sku)} +${x.qtd}`).join(", ")} (destacados abaixo)</p>` : ""}<table id="dt"></table><p class="muted">Total: <b>${tq}</b> un. · Valor a custo: <b>${brl(tv)}</b></p></div>
+  <div id="cartesp"></div>
+  <div class="card"><h2>Transferir</h2><form id="ft"><label>Produto</label><input id="tsq" type="search" autocomplete="off" placeholder="Nome, marca, SKU… (↑↓ Enter)"><ul id="tsug" class="sug"></ul><input type="hidden" id="ts">
   <div class="grid"><div><label>Direção</label><select id="td"><option value="para_loja">Depósito Especial → Loja</option><option value="da_loja">Loja → Depósito Especial</option></select></div><div><label>Qtd</label><input id="tq" type="number" min="1" required></div><div><label>Observação</label><input id="to" maxlength="200"></div></div><button class="btn gold">Transferir</button></form></div>
   <div class="card"><h2>Movimentos</h2><table><tr><th>Data</th><th>SKU</th><th>Tipo</th><th class="n">Qtd</th><th class="n">Antes → Depois</th><th>Motivo</th><th>Por</th></tr>
-  ${M.map(m => `<tr><td>${esc(new Date(m.created_at).toLocaleString("pt-BR"))}</td><td>${esc(m.sku)}</td><td>${DEPT[m.tipo] || esc(m.tipo)}</td><td class="n">${m.qtd > 0 ? "+" : ""}${m.qtd}</td><td class="n">${m.qtd_antes} → ${m.qtd_depois}</td><td>${esc(m.motivo)}</td><td>${esc(m.handle || "")}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhum movimento.</td></tr>'}</table></div>`;
+  ${eM ? `<tr><td colspan="7" class="warn">Erro ao carregar movimentos: ${esc(eM)}</td></tr>` : ""}${M.map(m => `<tr><td>${esc(new Date(m.created_at).toLocaleString("pt-BR"))}</td><td>${esc(m.sku)}</td><td>${DEPT[m.tipo] || esc(m.tipo)}</td><td class="n">${m.qtd > 0 ? "+" : ""}${m.qtd}</td><td class="n">${m.qtd_antes} → ${m.qtd_depois}</td><td>${esc(m.motivo)}</td><td>${esc(m.handle || "")}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhum movimento.</td></tr>'}</table></div>`;
   const draw = () => { const L = D.filter(d => match(d, $("#b").value)); $("#dt").innerHTML = `<tr><th>SKU</th><th>Produto</th><th class="n">Qtd especial</th><th class="n">Custo médio</th><th class="n">Total</th><th class="n">Loja</th><th></th></tr>` +
-    (L.map(d => `<tr><td>${esc(d.sku)}</td><td>${esc(d.marca)} ${esc(d.produto)} ${esc(d.tamanho || "")}</td><td class="n"><b>${d.qtd}</b></td><td class="n">${brl(d.custo)}</td><td class="n">${brl(d.qtd * d.custo)}</td><td class="n">${d.estoque_loja}</td><td><button class="btn ghost aj" data-s="${esc(d.sku)}" style="margin:0">Ajustar</button></td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nada no Depósito Especial.</td></tr>');
+    (L.map(d => `<tr${sv.has(d.sku) ? ' style="background:#e6f6ea"' : ""}><td>${esc(d.sku)}</td><td>${esc(d.marca)} ${esc(d.produto)} ${esc(d.tamanho || "")}</td><td class="n"><b>${d.qtd}</b></td><td class="n">${brl(d.custo)}</td><td class="n">${brl(d.qtd * d.custo)}</td><td class="n">${d.estoque_loja}</td><td><button class="btn ghost aj" data-s="${esc(d.sku)}" style="margin:0">Ajustar</button></td></tr>`).join("") || `<tr><td colspan="7" class="${eD ? "warn" : "muted"}">${eD ? "Não foi possível carregar (veja o erro acima)." : $("#b").value ? "Nada encontrado." : "Nada no Depósito Especial ainda — use a Entrada abaixo."}</td></tr>`);
     app.querySelectorAll(".aj").forEach(b => b.onclick = () => ajustar(D.find(d => d.sku === b.dataset.s))); };
   const ajustar = d => { const o = document.createElement("div"); o.className = "nmodal"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99";
     o.innerHTML = `<div class="card" style="max-width:460px;margin:0"><h2>Ajustar / remover</h2><p><b>${esc(d.sku)}</b> · ${esc(d.marca)} ${esc(d.produto)}<br>Hoje: <b>${d.qtd}</b> un.</p><label>Nova quantidade</label><input id="aq" type="number" min="0" value="${d.qtd}"><label>Motivo *</label><input id="am" maxlength="200" placeholder="Ex.: contagem, avaria, retirada"><p class="warn" id="aw" style="min-height:1em"></p><button class="btn ghost" id="an">Voltar</button> <button class="btn gold" id="ay">Salvar ajuste</button></div>`;
@@ -663,8 +674,11 @@ async function viewDepEsp() {
     o.querySelector("#ay").onclick = async () => { const q = +o.querySelector("#aq").value, m = o.querySelector("#am").value.trim(); if (!(Number.isInteger(q) && q >= 0)) { o.querySelector("#aw").textContent = "Quantidade inválida"; return; } if (m.length < 3) { o.querySelector("#aw").textContent = "Informe o motivo (mín. 3 letras)"; return; }
       try { await api.depEspAjuste(d.sku, q, m); o.remove(); toast("Ajuste salvo ✓"); viewDepEsp(); } catch (e) { o.querySelector("#aw").textContent = e.message; } }; };
   $("#b").oninput = draw; draw();
-  $("#fe").onsubmit = async ev => { ev.preventDefault(); try { await api.depEspEntrada($("#es").value, +$("#eq").value, +$("#ec").value, $("#eo").value.trim()); toast("Entrada salva ✓"); viewDepEsp(); } catch (e) { toast(e.message); } };
-  $("#ft").onsubmit = async ev => { ev.preventDefault(); const sku = $("#ts").value, q = +$("#tq").value, dir = $("#td").value;
+  await viewCompras({ root: $("#cartesp"), dest: "esp", onSaved: itens => viewDepEsp({ saved: itens }) });
+  const tl = p => `<b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b><small>${esc(p.sku)} · loja ${+p.estoque || 0} · especial ${(D.find(d => d.sku === p.sku) || {}).qtd || 0}</small>`;
+  combo($("#tsq"), $("#tsug"), q => (q ? P.filter(p => match(p, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: tl(p) })), k => { const p = P.find(x => x.sku === k); $("#ts").value = k; $("#tsq").value = `${p.marca} ${p.produto} ${p.tamanho || ""} · ${k}`; $("#tq").focus(); });
+  $("#tsq").addEventListener("typed", () => { $("#ts").value = ""; });
+  $("#ft").onsubmit = async ev => { ev.preventDefault(); if (!$("#ts").value) return toast("Escolha o produto na lista"); const sku = $("#ts").value, q = +$("#tq").value, dir = $("#td").value;
     if (!await confirmBox(`Transferir <b>${q}</b> un. de <b>${esc(sku)}</b> ${dir === "para_loja" ? "do Depósito Especial para a <b>Loja</b> (passa a aparecer no Estoque e na Nova nota)" : "da Loja para o <b>Depósito Especial</b> (sai do Estoque da loja)"}?`)) return;
     try { await api.depEspTransf(sku, q, dir, $("#to").value.trim()); toast("Transferência feita ✓"); viewDepEsp(); } catch (e) { toast(e.message); } };
 }
