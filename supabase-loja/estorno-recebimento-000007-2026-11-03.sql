@@ -14,39 +14,37 @@
 -- =====================================================================
 begin;
 do $$
-declare r record; n int; v_admin uuid; v_saida bigint;
+declare rec record; v_cnt int; v_admin uuid; v_saida bigint;
 begin
-  if exists (select 1 from public.caixa_movimentos where motivo like 'Estorno recebimento #% nota 000007 Willian%') then
+  if exists (select 1 from public.caixa_movimentos mv where mv.motivo like 'Estorno recebimento #8 nota 000007 Willian%') then
     raise notice 'Já estornado — nada a fazer.'; return; end if;
-  select count(*) into n
-    from public.cliente_recebimentos r join public.clientes c on c.id = r.cliente_id
-    join public.caixa_movimentos m on m.id = r.mov_id
-   where c.nome ilike 'willian%' and r.valor = 19025.00 and r.forma = 'pix' and m.tipo = 'entrada' and m.valor = 19025.00
-     and (r.created_at at time zone 'America/Sao_Paulo')::date = date '2026-11-03'
-     and to_char(r.created_at at time zone 'America/Sao_Paulo', 'HH24:MI') between '12:40' and '12:55'
-     and exists (select 1 from public.recebimento_notas rn where rn.recebimento_id = r.id and rn.nota_id = 7 and rn.valor = 19025.00)
-     and (select count(*) from public.recebimento_notas rn where rn.recebimento_id = r.id) = 1;
-  if n <> 1 then raise exception 'Esperava 1 recebimento, achei % — nada gravado', n; end if;
-  select r.*, c.nome cli, m.caixa_id mcx into r
-    from public.cliente_recebimentos r join public.clientes c on c.id = r.cliente_id
-    join public.caixa_movimentos m on m.id = r.mov_id
-   where c.nome ilike 'willian%' and r.valor = 19025.00 and r.forma = 'pix' and m.tipo = 'entrada' and m.valor = 19025.00
-     and (r.created_at at time zone 'America/Sao_Paulo')::date = date '2026-11-03'
-     and to_char(r.created_at at time zone 'America/Sao_Paulo', 'HH24:MI') between '12:40' and '12:55'
-     and exists (select 1 from public.recebimento_notas rn where rn.recebimento_id = r.id and rn.nota_id = 7);
-  if exists (select 1 from public.cliente_creditos k where k.cliente_id = r.cliente_id and k.tipo = 'entrada'
-              and k.created_at between r.created_at - interval '1 minute' and r.created_at + interval '1 minute') then
+  select count(*) into v_cnt
+    from public.cliente_recebimentos cr join public.clientes cl on cl.id = cr.cliente_id
+    join public.caixa_movimentos mv on mv.id = cr.mov_id
+   where cr.id = 8 and cl.id = 5 and cl.nome ilike 'willian%' and cr.valor = 19025.00 and cr.forma = 'pix'
+     and mv.tipo = 'entrada' and mv.valor = 19025.00
+     and (cr.created_at at time zone 'America/Sao_Paulo')::date = date '2026-11-03'
+     and to_char(cr.created_at at time zone 'America/Sao_Paulo', 'HH24:MI') between '12:40' and '12:55'
+     and exists (select 1 from public.recebimento_notas rn where rn.recebimento_id = cr.id and rn.nota_id = 7 and rn.valor = 19025.00)
+     and (select count(*) from public.recebimento_notas rn2 where rn2.recebimento_id = cr.id) = 1;
+  if v_cnt <> 1 then raise exception 'Esperava 1 recebimento (id 8), achei % — nada gravado', v_cnt; end if;
+  select cr.id, cr.cliente_id, cr.valor, cr.mov_id, cr.user_id, cr.created_at, cl.nome as cli, mv.caixa_id as mcx into rec
+    from public.cliente_recebimentos cr join public.clientes cl on cl.id = cr.cliente_id
+    join public.caixa_movimentos mv on mv.id = cr.mov_id
+   where cr.id = 8;
+  if exists (select 1 from public.cliente_creditos k where k.cliente_id = rec.cliente_id and k.tipo = 'entrada'
+              and k.created_at between rec.created_at - interval '1 minute' and rec.created_at + interval '1 minute') then
     raise exception 'Há crédito (excedente) gravado junto — revisar manualmente, nada gravado'; end if;
-  select id into v_admin from public.profiles where role = 'admin' order by created_at limit 1;
+  select pf.id into v_admin from public.profiles pf where pf.role = 'admin' order by pf.created_at limit 1;
   insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, user_id, forma)
-  values (r.mcx, 'saida', r.valor, left('Estorno recebimento #' || r.id || ' nota 000007 ' || r.cli || ' (lançado por engano no PIX; pago com crédito Caixa Geral)', 300),
-          coalesce(v_admin, r.user_id), 'pix') returning id into v_saida;
-  delete from public.cliente_recebimentos where id = r.id;   -- recebimento_notas sai por cascade
-  get diagnostics n = row_count; if n <> 1 then raise exception 'Delete não atingiu 1 linha'; end if;
+  values (rec.mcx, 'saida', rec.valor, left('Estorno recebimento #' || rec.id || ' nota 000007 ' || rec.cli || ' (lançado por engano no PIX; pago com crédito Caixa Geral)', 300),
+          coalesce(v_admin, rec.user_id), 'pix') returning id into v_saida;
+  delete from public.cliente_recebimentos where id = rec.id;   -- recebimento_notas sai por cascade
+  get diagnostics v_cnt = row_count; if v_cnt <> 1 then raise exception 'Delete não atingiu 1 linha'; end if;
   insert into public.security_events(kind, actor, detail) values ('fin_alteracao', v_admin,
-    jsonb_build_object('acao', 'estorno_recebimento', 'recebimento_id', r.id, 'mov_entrada', r.mov_id, 'mov_saida', v_saida,
-                       'cliente_id', r.cliente_id, 'nota', '000007', 'valor', r.valor, 'pedido', 'MB 03/11/2026'));
-  raise notice 'Estornado: recebimento % / saída % no caixa %', r.id, v_saida, r.mcx;
+    jsonb_build_object('acao', 'estorno_recebimento', 'recebimento_id', rec.id, 'mov_entrada', rec.mov_id, 'mov_saida', v_saida,
+                       'cliente_id', rec.cliente_id, 'nota', '000007', 'valor', rec.valor, 'pedido', 'MB 03/11/2026'));
+  raise notice 'Estornado: recebimento % / saída % no caixa %', rec.id, v_saida, rec.mcx;
 end $$;
 commit;
 -- Conferência: dívida do Willian volta a incluir a nota 000007
