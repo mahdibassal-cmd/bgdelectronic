@@ -211,6 +211,10 @@ if (!MOCK && !CONFIGURED) {
     async purchases() { return ok(await sb.from("purchases").select("*").order("id", { ascending: false }).limit(100)); },
     async addPurchase(p) { ok(await sb.from("purchases").insert(p)); },
     async compraLote(header, itens) { return ok(await sb.rpc("registrar_compra_lote", { p_header: header, p_itens: itens })); },
+    async comprasListar(q) { return ok(await sb.rpc("compras_listar", { p_q: q || null, p_limit: 200 })); },
+    async compraDetalhe(n) { return ok(await sb.rpc("compra_detalhe", { p_numero: String(n) })); },
+    async imeiSalvar(pid, slots) { return ok(await sb.rpc("compra_imei_salvar", { p_purchase_id: pid, p_slots: slots })); },
+    async imeiBuscar(q) { return ok(await sb.rpc("imei_buscar", { p_q: q })); },
     async saveProduct(p, custo) {
       ok(await sb.from("products").upsert(p));
       if (custo !== "" && custo != null) ok(await sb.from("product_costs").upsert({ sku: p.sku, custo: Number(custo) }));
@@ -231,7 +235,7 @@ if (!MOCK && !CONFIGURED) {
     .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }];
-  const AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = []; let id = 1, logged = qs.has("auto");
+  const AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
   const mkNota = (items, pags, cliente, user, at, clienteId, local, obs) => {
@@ -375,8 +379,21 @@ if (!MOCK && !CONFIGURED) {
     async usuarios() { return role === "admin" ? U : []; },
     async salvarUsuario(uid, u) { if (role !== "admin") throw new Error("Só admin"); Object.assign(U.find(x => x.id === uid), u); },
     async adminProducts() { return role === "admin" ? P.map(p => ({ ...p, custo: K[p.sku] })) : []; },
-    async compraLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function public.registrar_compra_lote (demo sem ?lote=1)"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); return { lote, itens: itens.length }; },
-    async purchases() { return PU; }, async addPurchase(p) { if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
+    async compraLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function public.registrar_compra_lote (demo sem ?lote=1)"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c) }; },
+    async comprasListar(q) { if (role === "vendedor") throw new Error("Sem permissão"); const G = new Map(); [...PU].reverse().forEach(p => { const g = G.get(p.compra_id) || { id: p.compra_id, numero: cnum(p.compra_id), data: p.data, fornecedor: p.fornecedor, observacao: p.observacao, itens: 0, unidades: 0, total: 0, imeis: 0, _h: "" }; g.itens++; g.unidades += p.qtd; g.total += p.total; g.imeis += IM.filter(i => i.purchase_id === p.id).length; const x = P.find(y => y.sku === p.sku); g._h += ` ${p.sku} ${x.marca} ${x.produto}`; G.set(p.compra_id, g); });
+      q = norm(q || ""); return [...G.values()].filter(g => !q || norm(`${g.numero} ${g.fornecedor} ${g._h}`).includes(q)).sort((a, b) => b.id - a.id); },
+    async compraDetalhe(n) { if (role === "vendedor") throw new Error("Sem permissão"); const cid = +String(n).replace(/\D/g, ""), L = PU.filter(p => p.compra_id === cid).sort((a, b) => a.id - b.id); if (!L.length) throw new Error(`Compra ${n} não encontrada`);
+      return { id: cid, numero: cnum(cid), data: L[0].data, fornecedor: L[0].fornecedor, observacao: L[0].observacao, itens: L.map(p => { const x = P.find(y => y.sku === p.sku); return { purchase_id: p.id, sku: p.sku, marca: x.marca, produto: x.produto, tamanho: x.tamanho, qtd: p.qtd, custo_unit: p.custo_unit, total: p.total, imeis: IM.filter(i => i.purchase_id === p.id).sort((a, b) => a.slot - b.slot) }; }) }; },
+    async imeiSalvar(pid, slots) { if (role !== "admin") throw new Error("Só admin cadastra IMEI"); const pu = PU.find(p => p.id === pid); let ok = 0, rm = 0;
+      for (const s of slots) { const a = String(s.imei1 || "").replace(/\D/g, ""), b = String(s.imei2 || "").replace(/\D/g, "") || null; if (s.slot < 1 || s.slot > pu.qtd) throw new Error(`Unidade ${s.slot} fora da quantidade comprada (${pu.qtd})`);
+        const k = IM.findIndex(i => i.purchase_id === pid && i.slot === s.slot); if (!a) { if (b) throw new Error(`Unidade ${s.slot}: IMEI 1 é obrigatório`); if (k >= 0) { IM.splice(k, 1); rm++; } continue; }
+        if (!/^\d{15}$/.test(a) || (b && !/^\d{15}$/.test(b))) throw new Error(`Unidade ${s.slot}: IMEI precisa ter 15 dígitos`); if (a === b) throw new Error(`Unidade ${s.slot}: IMEI 1 e IMEI 2 iguais`);
+        const d = IM.find(i => !(i.purchase_id === pid && i.slot === s.slot) && [i.imei1, i.imei2].some(v => v && (v === a || v === b))); if (d) throw new Error(`IMEI já cadastrado na compra ${cnum(PU.find(p => p.id === d.purchase_id).compra_id)} (unidade ${d.slot})`);
+        if (k >= 0) Object.assign(IM[k], { imei1: a, imei2: b }); else IM.push({ purchase_id: pid, slot: s.slot, imei1: a, imei2: b }); ok++; }
+      return { salvos: ok, removidos: rm }; },
+    async imeiBuscar(q) { if (role === "vendedor") throw new Error("Sem permissão"); q = String(q).replace(/\D/g, ""); if (q.length < 4) throw new Error("Digite pelo menos 4 dígitos do IMEI");
+      return IM.filter(i => i.imei1.includes(q) || (i.imei2 || "").includes(q)).map(i => { const p = PU.find(x => x.id === i.purchase_id), x = P.find(y => y.sku === p.sku); return { ...i, numero: cnum(p.compra_id), compra_id: p.compra_id, data: p.data, fornecedor: p.fornecedor, sku: p.sku, marca: x.marca, produto: x.produto, tamanho: x.tamanho, custo_unit: p.custo_unit, qtd: p.qtd }; }); },
+    async purchases() { return PU; }, async addPurchase(p) { if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); const ci = p.compra_lote && (PU.find(x => x.compra_lote === p.compra_lote) || {}).compra_id || ++CNO; PU.unshift({ id: id++, data: today(), ...p, compra_id: ci, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
   Object.assign(api, BGDUsers.mockApi(qs, U, meU.id));
@@ -414,12 +431,12 @@ async function boot() {
   go(location.hash.slice(1) || (can("vendas") ? "nota" : "caixa"));
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin", caixa: "caixa" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin", imei: "financas", caixa: "caixa" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : "seguranca";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, imei: viewImei }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -607,8 +624,9 @@ async function viewCompras(o = {}) {
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
   <button class="btn" id="sv">Salvar</button></div>
-  ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
-  ${PU.map(p => `<tr><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
+  ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Compra</th><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
+  ${PU.map(p => `<tr><td>${p.compra_id ? `<a href="#imei" class="cpn" data-c="${p.compra_id}">C-${String(p.compra_id).padStart(6, "0")}</a>` : "—"}</td><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
+  root.querySelectorAll(".cpn").forEach(a => a.onclick = e => { e.preventDefault(); viewImei({ numero: a.dataset.c }); });
   const dest = () => emb ? "esp" : ($("#dst") || {}).value || "loja", sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; }; if ($("#dst")) $("#dst").onchange = sb0; sb0();
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
@@ -642,7 +660,7 @@ async function viewCompras(o = {}) {
       busy = false; $("#sv").disabled = false; if (!fl.length) { toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
       L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob };
-    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.compraLote(hd, itens); toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
+    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); const rs = await api.compraLote(hd, itens); toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewImei({ numero: rs.numero, nova: true }); return again(); }
     catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
     const fail = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
       try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
@@ -650,6 +668,43 @@ async function viewCompras(o = {}) {
     if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
     L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL();
     w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
+}
+// ---------- Compras numeradas + IMEI ----------
+const CEL = /iphone|celular|smartphone|galaxy|redmi|poco|xiaomi.*note|motorola|moto ?[geg]\d|realme|pixel/i, isCel = it => CEL.test(`${it.marca} ${it.produto} ${it.sku}`);
+const luhn = s => { let t = 0; for (let i = 0; i < 15; i++) { let d = +s[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } t += d; } return t % 10 === 0; };
+async function viewImei(o = {}) {
+  const adm = me.role === "admin"; if (!api.comprasListar) { app.innerHTML = '<div class="card"><h2>Compras & IMEI</h2><p class="warn">Indisponível.</p></div>'; return; }
+  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
+  let C, err = ""; try { C = await api.comprasListar(o.q || ""); } catch (e) { if (/PGRST202|could not find the function|schema cache|does not exist/i.test(e.message)) { app.innerHTML = '<div class="card"><h2>Compras & IMEI</h2><p class="warn">Ainda não instalado no banco (falta rodar migration-compras-imei.sql).</p></div>'; return; } C = []; err = e.message; }
+  app.innerHTML = `<div class="card"><h2>🔎 Buscar IMEI</h2><div class="grid"><div><label>IMEI (mín. 4 dígitos)</label><input id="iq" inputmode="numeric" autocomplete="off" placeholder="Ex.: 356938035643809" value="${esc(o.iq || "")}"></div><div><label>&nbsp;</label><button class="btn" id="ib">Buscar</button></div></div><div id="ir"></div></div>
+  <div class="card" id="cd"></div>
+  <div class="card"><h2>Compras</h2><div class="grid"><div><label>Filtrar (número, fornecedor, produto)</label><input id="cq" type="search" value="${esc(o.q || "")}" placeholder="C-000012, fornecedor, iPhone…"></div></div>${err ? `<p class="warn">${esc(err)}</p>` : ""}
+  <div style="overflow-x:auto"><table><tr><th>Compra</th><th>Data</th><th>Fornecedor</th><th class="n">Itens</th><th class="n">Un.</th><th class="n">Total</th><th class="n">IMEIs</th><th></th></tr>
+  ${C.map(c => `<tr><td><b>${esc(c.numero)}</b></td><td>${esc(c.data)}</td><td>${esc(c.fornecedor || "—")}</td><td class="n">${c.itens}</td><td class="n">${c.unidades}</td><td class="n">${brl(c.total)}</td><td class="n">${c.imeis}</td><td><button class="btn ghost op" data-n="${esc(c.numero)}">Abrir</button></td></tr>`).join("") || '<tr><td colspan="8" class="muted">Nenhuma compra.</td></tr>'}</table></div></div>`;
+  const busca = async () => { const q = $("#iq").value.replace(/\D/g, ""), r = $("#ir"); try { const R = await api.imeiBuscar(q);
+      r.innerHTML = R.length ? `<div style="overflow-x:auto"><table><tr><th>IMEI</th><th>Compra</th><th>Fornecedor</th><th>Data</th><th>Produto</th><th class="n">Custo un.</th></tr>${R.map(x => `<tr><td>${esc(x.imei1)}${x.imei2 ? `<br><small>${esc(x.imei2)}</small>` : ""}</td><td><a href="#imei" class="opn" data-n="${esc(x.numero)}"><b>${esc(x.numero)}</b></a> · un. ${x.slot}</td><td><b>${esc(x.fornecedor || "—")}</b></td><td>${esc(x.data)}</td><td>${esc(x.marca)} ${esc(x.produto)}${x.tamanho ? " " + esc(x.tamanho) : ""}<br><small>${esc(x.sku)}</small></td><td class="n">${brl(x.custo_unit)}</td></tr>`).join("")}</table></div>` : '<p class="warn">Nenhum aparelho com esse IMEI.</p>';
+      r.querySelectorAll(".opn").forEach(a => a.onclick = e => { e.preventDefault(); abrir(a.dataset.n); }); } catch (e) { r.innerHTML = `<p class="warn">${esc(e.message)}</p>`; } };
+  $("#ib").onclick = busca; $("#iq").onkeydown = e => { if (e.key === "Enter") busca(); }; if (o.iq) busca();
+  let t; $("#cq").oninput = e => { clearTimeout(t); t = setTimeout(() => viewImei({ q: e.target.value, iq: $("#iq").value }).then(() => { const i = $("#cq"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }), 350); };
+  document.querySelectorAll(".op").forEach(b => b.onclick = () => abrir(b.dataset.n));
+  async function abrir(n, nova) { const cd = $("#cd"); cd.hidden = false; let D; try { D = await api.compraDetalhe(n); } catch (e) { cd.innerHTML = `<p class="warn">${esc(e.message)}</p>`; return; }
+    const tudo = cd.dataset.all === "1", its = D.itens.filter(it => tudo || isCel(it) || it.imeis.length);
+    cd.innerHTML = `<h2>Compra ${esc(D.numero)}</h2>${nova ? '<p class="ok">✓ Compra salva. Cadastre os IMEIs dos celulares agora ou depois (Compras & IMEI).</p>' : ""}
+      <p><b>Fornecedor:</b> ${esc(D.fornecedor || "—")} · <b>Data:</b> ${esc(D.data)}${D.observacao ? ` · ${esc(D.observacao)}` : ""}</p>
+      <p class="muted">${D.itens.map(it => `${esc(it.marca)} ${esc(it.produto)}${it.tamanho ? " " + esc(it.tamanho) : ""} × ${it.qtd} · ${brl(it.custo_unit)}`).join("<br>")}</p>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="all" style="width:auto" ${tudo ? "checked" : ""}> Mostrar todos os itens (não só celulares)</label>
+      ${its.map(it => { const M = Object.fromEntries(it.imeis.map(i => [i.slot, i])); return `<div class="card ii" data-p="${it.purchase_id}"><h3>${esc(it.marca)} ${esc(it.produto)}${it.tamanho ? " " + esc(it.tamanho) : ""} <small class="muted">${esc(it.sku)} · ${it.qtd} un. · ${it.imeis.length}/${it.qtd} com IMEI</small></h3>
+        <table><tr><th>Un.</th><th>IMEI 1</th><th>IMEI 2 (opcional)</th></tr>${Array.from({ length: it.qtd }, (_, k) => k + 1).map(sl => `<tr data-s="${sl}"><td>${sl}</td><td><input class="i1" inputmode="numeric" maxlength="20" value="${esc((M[sl] || {}).imei1 || "")}" ${adm ? "" : "readonly"}><small class="w"></small></td><td><input class="i2" inputmode="numeric" maxlength="20" value="${esc((M[sl] || {}).imei2 || "")}" placeholder="IMEI 2 (opcional)" ${adm ? "" : "readonly"}><small class="w"></small></td></tr>`).join("")}</table>
+        ${adm ? '<button class="btn sv">Salvar IMEIs deste item</button> <span class="warn st"></span>' : ""}</div>`; }).join("") || '<p class="muted">Nenhum celular nesta compra. Marque "Mostrar todos os itens" para cadastrar IMEI de outro item.</p>'}`;
+    cd.querySelector("#all").onchange = e => { cd.dataset.all = e.target.checked ? "1" : ""; abrir(n); };
+    const chk = inp => { const v = inp.value.replace(/\D/g, ""), w = inp.nextElementSibling; w.className = "w"; w.textContent = !v ? "" : v.length !== 15 ? `${v.length}/15 dígitos` : luhn(v) ? "✓" : "⚠ dígito verificador não confere (confira)"; if (v && v.length !== 15) w.className = "w warn"; };
+    cd.querySelectorAll(".i1,.i2").forEach(i => { chk(i); i.oninput = () => chk(i); });
+    cd.querySelectorAll(".ii").forEach(box => { const b = box.querySelector(".sv"); if (!b) return; b.onclick = async () => { const st = box.querySelector(".st"), sl = [...box.querySelectorAll("tr[data-s]")].map(tr => ({ slot: +tr.dataset.s, imei1: tr.querySelector(".i1").value.replace(/\D/g, ""), imei2: tr.querySelector(".i2").value.replace(/\D/g, "") }));
+      const bad = sl.find(s => (s.imei1 && s.imei1.length !== 15) || (s.imei2 && s.imei2.length !== 15) || (!s.imei1 && s.imei2)); if (bad) return st.textContent = `Unidade ${bad.slot}: IMEI precisa ter 15 dígitos (IMEI 1 obrigatório se tiver IMEI 2)`;
+      const all = sl.flatMap(s => [s.imei1, s.imei2]).filter(Boolean), dup = all.find((v, i) => all.indexOf(v) !== i); if (dup) return st.textContent = `IMEI repetido nesta lista: ${dup}`;
+      b.disabled = true; st.textContent = "Salvando…"; try { const r = await api.imeiSalvar(+box.dataset.p, sl); toast(`IMEIs salvos ✓ ${r.salvos}${r.removidos ? ` · removidos ${r.removidos}` : ""}`); abrir(n); } catch (e) { b.disabled = false; st.textContent = e.message; } }; });
+    cd.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  $("#cd").hidden = true; if (o.numero) await abrir(o.numero, o.nova);
 }
 const DEPT = { entrada: "Entrada", ajuste: "Ajuste", para_loja: "→ Loja", da_loja: "← Loja" };
 async function viewDepEsp(o = {}) {
