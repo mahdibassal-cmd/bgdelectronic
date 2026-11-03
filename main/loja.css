@@ -36,6 +36,9 @@ td.n,th.n{text-align:right}.low{color:#c2410c;font-weight:700}.warn{color:#c2410
 .recibo .rs{display:grid;grid-template-columns:9ch 1fr;white-space:nowrap}.recibo .rs>:nth-child(2){text-align:right}
 .recibo .rtot{font-weight:900;font-size:1.15em}
 .recibo .via{white-space:nowrap;letter-spacing:.05em!important}
+.recibo .rpre{font-family:"Courier New",Courier,monospace;font-size:13px;line-height:1.25;margin:0;white-space:pre;overflow:hidden;font-weight:700}html.w58 .recibo .rpre{font-size:11px}
+.recibo pre.rpre.rh{text-align:left!important;border:0!important;padding:0!important;margin:0!important;display:block}
+@media print{.recibo .rpre{font-size:10.6px!important}html.w58 .recibo .rpre{font-size:9.6px!important}}
 @media print{
 html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;max-width:none!important;overflow:visible!important}
 .top,#mockbar,.noprint,#toast,nav,button,header{display:none!important}

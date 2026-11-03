@@ -43,10 +43,27 @@ const confirmNota = (items, total, pag) => new Promise(res => { const o = docume
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
   document.body.append(o); o.querySelector("#nmv").onclick = () => done(false); o.querySelector("#nmc").onclick = () => done(true); document.addEventListener("keydown", k); o.querySelector("#nmc").focus(); });
-const printVia = via => { let v = document.querySelector(".recibo .via"); if (!v) { v = document.createElement("div"); v.className = "via"; v.style.cssText = "text-align:center;font-weight:700;letter-spacing:.12em;border:1px dashed #000;padding:3px;margin:6px 0"; const r = document.querySelector(".recibo .rh"); r ? r.after(v) : document.querySelector(".recibo")?.prepend(v); } v.textContent = "*** " + via + " ***"; window.print(); };
+const printVia = via => { let v = document.querySelector(".recibo .via"); if (!v) { v = document.createElement("pre"); v.className = "via rpre"; const r = document.querySelector(".recibo .rh"); r ? r.after(v) : document.querySelector(".recibo")?.prepend(v); } v.textContent = rcC("*** " + via + " ***"); window.print(); };
 const printBtns = () => { const pr = $("#pr"); if (!pr) return; pr.textContent = "🖨️ Imprimir de novo"; pr.onclick = () => printVia("VIA DA LOJA");
   const c = document.createElement("button"); c.className = "btn gold"; c.id = "prc"; c.textContent = "🧾 Imprimir via do cliente"; c.style.marginLeft = "6px"; c.onclick = () => printVia("VIA DO CLIENTE"); pr.after(c); setTimeout(() => printVia("VIA DA LOJA"), 350); };
 const rnum = v => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); /* sem "R$" nem U+00A0 (o driver térmico imprime o NBSP como lixo) */
+/* cupom térmico em texto puro (ASCII, colunas com espaços): o driver da Bematech ignora CSS e não usa UTF-8 */
+const asc = s => String(s ?? "").replace(/º/g, "o").replace(/ª/g, "a").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\u00a0\u202f]/g, " ").replace(/[^\x20-\x7e]/g, "");
+const rcW = () => document.documentElement.classList.contains("w58") ? 32 : 42;
+const rcL = (a, b, W = rcW()) => { a = asc(a); b = asc(b); const n = W - a.length - b.length; return n >= 1 ? a + " ".repeat(n) + b : a + "\n" + " ".repeat(Math.max(0, W - b.length)) + b; };
+const rcC = (s, W = rcW()) => { s = asc(s); return s.length >= W ? s : " ".repeat(Math.floor((W - s.length) / 2)) + s; };
+const rcWrap = (s, W = rcW()) => { const o = []; let l = ""; for (const w of asc(s).split(/\s+/).filter(Boolean)) { if (!l) l = w; else if ((l + " " + w).length <= W) l += " " + w; else { o.push(l); l = w; } while (l.length > W) { o.push(l.slice(0, W)); l = l.slice(W); } } if (l) o.push(l); return o.join("\n"); };
+const rc3 = (a, b, c, W = rcW()) => { const cw = W >= 42 ? 14 : 11; a = asc(a); return a + " ".repeat(Math.max(1, W - 2 * cw - a.length)) + asc(b).padStart(cw) + asc(c).padStart(cw); };
+const rcEsc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
+  const head = [rcC(store), rcC("bgdstores.com"), E].join("\n");
+  const L = ["PEDIDO DE VENDA", rcL("Data: " + dt.toLocaleDateString("pt-BR", { timeZone: TZ }), dt.toLocaleTimeString("pt-BR", { timeZone: TZ })),
+    ...(h.cliente ? [rcWrap("Cliente: " + h.cliente)] : []), rcWrap("Vendedor: " + h.nome + " (" + h.handle + ")"), "Nota No.: " + String(nid).padStart(6, "0"), E,
+    "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
+    ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
+    rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot)), D,
+    ...pays.map(p => rcWrap("Pago: " + p)), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
+  return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
@@ -575,15 +592,7 @@ async function viewRecibo(nid) {
   const [R, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]); if (!R.length) return toast("Nota não encontrada");
   const h = R[0], tot = R.reduce((a, r) => a + Number(r.total), 0);
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
-  ${(() => { const dt = new Date(h.created_at), TZ = "America/Sao_Paulo", qt = R.reduce((a, r) => a + Number(r.qtd), 0);
-  return `<div class="recibo"><div class="rc rh"><div class="rb">BAGDA STORES</div><div>bgdstores.com</div></div><hr class="r2">
-  <div>PEDIDO DE VENDA</div><div class="rl"><span>Data: ${dt.toLocaleDateString("pt-BR", { timeZone: TZ })}</span><span>${dt.toLocaleTimeString("pt-BR", { timeZone: TZ })}</span></div>
-  ${h.cliente ? `<div><span class="rk">Cliente</span>: ${esc(h.cliente)}</div>` : ""}<div><span class="rk">Vendedor</span>: ${esc(h.nome)} (${esc(h.handle)})</div><div><span class="rk">Nota nº</span>: ${String(nid).padStart(6, "0")}</div><hr class="r2">
-  <div>Código Descrição</div><div class="rg"><span>Qtd</span><span>Preço</span><span>Total</span></div><hr class="r1">
-  ${R.map(r => `<div class="rnm">${esc([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" "))}</div><div class="rg"><span>${r.qtd} Un</span><span>${rnum(r.preco_vendido)}</span><span>${rnum(r.total)}</span></div>`).join("")}<hr class="r1">
-  <div class="rl"><span>Total: ${qt}</span><span>Itens: ${R.length}</span></div><hr class="r1">
-  <div class="rs"><span>Subtotal:</span><span>${rnum(tot)}</span><span>Desc.:</span><span>0,00</span><span class="rtot">Total:</span><span class="rtot">R$ ${rnum(tot)}</span></div><hr class="r1">
-  ${PGN.map(g => `<div>Pago: ${esc(PAYL[g.metodo] || g.metodo)}${PGN.length > 1 ? " " + rnum(g.valor) : ""}</div>`).join("")} ${h.status === "cancelada" ? '<p class="rc"><b>*** NOTA CANCELADA ***</b></p>' : ""}<hr class="r2"><p class="rc">&gt;&gt;&gt; CONFIRA SUAS MERCADORIAS &lt;&lt;&lt;</p><p class="rc">Obrigado pela preferência!</p></div>`; })()}`;
+  ${reciboTxt("BAGDA STORES", nid, h, R, tot, PGN.map(g => (PAYL[g.metodo] || g.metodo) + (PGN.length > 1 ? " R$ " + rnum(g.valor) : "")), h.status === "cancelada")}`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
 }
 async function viewNotas() {
