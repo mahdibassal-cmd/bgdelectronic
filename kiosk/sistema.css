@@ -79,3 +79,9 @@ html[data-theme=dark] #theme-tg{background:#17140f;color:#e8c979;border-color:rg
 .sorteio-bar{padding-right:48px!important;padding-left:48px!important}
 body>header,header.top{padding-right:52px!important}
 @media print{#theme-tg{display:none!important}}
+/* Extrato de vendas (Relatório diário) */
+.ext td,.ext th{vertical-align:top}.ext tr.exc td{opacity:.6;text-decoration:line-through}.ext tr.exc td:nth-last-child(2),.ext tr.exc td:last-child{text-decoration:none;opacity:1}
+.ext .ext-t{border:0;background:none;cursor:pointer;font-size:15px;color:inherit;padding:0 4px}.ext tr.exi>td{background:rgba(0,0,0,.03);padding-top:0}
+.exit{width:100%;margin:2px 0 6px;font-size:13px}.exit th{font-weight:600}.ext tr.tot th{border-top:2px solid var(--ink)}.ok-r{color:#1f7a3a;font-weight:600}
+html[data-theme=dark] .ext tr.exi>td{background:#1f1c15}html[data-theme=dark] .ok-r{color:#7fd39a}
+@media print{.ext tr.exi{display:table-row!important}.ext tr.exi>td{background:#fff!important}.ext tr.exc td{opacity:1!important}.ok-r{color:#000!important}#ext{break-before:auto}}
