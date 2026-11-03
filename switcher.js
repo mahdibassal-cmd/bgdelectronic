@@ -13,7 +13,7 @@
       if (!Array.isArray(L) || L.length < 2 || document.getElementById("bgdsw")) return;
       const cur = L.find(s => here() === s.url) || {};
       const sel = document.createElement("select");
-      sel.id = "bgdsw"; sel.title = "Trocar de loja"; sel.style.cssText = "margin-left:8px;padding:4px 8px;border-radius:8px";
+      sel.id = "bgdsw"; sel.title = "Trocar de loja"; sel.style.cssText = "margin-left:8px;padding:4px 8px;border-radius:8px;width:auto;max-width:220px";
       sel.innerHTML = L.map((s, i) => `<option value="${i}" ${s.url === cur.url ? "selected" : ""}>${esc(s.nome)}</option>`).join("");
       sel.onchange = () => {
         const t = L[+sel.value]; if (!t || t.url === cur.url) return;
