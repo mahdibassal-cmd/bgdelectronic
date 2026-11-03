@@ -1,3 +1,5 @@
-#theme-tg{position:fixed;left:14px;bottom:80px;z-index:9999;width:42px;height:42px;border-radius:50%;border:1px solid rgba(160,130,60,.55);background:#fff;color:#1a1a1a;font:20px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:0}
+#theme-tg{position:fixed;right:8px;top:4px;z-index:10000;width:32px;height:32px;border-radius:50%;border:1px solid rgba(160,130,60,.55);background:#fff;color:#1a1a1a;font:17px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:0}
 html[data-theme=dark] #theme-tg{background:#17140f;color:#e8c979;border-color:rgba(214,180,106,.5)}
+.sorteio-bar{padding-right:48px!important;padding-left:48px!important}
+body>header,header.top{padding-right:52px!important}
 @media print{#theme-tg{display:none!important}}
