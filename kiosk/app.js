@@ -397,7 +397,7 @@ async function viewSeguranca() {
 async function viewNota() {
   const P = (await api.products()).filter(p => p.ativo); let items = [];
   app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
-  <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter adiciona)" autofocus>
+  <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter seleciona)" autofocus>
   <ul id="sug" class="sug"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
   <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="50" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
@@ -414,18 +414,22 @@ async function viewNota() {
     $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${p.estoque < 1 ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> <small>${esc(p.sku)} · ${brl(p.preco_venda)} · ${p.estoque} disp.</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
     document.querySelectorAll("#sug li[data-s]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(li.dataset.s); }); };
   const pick = sku => { const p = P.find(x => x.sku === sku); if (!p) return; if (p.estoque < 1) return toast("Sem estoque");
-    const pv = +$("#pv").value || p.preco_venda, q = +$("#q").value || 1, ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
-    if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
-    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
-    $("#f").reset(); $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
-  $("#bq").oninput = () => { hi = 0; drawS(); };
+    $("#sku").value = p.sku; $("#bq").value = `${p.marca} ${p.produto} ${p.tamanho || ""}`.trim(); M = []; hi = 0; $("#sug").innerHTML = "";
+    $("#sel").innerHTML = `Selecionado: <b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> · ${esc(p.sku)} · tabela ${brl(p.preco_venda)} · ${p.estoque} disp.`;
+    $("#pv").value = ""; chk(); $("#q").focus(); $("#q").select(); };
+  $("#bq").oninput = () => { hi = 0; $("#sku").value = ""; $("#sel").innerHTML = ""; drawS(); };
+  $("#q").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#pv").focus(); } };
   $("#bq").onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); hi = Math.min(hi + 1, M.length - 1); drawS(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); drawS(); } else if (e.key === "Enter") { e.preventDefault(); if (M[hi]) pick(M[hi].sku); } else if (e.key === "Escape") { $("#bq").value = ""; drawS(); } };
   $("#pv").oninput = chk;
-  $("#f").onsubmit = ev => { ev.preventDefault(); if (M[hi]) return pick(M[hi].sku); const p = P.find(x => x.sku === $("#sku").value), q = +$("#q").value; if (!p) return toast("Escolha um produto");
+  $("#f").onsubmit = ev => { ev.preventDefault(); if (!$("#sku").value && M[hi]) return pick(M[hi].sku); const p = P.find(x => x.sku === $("#sku").value), q = +$("#q").value, pv = Math.round(+String($("#pv").value).replace(",", ".") * 100) / 100;
+    if (!p) { toast("Escolha um produto"); return $("#bq").focus(); }
+    if (!Number.isInteger(q) || q < 1) { toast("Quantidade inválida"); return $("#q").focus(); }
+    if (!(pv > 0)) { toast("Informe o preço vendido (maior que R$ 0,00)"); return $("#pv").focus(); }
     const ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
     if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
-    items.push({ sku: p.sku, qtd: q, preco_vendido: +$("#pv").value, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); $("#f").reset(); $("#w").textContent = ""; draw(); };
-  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item");
+    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
+    $("#f").reset(); $("#sku").value = ""; $("#sel").innerHTML = ""; $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
+  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item"); if (items.some(x => !(+x.preco_vendido > 0))) return toast("Há item com preço R$ 0,00 — remova e adicione com o preço vendido");
     if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0), esc($("#fp").value)))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0), pagTxt = esc($("#fp").value);
     try { const nid = await api.criarNota($("#fp").value, items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), $("#cl").value);

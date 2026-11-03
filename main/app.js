@@ -22,6 +22,7 @@
 "use strict";
 const C = window.LOJA_CONFIG || {};
 const qs = new URLSearchParams(location.search);
+const ATEND = ["1", "2", "3", "4", "BAGDA OFFICIAL"];
 const CONFIGURED = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(C.SUPABASE_URL || "") && /^(sb_publishable_|eyJ)/.test(C.SUPABASE_ANON_KEY || "");
 const MOCK = qs.has("mock");
 const PAY = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["prazo", "Paga Depois"]];
@@ -118,8 +119,11 @@ if (!MOCK && !CONFIGURED) {
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
     async criarNota(items, pagamentos, cliente, clienteId) { return ok(await sb.rpc("criar_nota", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null })); },
     async buscarClientes(q) { return ok(await sb.rpc("buscar_clientes", { p_q: q })); },
-    async criarCliente(c) { return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); },
-    async clientes() { return ok(await sb.from("v_clientes_saldo").select("*").order("nome")); },
+    async criarCliente(c) { if ("atendimento" in c) { const r = await sb.rpc("criar_cliente_atendimento", { p_nome: c.nome, p_atendimento: c.atendimento || null });
+        if (!r.error) return r.data; if (!/PGRST202|criar_cliente_atendimento|schema cache/i.test((r.error.code || "") + " " + (r.error.message || ""))) return ok(r); }
+      return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); },
+    async clientes() { const L = ok(await sb.from("v_clientes_saldo").select("*").order("nome")); const A = await sb.from("clientes").select("id,atendimento").limit(5000);
+      if (!A.error && A.data) { const m = Object.fromEntries(A.data.map(x => [x.id, x.atendimento])); L.forEach(c => { if (c.atendimento == null) c.atendimento = m[c.id] ?? null; }); } return L; },
     async salvarCliente(id, c) { ok(await sb.from("clientes").update(c).eq("id", id)); },
     async fornecedores() { return ok(await sb.from("fornecedores").select("*").order("nome")); },
     async salvarFornecedor(id, f) { ok(id ? await sb.from("fornecedores").update(f).eq("id", id) : await sb.from("fornecedores").insert(f)); },
@@ -220,7 +224,7 @@ if (!MOCK && !CONFIGURED) {
     async repProfit(d) { const r = await this.repSeller(d); return r.map(x => ({ ...x, lucro: x.faturamento - x.custo })); },
     async buscarClientes(q) { if (q.trim().length < 2) return []; const d = dig(q); return CL.filter(c => c.ativo && (norm(c.nome).includes(norm(q)) || (d.length >= 3 && (dig(c.doc).includes(d) || dig(c.telefone).includes(d))))).slice(0, 15).map(({ id, nome, telefone, doc }) => ({ id, nome, telefone, doc })); },
     async criarCliente(c) { if (role === "financeiro" && false) return; if (!c.nome || c.nome.trim().length < 2) throw new Error("Informe o nome do cliente"); const d = dig(c.doc) || null; if (d && !docOk(d)) throw new Error("CPF/CNPJ inválido"); const ex = d && CL.find(x => x.doc === d); if (ex) return ex.id;
-      const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", ativo: true }; CL.push(nc); return nc.id; },
+      const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", atendimento: c.atendimento || null, ativo: true }; CL.push(nc); return nc.id; },
     async clientes() { await ready; needFin(); return CL.map(c => ({ ...c, total_fiado: fiado(c.id), total_recebido: recebido(c.id), saldo: fiado(c.id) - recebido(c.id) })); },
     async salvarCliente(cid, c) { needFin(); if (c.doc && !docOk(c.doc)) throw new Error("CPF/CNPJ inválido"); Object.assign(CL.find(x => x.id === cid), c); },
     async fornecedores() { await ready; needFin(); return FO; },
@@ -494,7 +498,7 @@ async function viewSeguranca() {
 async function viewNota() {
   const P = (await api.products()).filter(p => p.ativo); let items = [];
   app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
-  <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter adiciona)" autofocus>
+  <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter seleciona)" autofocus>
   <ul id="sug" class="sug"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
   <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="50" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
@@ -504,7 +508,7 @@ async function viewNota() {
   <label>Cliente (obrigatório para Paga Depois)</label><input id="cl" type="search" autocomplete="off" maxlength="120" placeholder="Buscar por nome, telefone ou CPF…">
   <ul id="csug" class="sug"></ul><div id="csel" class="muted"></div>
   <button type="button" class="btn ghost" id="cnovo" style="margin-top:4px">+ Novo cliente</button>
-  <div id="cform" hidden class="grid" style="margin-top:8px"><div><label>Nome</label><input id="cn" maxlength="120"></div><div><label>Telefone</label><input id="ct" maxlength="30" inputmode="tel"></div><div><label>CPF/CNPJ</label><input id="cd" maxlength="18" inputmode="numeric"></div><div><button type="button" class="btn" id="csave">Salvar cliente</button></div></div>
+  <div id="cform" hidden class="grid" style="margin-top:8px"><div><label>Nome do cliente</label><input id="cn" maxlength="120"></div><div><label>Atendimento número</label><select id="cat"><option value="">— selecione —</option>${ATEND.map(a => `<option>${a}</option>`).join("")}</select></div><div><button type="button" class="btn" id="csave">Salvar cliente</button></div></div>
   <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
   let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0))}</th><th></th></tr>`;
     document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
@@ -514,25 +518,29 @@ async function viewNota() {
     $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${p.estoque < 1 ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> <small>${esc(p.sku)} · ${brl(p.preco_venda)} · ${p.estoque} disp.</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
     document.querySelectorAll("#sug li[data-s]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(li.dataset.s); }); };
   const pick = sku => { const p = P.find(x => x.sku === sku); if (!p) return; if (p.estoque < 1) return toast("Sem estoque");
-    const pv = +$("#pv").value || p.preco_venda, q = +$("#q").value || 1, ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
-    if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
-    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
-    $("#f").reset(); $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
-  $("#bq").oninput = () => { hi = 0; drawS(); };
+    $("#sku").value = p.sku; $("#bq").value = `${p.marca} ${p.produto} ${p.tamanho || ""}`.trim(); M = []; hi = 0; $("#sug").innerHTML = "";
+    $("#sel").innerHTML = `Selecionado: <b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> · ${esc(p.sku)} · tabela ${brl(p.preco_venda)} · ${p.estoque} disp.`;
+    $("#pv").value = ""; chk(); $("#q").focus(); $("#q").select(); };
+  $("#bq").oninput = () => { hi = 0; $("#sku").value = ""; $("#sel").innerHTML = ""; drawS(); };
+  $("#q").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#pv").focus(); } };
   $("#bq").onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); hi = Math.min(hi + 1, M.length - 1); drawS(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); drawS(); } else if (e.key === "Enter") { e.preventDefault(); if (M[hi]) pick(M[hi].sku); } else if (e.key === "Escape") { $("#bq").value = ""; drawS(); } };
   $("#pv").oninput = chk;
-  $("#f").onsubmit = ev => { ev.preventDefault(); if (M[hi]) return pick(M[hi].sku); const p = P.find(x => x.sku === $("#sku").value), q = +$("#q").value; if (!p) return toast("Escolha um produto");
+  $("#f").onsubmit = ev => { ev.preventDefault(); if (!$("#sku").value && M[hi]) return pick(M[hi].sku); const p = P.find(x => x.sku === $("#sku").value), q = +$("#q").value, pv = Math.round(+String($("#pv").value).replace(",", ".") * 100) / 100;
+    if (!p) { toast("Escolha um produto"); return $("#bq").focus(); }
+    if (!Number.isInteger(q) || q < 1) { toast("Quantidade inválida"); return $("#q").focus(); }
+    if (!(pv > 0)) { toast("Informe o preço vendido (maior que R$ 0,00)"); return $("#pv").focus(); }
     const ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
     if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
-    items.push({ sku: p.sku, qtd: q, preco_vendido: +$("#pv").value, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); $("#f").reset(); $("#w").textContent = ""; draw(); };
+    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
+    $("#f").reset(); $("#sku").value = ""; $("#sel").innerHTML = ""; $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
   let cli = null;
   const setCli = c => { cli = c; $("#csel").innerHTML = c ? `Cliente: <b>${esc(c.nome)}</b> ${esc(c.telefone || "")} ${c.doc ? esc(fmtDoc(c.doc)) : ""} <button type="button" id="cx0">✕</button>` : ""; $("#csug").innerHTML = ""; if (c) { $("#cl").value = ""; $("#cx0").onclick = () => setCli(null); } };
   let ct0; $("#cl").oninput = () => { clearTimeout(ct0); ct0 = setTimeout(async () => { const q = $("#cl").value; const L = q.trim().length >= 2 ? await api.buscarClientes(q).catch(e => (toast(e.message), [])) : [];
     $("#csug").innerHTML = L.map((c, i) => `<li data-i="${i}"><b>${esc(c.nome)}</b> <small>${esc(c.telefone || "")} ${c.doc ? "· " + esc(fmtDoc(c.doc)) : ""}</small></li>`).join("") || (q.trim().length >= 2 ? '<li class="off">Nenhum cliente — use "+ Novo cliente"</li>' : "");
     document.querySelectorAll("#csug li[data-i]").forEach(li => li.onmousedown = e => { e.preventDefault(); setCli(L[+li.dataset.i]); }); }, 200); };
   $("#cnovo").onclick = () => { $("#cform").hidden = !$("#cform").hidden; $("#cn").value = $("#cl").value; $("#cn").focus(); };
-  $("#csave").onclick = async () => { const c = { nome: $("#cn").value.trim(), telefone: $("#ct").value.trim(), doc: dig($("#cd").value) };
-    if (c.nome.length < 2) return toast("Informe o nome do cliente"); if (c.doc && !docOk(c.doc)) return toast("CPF/CNPJ inválido");
+  $("#csave").onclick = async () => { const c = { nome: $("#cn").value.trim(), atendimento: $("#cat").value || null };
+    if (c.nome.length < 2) return toast("Informe o nome do cliente"); if (!c.atendimento) return toast("Escolha o Atendimento número");
     try { const cid = await api.criarCliente(c); setCli({ id: +cid, ...c }); $("#cform").hidden = true; toast("Cliente salvo ✓"); } catch (e) { toast(e.message); } };
   let pgs = [{ metodo: "pix", valor: null }];
   const totalN = () => Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100;
@@ -546,7 +554,7 @@ async function viewNota() {
     document.querySelectorAll(".rmpg").forEach(x => x.onclick = () => { pgs.splice(+x.dataset.i, 1); drawPg(); }); };
   $("#addpg").onclick = () => { if (pgs.length >= 3) return; const t = totalN(), soma = pgs.reduce((a, g) => a + (+g.valor || 0), 0); if (pgs.length === 1) pgs[0].valor = t; pgs.push({ metodo: PAY.map(x => x[0]).find(m => !pgs.some(g => g.metodo === m)) || "dinheiro", valor: Math.max(Math.round((t - soma) * 100) / 100, 0) || null }); drawPg(); };
   const draw0 = draw; draw = () => { draw0(); drawPg(); };
-  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item");
+  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item"); if (items.some(x => !(+x.preco_vendido > 0))) return toast("Há item com preço R$ 0,00 — remova e adicione com o preço vendido");
     const t = totalN(), P2 = pgs.filter(g => +g.valor > 0).map(g => ({ metodo: g.metodo, valor: Math.round(+g.valor * 100) / 100 }));
     if (Math.round(P2.reduce((a, g) => a + g.valor, 0) * 100) !== Math.round(t * 100)) return toast("A soma dos pagamentos precisa ser igual ao total");
     if (P2.some(g => g.metodo === "prazo") && !cli) return toast("Paga Depois exige cliente — busque ou cadastre o cliente");
@@ -638,7 +646,7 @@ async function viewClientes() {
   <button class="btn" id="sv">Salvar cliente</button> <button type="button" class="btn ghost" id="cn" hidden>Cancelar edição</button></form></div>
   <div class="card"><h2>Clientes</h2><input id="b" type="search" placeholder="Buscar nome, telefone ou CPF…"><table id="tb" class="stk"></table></div>`;
   const draw = () => { const q = norm($("#b").value), dq = dig($("#b").value); const F = L.filter(c => !q || norm(c.nome).includes(q) || (dq && (dig(c.doc).includes(dq) || dig(c.telefone).includes(dq))));
-    $("#tb").innerHTML = `<tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th class="n">Saldo a receber</th><th></th></tr>` + (F.map(c => `<tr><td>${esc(c.nome)}${c.email ? `<br><small class="muted">${esc(c.email)}</small>` : ""}</td><td>${esc(fmtDoc(c.doc))}</td><td>${esc(c.telefone || "")}</td><td class="n ${+c.saldo > 0 ? "low" : ""}">${brl(c.saldo)}</td><td><button class="ed" data-i="${c.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum cliente.</td></tr>');
+    $("#tb").innerHTML = `<tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Atend.</th><th class="n">Saldo a receber</th><th></th></tr>` + (F.map(c => `<tr><td>${esc(c.nome)}${c.email ? `<br><small class="muted">${esc(c.email)}</small>` : ""}</td><td>${esc(fmtDoc(c.doc))}</td><td>${esc(c.telefone || "")}</td><td>${esc(c.atendimento || "")}</td><td class="n ${+c.saldo > 0 ? "low" : ""}">${brl(c.saldo)}</td><td><button class="ed" data-i="${c.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhum cliente.</td></tr>');
     document.querySelectorAll(".ed").forEach(b => b.onclick = () => { const c = L.find(x => x.id === +b.dataset.i); ed = c.id; $("#n").value = c.nome; $("#d").value = fmtDoc(c.doc); $("#t").value = c.telefone || ""; $("#e").value = c.email || ""; $("#a").value = c.endereco || ""; $("#o").value = c.obs || ""; $("#cn").hidden = false; $("#sv").textContent = "Salvar alterações"; scrollTo(0, 0); }); };
   $("#b").oninput = draw; draw(); $("#cn").onclick = () => viewClientes();
   $("#f").onsubmit = async ev => { ev.preventDefault(); const c = { nome: val("n"), doc: dig(val("d")) || null, telefone: val("t") || null, email: val("e") || null, endereco: val("a") || null, obs: val("o") || null };
