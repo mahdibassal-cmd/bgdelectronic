@@ -17,7 +17,7 @@
 alter table public.notas add column if not exists prazo_lancada_em  timestamptz;
 alter table public.notas add column if not exists prazo_lancada_por uuid references public.profiles(id);
 
--- ---------- Log: 20 tipos existentes + 1 novo ----------
+-- ---------- Log: lista completa (25 tipos; igual em todas as migrations de 03/11 à tarde, ordem não importa) ----------
 do $$ begin
   if to_regclass('public.security_events') is not null then
     alter table public.security_events drop constraint if exists security_events_kind_check;
@@ -27,7 +27,8 @@ do $$ begin
       'credito_entrada','credito_uso','credito_excedente','nota_lancada',
       'estorno_recebimento','estorno_credito',
       'dep_esp_entrada','dep_esp_ajuste','dep_esp_transferencia',
-      'nota_prazo_lancada'));
+      'nota_prazo_lancada','nota_dispensada','nota_dispensa_desfeita',
+      'nota_cancelada_financas','nota_pag_corrigido'));
   end if;
 end $$;
 
