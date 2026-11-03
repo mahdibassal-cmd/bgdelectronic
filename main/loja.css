@@ -95,3 +95,4 @@ body>header,header.top{padding-right:52px!important}
 html[data-theme=dark] .ext tr.exi>td{background:#1f1c15}html[data-theme=dark] .ok-r{color:#7fd39a}
 @media print{.ext tr.exi{display:table-row!important}.ext tr.exi>td{background:#fff!important}.ext tr.exc td{opacity:1!important}.ok-r{color:#000!important}#ext{break-before:auto}}
 .lanc td.cli{max-width:220px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.lanc tr.pz td{border-top:0;padding-top:2px;background:rgba(201,162,39,.06)}
+.lacts{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}.lacts .btn{font-size:12px;padding:4px 10px}.btn.danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
