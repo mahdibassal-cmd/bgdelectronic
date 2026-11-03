@@ -27,3 +27,8 @@ html[data-theme=dark] .bc-it img,html[data-theme=dark] .bc-ph,html[data-theme=da
 html[data-theme=dark] .bc-copy,html[data-theme=dark] .bc-add.pill{color:#d4af5f;border-color:#d4af5f}
 html[data-theme=dark] .nav-sorteio{color:#ff7a5c!important}
 }
+/* fix /beleza: fotos sem moldura ganham a mesma moldura dourada das demais no escuro */
+@media screen{
+html[data-theme=dark] .bcard .bimg:not(:has(img[src*="fino-premium-touch"],img[src*="fino-airy-smooth"],img[src*="celimax-retinal-shot"])){padding:6px;background:#140e06}
+html[data-theme=dark] .bcard .bimg:not(:has(img[src*="fino-premium-touch"],img[src*="fino-airy-smooth"],img[src*="celimax-retinal-shot"])) img{border:1px solid rgba(212,175,95,.6);background:#f4f1ea}
+}
