@@ -160,6 +160,7 @@ if (!MOCK && !CONFIGURED) {
     async pagarConta(id, v, cx, forma, data) { return ok(await sb.rpc("pagar_conta", { p_conta: id, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null })); },
     async contaPagamentos() { return ok(await sb.from("conta_pagamentos").select("*").order("id", { ascending: false }).limit(100)); },
     async recebimentos() { return ok(await sb.from("v_recebimentos").select("*").order("id", { ascending: false }).limit(100)); },
+    async receberCredito(cli, v, data, obs) { return ok(await sb.rpc("registrar_recebimento_com_credito", { p_cliente: cli, p_valor: v, p_data: data || null, p_obs: obs || null })); },
     async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento_credito", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
     async caixasLista() { return ok(await sb.from("caixas").select("id,nome,metodo").eq("ativo", true).order("id")).map(c => ({ caixa_id: c.id, nome: c.nome, metodo: c.metodo })); },
     async cancelarNota(id, motivo) { ok(await sb.rpc("cancelar_nota", { p_id: id, p_motivo: motivo })); },
@@ -265,7 +266,9 @@ if (!MOCK && !CONFIGURED) {
     async salvarConta(kid, c) { needFin(); kid ? Object.assign(CP.find(x => x.id === kid), c) : CP.push({ id: CP.length + 1, ...c }); },
     async pagarConta(kid, v, cx, forma, data) { needFin(); const k = CP.find(x => x.id === kid); if (pago(kid) + v > k.valor + 0.001) throw new Error("Pagamento maior que o saldo da conta"); CPG.unshift({ id: id++, conta_id: kid, valor: v, caixa_id: cx, forma, data: data || today() }); mov(cx, "saida", v, `Pagamento fornecedor ${(FO.find(f => f.id === k.fornecedor_id) || {}).nome} — conta ${kid}`, null, meU); },
     async contaPagamentos() { needFin(); return CPG; },
-    async recebimentos() { needFin(); return RC.map(r => ({ ...r, cliente: CL.find(c => c.id === r.cliente_id).nome, caixa: CX.find(c => c.caixa_id === r.caixa_id).nome, handle: meU.handle })); },
+    async recebimentos() { needFin(); return RC.map(r => ({ ...r, cliente: CL.find(c => c.id === r.cliente_id).nome, caixa: r.caixa_id ? CX.find(c => c.caixa_id === r.caixa_id).nome : "Caixa Geral (crédito)", handle: meU.handle })); },
+    async receberCredito(cli, v, data, obs) { needFin(); const sd = Math.max(fiado(cli) - recebido(cli), 0); if (v > sd + 0.001) throw new Error(`Valor maior que a dívida do cliente (${brl(sd)})`); if (v > crSaldo(cli) + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(crSaldo(cli))})`);
+      RC.unshift({ id: id++, cliente_id: cli, valor: v, caixa_id: null, forma: "credito", data: data || today(), obs }); CR.push({ id: id++, cliente_id: cli, tipo: "uso", valor: v, obs: "Pagamento Contas a receber", nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); },
     async receber(cli, v0, cx, forma, data, obs) { needFin(); const sd = Math.max(fiado(cli) - recebido(cli), 0), v = Math.min(v0, sd), ex = Math.round((v0 - v) * 100) / 100;
       if (ex > 0) { mov(cx, "entrada", ex, "Crédito Caixa Geral (excedente) " + CL.find(c => c.id === cli).nome, null, meU); const ln = N.filter(x => x.cliente_id === cli).map(x => x.nota_id).sort((a, b) => b - a)[0]; CR.push({ id: id++, cliente_id: cli, tipo: "entrada", valor: ex, obs: v > 0 && ln ? "Excedente pagamento nota " + String(ln).padStart(6, "0") : "Excedente pagamento (sem dívida em aberto)", nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); }
       if (!(v > 0)) return; RC.unshift({ id: id++, cliente_id: cli, valor: v, caixa_id: cx, forma, data: data || today(), obs }); mov(cx, "entrada", v, "Recebimento cliente " + CL.find(c => c.id === cli).nome, null, meU);
@@ -737,19 +740,25 @@ async function viewPagar() {
   $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.salvarConta(null, { fornecedor_id: +$("#fo").value, valor: +$("#v").value, vencimento: $("#ve").value, descricao: val("ds") || null }); toast("Conta salva ✓"); viewPagar(); } catch (e) { toast(e.message); } };
 }
 async function viewReceber() {
-  const [C, RC, CX] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista()]);
+  const [C, RC, CX, CRD] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista(), api.creditos().catch(() => [])]);
+  const crd = id => Number((CRD.find(k => k.cliente_id === id) || {}).saldo || 0);
   const dev = C.filter(c => +c.saldo > 0).sort((a, b) => b.saldo - a.saldo), tot = dev.reduce((a, c) => a + Number(c.saldo), 0);
   app.innerHTML = `<div class="card"><h2>Contas a receber — Paga Depois</h2><div class="grid"><div class="kpi"><small>Total a receber</small><b>${brl(tot)}</b></div><div class="kpi"><small>Clientes devendo</small><b>${dev.length}</b></div></div></div>
   <div class="card"><h2>Registrar pagamento do cliente</h2><form id="f"><div class="grid"><div><label>Cliente</label><select id="c" required>${dev.map(c => `<option value="${c.id}">${esc(c.nome)} — deve ${brl(c.saldo)}</option>`).join("")}</select></div>
   <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Data</label><input id="d" type="date" value="${today()}"></div>
-  <div><label>Entra no caixa</label><select id="cx">${CX.map(c => `<option value="${c.caixa_id}" data-m="${esc(c.metodo)}">${esc(c.nome)}</option>`).join("")}</select></div></div>
+  <div><label>Pagar com</label><select id="pm"><option value="caixa">Dinheiro no caixa (PIX/Máquina/Dinheiro)</option><option value="credito">Crédito (Caixa Geral)</option></select><small class="muted" id="crs"></small></div>
+  <div id="cxw"><label>Entra no caixa</label><select id="cx">${CX.map(c => `<option value="${c.caixa_id}" data-m="${esc(c.metodo)}">${esc(c.nome)}</option>`).join("")}</select></div></div>
   <label>Observação</label><input id="o" maxlength="300"><button class="btn gold">Registrar recebimento</button>${dev.length ? "" : ' <span class="muted">Nenhum cliente com saldo.</span>'}</form></div>
   <div class="card"><h2>Saldos por cliente</h2><table class="stk"><tr><th>Cliente</th><th>Telefone</th><th class="n">Comprou (Paga Depois)</th><th class="n">Pagou</th><th class="n">Saldo</th></tr>
   ${dev.map(c => `<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone || "")}</td><td class="n">${brl(c.total_fiado)}</td><td class="n">${brl(c.total_recebido)}</td><td class="n low">${brl(c.saldo)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Ninguém devendo.</td></tr>'}</table></div>
   <div class="card"><h2>Últimos recebimentos</h2><table class="stk"><tr><th>Data</th><th>Cliente</th><th>Caixa</th><th>Por</th><th class="n">Valor</th></tr>
   ${RC.map(r => `<tr><td>${dBR(r.data)}</td><td>${esc(r.cliente)}</td><td>${esc(r.caixa)}</td><td>${esc(r.handle || "")}</td><td class="n">${brl(r.valor)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum recebimento.</td></tr>'}</table></div>`;
-  const sc = () => { const c = dev.find(x => x.id === +$("#c").value); if (c) $("#v").value = Number(c.saldo).toFixed(2); }; if ($("#c")) { $("#c").onchange = sc; sc(); }
+  const sc = () => { const c = dev.find(x => x.id === +$("#c").value); if (c) $("#v").value = Number(c.saldo).toFixed(2); }; const pm = () => { const cr = $("#pm").value === "credito", c = dev.find(x => x.id === +$("#c").value); $("#cxw").style.display = cr ? "none" : ""; $("#crs").textContent = cr && c ? "Crédito disponível: " + brl(crd(c.id)) : ""; };
+  if ($("#c")) { $("#c").onchange = () => { sc(); pm(); }; sc(); $("#pm").onchange = pm; pm(); }
   $("#f").onsubmit = async ev => { ev.preventDefault(); if (!dev.length) return; const c = dev.find(x => x.id === +$("#c").value), vv = Math.round(+$("#v").value * 100) / 100, ex = Math.round((vv - Number(c.saldo)) * 100) / 100;
+    if ($("#pm").value === "credito") { const cs = crd(c.id); if (ex > 0) return toast(`Valor maior que a dívida (${brl(c.saldo)})`); if (vv > cs + 0.001) return toast(`Crédito insuficiente na Caixa Geral (saldo ${brl(cs)})`);
+      if (!(await confirmBox(`Pagar <b>${brl(vv)}</b> da dívida de <b>${esc(c.nome)}</b> usando o crédito da Caixa Geral?<br><small>Nenhum dinheiro entra no caixa. Crédito restante: ${brl(cs - vv)}</small>`))) return;
+      const b = ev.submitter; b.disabled = true; try { await api.receberCredito(c.id, vv, $("#d").value, val("o")); toast("Pago com crédito da Caixa Geral ✓"); viewReceber(); } catch (e) { toast(e.message); b.disabled = false; } return; }
     if (ex > 0 && !(await confirmBox(`Valor maior que a dívida (${brl(c.saldo)}).<br><b>${brl(ex)}</b> vira crédito na Caixa Geral de <b>${esc(c.nome)}</b>.<br>Confirmar?`))) return;
     const b = ev.submitter; b.disabled = true; const o = $("#cx").selectedOptions[0];
     try { await api.receber(+$("#c").value, Math.round(+$("#v").value * 100) / 100, +$("#cx").value, o.dataset.m, $("#d").value, val("o")); toast(ex > 0 ? `Dívida quitada ✓ · ${brl(ex)} virou crédito na Caixa Geral` : "Recebimento registrado ✓ (entrada no caixa)"); viewReceber(); } catch (e) { toast(e.message); b.disabled = false; } };
