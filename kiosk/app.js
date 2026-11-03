@@ -130,9 +130,11 @@ if (!MOCK) {
         S.forEach(x => { if (x.id in cm) lucro[x.nota_id] = (lucro[x.nota_id] || 0) + Number(x.total) - Number(x.qtd) * cm[x.id]; }); }
       return { itens, pags, lucro }; },
     async notas() { return ok(await sb.from("v_nota_itens").select("nota_id,data,created_at,forma_pagamento,handle,total").order("created_at", { ascending: false }).order("nota_id", { ascending: false }).limit(300)); },
+    async productsFull() { return ok(await sb.from("products").select("*").order("sku")); },
     async adminProducts() { return ok(await sb.from("v_admin_products").select("*").order("sku")); },
     async purchases() { return ok(await sb.from("purchases").select("*").order("id", { ascending: false }).limit(100)); },
     async addPurchase(p) { ok(await sb.from("purchases").insert(p)); },
+    async compraLote(header, itens) { return ok(await sb.rpc("registrar_compra_lote", { p_header: header, p_itens: itens })); },
     async saveProduct(p, custo) {
       ok(await sb.from("products").upsert(p));
       if (custo !== "" && custo != null) ok(await sb.from("product_costs").upsert({ sku: p.sku, custo: Number(custo) }));
@@ -144,6 +146,8 @@ if (!MOCK) {
   let P = [], S = [], PU = [], K = {}, id = 1, logged = qs.has("auto");
   const ready = fetch("mock-produtos.json").then(r => r.json()).then(j => {
     P = j.map((p, i) => ({ ...p, estoque: (i * 7) % 9, estoque_minimo: 2, ativo: true }));
+    [["LAT-901", "Lattafa", "Khamrah", "100ml", "Edição Qahwa", "Distribuidora Árabe"], ["LAT-902", "Lattafa", "Khamrah", "100ml", null, "Distribuidora Árabe"], ["LAT-903", "Lattafa", "Khamrah", "30ml", "Travel", null]]
+      .forEach(([sku, marca, produto, tamanho, notas, fornecedor], i) => P.push({ sku, marca, produto, tamanho, notas, fornecedor, preco_venda: 300, estoque: i, estoque_minimo: 2, ativo: true }));
     P.forEach(p => K[p.sku] = Math.round(p.preco_venda * 0.55));
     const sellers = [["@kaio", "Kaio"], ["@suelen", "Suelen"], ["@leticia", "Leticia"], ["@bianca", "Bianca"]];
     for (let i = 0; i < 14; i++) {
@@ -172,7 +176,8 @@ if (!MOCK) {
     async notas() { return S.filter(s => s.nota_id); },
     async estoqueVendedor() { await ready; return P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
     async adminProducts() { return P.map(p => ({ ...p, custo: K[p.sku] })); },
-    async purchases() { return PU; }, async addPurchase(p) { PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
+    async compraLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function public.registrar_compra_lote (demo sem ?lote=1)"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); return { lote, itens: itens.length }; },
+    async purchases() { return PU; }, async addPurchase(p) { if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); PU.unshift({ id: id++, data: today(), ...p, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
   const KU = [{ id: "u-me", handle: role === "admin" ? "@mb" : "@kaio", nome: role === "admin" ? "MB" : "Kaio", role: role === "admin" ? "admin" : "vendedor", ativo: true }, { id: "u@sam", handle: "@sam", nome: "Sam", role: "admin", ativo: true }, { id: "u@bianca", handle: "@bianca", nome: "Bianca", role: "vendedor", ativo: true }, { id: "u@suelen", handle: "@suelen", nome: "Suelen", role: "vendedor", ativo: false }];
@@ -381,14 +386,73 @@ async function viewExtrato(d, adm, K, cfg) {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + out.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `extrato-vendas-${d}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 }
+// ---------- Registrar compra (carrinho multi-itens) ----------
+const CORES = /\b(preto|preta|branco|branca|azul(?:-c[eé]u)?|verde|rosa|roxo|lil[aá]s|amarelo|vermelho|cinza|prata|prateado|dourado|ouro|grafite|meia-noite|estelar|tit[aâ]nio(?: natural| preto| branco| deserto)?|black|white|blue|silver|gold|space gray|midnight|starlight|natural|lavanda|creme|bege|laranja|coral)\b/i;
+const variante = p => { const raw = [p.variante, p.cor, p.armazenamento, p.memoria, p.ram, p.tamanho, p.notas].filter(Boolean).map(String).join(" · ").replace(/\s+/g, " ").trim();
+  const all = `${p.produto || ""} ${raw}`, cor = p.cor || (raw.match(CORES) || [])[0] || "", gb = [...new Set((all.match(/\b\d+\s?(?:GB|TB)\b(?:\s?RAM)?/gi) || []).map(x => x.replace(/\s+(?=GB|TB)/i, "").toUpperCase()))];
+  return { raw, cor, gb }; };
+// combobox genérico: itens(q) -> [{k, html}], onPick(k|null para "novo")
+const combo = (inp, ul, itens, onPick) => { let hi = 0, M = [];
+  const draw = () => { M = itens(inp.value.trim()); hi = Math.min(hi, Math.max(M.length - 1, 0));
+    ul.innerHTML = M.map((m, i) => `<li role="option" data-i="${i}" class="${i === hi ? "hi" : ""}${m.off ? " off" : ""}">${m.html}</li>`).join("") || (inp.value.trim() ? '<li class="off">Nada encontrado</li>' : "");
+    const h = ul.querySelector("li.hi"); if (h) h.scrollIntoView({ block: "nearest" });
+    ul.querySelectorAll("li[data-i]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(+li.dataset.i); }); };
+  const pick = i => { const m = M[i]; if (!m) return; ul.innerHTML = ""; M = []; hi = 0; onPick(m.k); };
+  inp.oninput = () => { hi = 0; draw(); inp.dispatchEvent(new Event("typed")); }; inp.onfocus = draw; inp.onblur = () => setTimeout(() => { ul.innerHTML = ""; }, 150);
+  inp.onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); if (!M.length) draw(); hi = Math.min(hi + 1, M.length - 1); draw(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); draw(); }
+    else if (e.key === "Enter") { e.preventDefault(); if (M.length) pick(hi); } else if (e.key === "Escape") { e.preventDefault(); if (ul.innerHTML) { ul.innerHTML = ""; M = []; } else { inp.value = ""; inp.dispatchEvent(new Event("typed")); } } };
+  return { pick: () => M.length && pick(hi), open: draw }; };
 async function viewCompras() {
-  const [P, PU] = await Promise.all([api.products(), api.purchases()]);
-  app.innerHTML = `<div class="card"><h2>Registrar compra</h2><form id="f"><label>Produto</label><select id="sku" required>${P.map(p => `<option value="${esc(p.sku)}">${esc(p.sku)} · ${esc(p.marca)} ${esc(p.produto)}</option>`).join("")}</select>
-  <div class="grid"><div><label>Fornecedor</label><input id="fo"></div><div><label>Qtd</label><input id="q" type="number" min="1" required></div><div><label>Custo unitário (R$)</label><input id="c" type="number" min="0" step="0.01" required></div></div>
-  <label>Observação</label><input id="ob"><button class="btn">Salvar compra (soma ao estoque)</button></form></div>
+  const adm = me.role === "admin", [P, PU, K, FT] = await Promise.all([(api.productsFull ? api.productsFull() : api.products()).catch(() => api.products()), api.purchases(), adm ? api.costs().catch(() => []) : [], api.fornecedores ? api.fornecedores().catch(() => []) : []]);
+  const cm = Object.fromEntries((K || []).map(k => [k.sku, k.custo])), V = Object.fromEntries(P.map(p => [p.sku, variante(p)])), PS = Object.fromEntries(P.map(p => [p.sku, p]));
+  const hay = p => `${p.sku} ${p.marca} ${p.produto} ${V[p.sku].raw} ${V[p.sku].gb.join(" ")}`, nome = p => `${p.marca} ${p.produto}${V[p.sku].raw ? " — " + V[p.sku].raw : ""}`;
+  const line = p => { const v = V[p.sku], tags = [v.cor && `🎨 ${v.cor}`, v.gb.length && `💾 ${v.gb.join(" / ")}`].filter(Boolean).join(" · ");
+    return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
+  const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
+  [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
+  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "" }], busy = false;
+  app.innerHTML = `<div class="card"><h2>Registrar compra</h2>
+  <div class="grid"><div><label>Fornecedor</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
+  <div><label>Data</label><input id="dt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
+  <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
+  <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
+  <button class="btn" id="sv">Salvar compra (soma ao estoque)</button></div>
   <div class="card"><h2>Últimas compras</h2><table><tr><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
   ${PU.map(p => `<tr><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra.</td></tr>'}</table></div>`;
-  $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.addPurchase({ sku: $("#sku").value, fornecedor: $("#fo").value || null, qtd: +$("#q").value, custo_unit: +$("#c").value, observacao: $("#ob").value || null }); toast("Compra salva ✓"); viewCompras(); } catch (e) { toast(e.message); } };
+  combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
+    k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
+  const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
+  const tot = () => { const ok = L.filter(l => l.sku); $("#gt").textContent = brl(ok.reduce((a, l) => a + (+l.qtd || 0) * (num(l.custo) || 0), 0)); $("#gq").textContent = `${ok.length} item(ns) · ${ok.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
+    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * (num(l.custo) || 0)); }); };
+  const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div></div>
+    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>Custo un. (R$)</label><input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}"></div>
+    <div><label>Total</label><div class="lt n" data-i="${i}"></div></div><div><button type="button" class="btn ghost rm" title="Remover linha" ${L.length < 2 ? "disabled" : ""}>✕</button></div></div>`; }).join("");
+    document.querySelectorAll("#lns .cl").forEach(r => { const i = +r.dataset.i, l = L[i], pq = r.querySelector(".pq");
+      combo(pq, r.querySelector(".sug"), q => (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: line(p) + (L.some((x, j) => j !== i && x.sku === p.sku) ? '<small class="warn">já está em outra linha</small>' : "") })),
+        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
+      pq.addEventListener("typed", () => { if (l.sku) { l.sku = ""; r.querySelector(".ps").innerHTML = ""; tot(); } });
+      r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); }; r.querySelector(".lc").oninput = e => { l.custo = e.target.value; tot(); };
+      r.querySelector(".lc").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#add").click(); } };
+      r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
+    tot(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
+  $("#add").onclick = () => { L.push({ sku: "", qtd: 1, custo: "" }); drawL(true); };
+  drawL();
+  $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" ), w = $("#pw");
+    for (const [i, l] of it.entries()) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`; if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
+    if (!it.length) return w.textContent = "Adicione pelo menos um item";
+    const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#dt").value || today(), ob = $("#ob").value.trim() || null;
+    const itens = it.map(l => ({ sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) })), total = itens.reduce((a, x) => a + x.qtd * x.custo_unit, 0);
+    busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
+    if (fx.length >= 2 && api.salvarFornecedor && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {});
+    const hd = { fornecedor: fx || null, data: dt, observacao: ob };
+    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.compraLote(hd, itens); toast(`Compra salva ✓ ${itens.length} item(ns)`); return viewCompras(); }
+    catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
+    const fail = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
+      try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
+    busy = false; $("#sv").disabled = false;
+    if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return viewCompras(); }
+    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL();
+    w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
 }
 async function viewProdutos() {
   const [P, K] = await Promise.all([api.products(), api.costs()]); const cm = Object.fromEntries(K.map(k => [k.sku, k.custo]));
