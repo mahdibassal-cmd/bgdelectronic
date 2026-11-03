@@ -309,7 +309,7 @@ if (!MOCK && !CONFIGURED) {
         if (open <= 0) continue; const a = Math.min(open, rest); AL.push({ nota_id: n.nota_id, valor: a, rec: RC[0].id }); al.push(String(n.nota_id).padStart(6, "0") + " (" + brl(a) + ")"); rest -= a; }
       mm.notas = al.join(", "); },
     async caixasLista() { needCx(); return CX; },
-    async criarNota(items, pags, cliente, clienteId, local, obs) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); if (!LOCAIS.includes(local)) throw new Error("Escolha o Local do pagamento");
+    async criarNota(items, pags, cliente, clienteId, local, obs) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); if (local ? !LOCAIS.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
       if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
         const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
       return mkNota(items, pags, cliente, meU, null, clienteId, local, obs); },
@@ -616,7 +616,7 @@ async function viewNota() {
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>
   <h3>Pagamento</h3><div id="pgs"></div><button class="btn ghost" id="addpg" type="button">+ Dividir pagamento</button> <span id="pgok" class="muted"></span>
-  <div class="grid"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.map(l => `<option>${l}</option>`).join("")}</select></div>
+  <div class="grid" id="lpbox"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.map(l => `<option>${l}</option>`).join("")}</select></div>
   <div><label>Observação (opcional)</label><input id="obp" maxlength="200" placeholder="Ex.: maquininha 2, pago pelo marido…"></div></div><p class="muted" id="lpinfo"></p>
   <label>Nome do cliente (referência, sem cadastro)</label><input id="cref" maxlength="120" placeholder="Opcional — sai no cupom como Cliente:">
   <label>Cliente cadastrado (obrigatório para Paga Depois e Caixa Geral)</label><input id="cl" type="search" autocomplete="off" maxlength="120" placeholder="Buscar por nome, telefone ou CPF…">
@@ -657,13 +657,16 @@ async function viewNota() {
     if (c.nome.length < 2) return toast("Informe o nome do cliente"); if (!c.atendimento) return toast("Escolha o Atendimento número");
     try { const cid = await api.criarCliente(c); setCli({ id: +cid, ...c }); $("#cform").hidden = true; toast("Cliente salvo ✓"); } catch (e) { toast(e.message); } };
   let pgs = [{ metodo: "pix", valor: null }];
+  const lpNeed = () => pgs.length === 1 ? pgs[0].metodo !== "prazo" : pgs.some(g => g.metodo !== "prazo" && +g.valor > 0);
+  const lpSync = () => { const n = lpNeed(); $("#lpbox").style.display = n ? "" : "none"; $("#lp").required = n; $("#lpinfo").hidden = !n; };
   const totalN = () => Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100;
   const drawPg = () => { const t = totalN(); if (pgs.length === 1) pgs[0].valor = t;
     $("#pgs").innerHTML = pgs.map((g, i) => `<div class="grid pgrow"><div><select data-i="${i}" class="pm">${PAY.map(([v, l]) => `<option value="${v}" ${g.metodo === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div><input data-i="${i}" class="pv2" type="number" min="0.01" step="0.01" value="${g.valor ?? ""}" ${pgs.length === 1 ? "readonly" : ""}></div>${pgs.length > 1 ? `<div><button type="button" class="rmpg" data-i="${i}">✕</button></div>` : ""}</div>`).join("");
     const soma = Math.round(pgs.reduce((a, g) => a + (+g.valor || 0), 0) * 100) / 100;
     $("#pgok").textContent = pgs.length > 1 ? (soma === t ? "✓ soma confere" : `Soma ${brl(soma)} · falta ${brl(t - soma)}`) : "";
-    document.querySelectorAll(".pm").forEach(x => x.onchange = () => { pgs[+x.dataset.i].metodo = x.value; });
+    lpSync();
+    document.querySelectorAll(".pm").forEach(x => x.onchange = () => { pgs[+x.dataset.i].metodo = x.value; lpSync(); });
     document.querySelectorAll(".pv2").forEach(x => x.onchange = () => { pgs[+x.dataset.i].valor = +x.value; drawPg(); });
     document.querySelectorAll(".rmpg").forEach(x => x.onclick = () => { pgs.splice(+x.dataset.i, 1); drawPg(); }); };
   $("#addpg").onclick = () => { if (pgs.length >= 3) return; const t = totalN(), soma = pgs.reduce((a, g) => a + (+g.valor || 0), 0); if (pgs.length === 1) pgs[0].valor = t; pgs.push({ metodo: PAY.map(x => x[0]).find(m => !pgs.some(g => g.metodo === m)) || "dinheiro", valor: Math.max(Math.round((t - soma) * 100) / 100, 0) || null }); drawPg(); };
@@ -672,7 +675,7 @@ async function viewNota() {
     const t = totalN(), P2 = pgs.filter(g => +g.valor > 0).map(g => ({ metodo: g.metodo, valor: Math.round(+g.valor * 100) / 100 }));
     if (Math.round(P2.reduce((a, g) => a + g.valor, 0) * 100) !== Math.round(t * 100)) return toast("A soma dos pagamentos precisa ser igual ao total");
     if (P2.some(g => g.metodo === "prazo") && !cli) return toast("Paga Depois exige cliente — busque ou cadastre o cliente");
-    const LP = $("#lp").value, OBP = $("#obp").value.trim(); if (!LP) { toast("Escolha o Local do pagamento"); return $("#lp").focus(); }
+    const lpN = P2.some(g => g.metodo !== "prazo"), LP = lpN ? $("#lp").value : null, OBP = lpN ? $("#obp").value.trim() : ""; if (lpN && !LP) { toast("Escolha o Local do pagamento"); return $("#lp").focus(); }
     if (LP === "CAIXA GERAL") { if (!cli) return toast("Caixa Geral exige cliente cadastrado — busque ou cadastre o cliente"); P2.splice(0, P2.length, { metodo: "credito", valor: t }); }
     if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ")))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = t, pagTxt = P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ");
@@ -682,7 +685,7 @@ async function viewNota() {
       items = []; await viewRecibo(+nid);
       banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b> · Pagamento: <b>${pagTxt}</b>`);  printBtns();}
     catch (e) { console.error("Nota NÃO salva:", e); fb.disabled = false; fb.textContent = lbl;
-      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small><br><small>Os itens continuam no carrinho.</small>`); }
+      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); }
     finally { notaSaving = false; } };
   $("#lp").onchange = () => { $("#lpinfo").textContent = $("#lp").value === "CAIXA GERAL" ? "Caixa Geral: o total sai do crédito do cliente cadastrado (as formas acima são ignoradas)." : ""; };
   draw(); $("#bq").focus();
