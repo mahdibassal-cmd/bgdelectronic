@@ -24,11 +24,11 @@ const C = window.LOJA_CONFIG || {};
 const qs = new URLSearchParams(location.search);
 const CONFIGURED = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(C.SUPABASE_URL || "") && /^(sb_publishable_|eyJ)/.test(C.SUPABASE_ANON_KEY || "");
 const MOCK = qs.has("mock");
-const PAY = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"]];
+const PAY = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["prazo", "Paga Depois"]];
 const PAYL = Object.fromEntries(PAY);
 const ROLEL = { admin: "Admin", vendedor: "Vendedor(a)", financeiro: "Financeiro" };
 /* permissões por papel (espelha public.role_perms no banco; o banco é quem garante) */
-const PERMS = { admin: ["admin", "vendas", "caixa"], vendedor: ["vendas"], financeiro: ["caixa"] };
+const PERMS = { admin: ["admin", "vendas", "caixa", "financas"], vendedor: ["vendas"], financeiro: ["caixa", "financas"] };
 const can = p => !!me && (PERMS[me.role] || []).includes(p);
 const $ = s => document.querySelector(s);
 const app = $("#app");
@@ -50,6 +50,12 @@ const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
 const coll = new Intl.Collator("pt-BR", { sensitivity: "base" });
 const stockSort = L => [...L].sort((a, b) => ((+b.estoque > 0) - (+a.estoque > 0)) || coll.compare(a.produto || "", b.produto || "") || coll.compare(a.marca || "", b.marca || ""));
+const dig = s => String(s ?? "").replace(/\D/g, "");
+const docOk = v => { const d = dig(v); if (!d) return true; if (/^(\d)\1+$/.test(d)) return false;
+  if (d.length === 11) { const f = n => { let s = 0; for (let i = 0; i < n; i++) s += +d[i] * (n + 1 - i); const r = s * 10 % 11; return r === 10 ? 0 : r; }; return f(9) === +d[9] && f(10) === +d[10]; }
+  if (d.length === 14) { const f = n => { let s = 0, w = n - 7; for (let i = 0; i < n; i++) { s += +d[i] * w--; if (w < 2) w = 9; } const r = s % 11; return r < 2 ? 0 : 11 - r; }; return f(12) === +d[12] && f(13) === +d[13]; }
+  return false; };
+const fmtDoc = v => { const d = dig(v); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5") : (v || ""); };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase();
@@ -109,7 +115,20 @@ if (!MOCK && !CONFIGURED) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
-    async criarNota(items, pagamentos, cliente) { return ok(await sb.rpc("criar_nota", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null })); },
+    async criarNota(items, pagamentos, cliente, clienteId) { return ok(await sb.rpc("criar_nota", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null })); },
+    async buscarClientes(q) { return ok(await sb.rpc("buscar_clientes", { p_q: q })); },
+    async criarCliente(c) { return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); },
+    async clientes() { return ok(await sb.from("v_clientes_saldo").select("*").order("nome")); },
+    async salvarCliente(id, c) { ok(await sb.from("clientes").update(c).eq("id", id)); },
+    async fornecedores() { return ok(await sb.from("fornecedores").select("*").order("nome")); },
+    async salvarFornecedor(id, f) { ok(id ? await sb.from("fornecedores").update(f).eq("id", id) : await sb.from("fornecedores").insert(f)); },
+    async contas() { return ok(await sb.from("v_contas_pagar").select("*").order("vencimento")); },
+    async salvarConta(id, c) { ok(id ? await sb.from("contas_pagar").update(c).eq("id", id) : await sb.from("contas_pagar").insert(c)); },
+    async pagarConta(id, v, cx, forma, data) { return ok(await sb.rpc("pagar_conta", { p_conta: id, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null })); },
+    async contaPagamentos() { return ok(await sb.from("conta_pagamentos").select("*").order("id", { ascending: false }).limit(100)); },
+    async recebimentos() { return ok(await sb.from("v_recebimentos").select("*").order("id", { ascending: false }).limit(100)); },
+    async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
+    async caixasLista() { return ok(await sb.from("caixas").select("id,nome,metodo").eq("ativo", true).order("id")).map(c => ({ caixa_id: c.id, nome: c.nome, metodo: c.metodo })); },
     async cancelarNota(id, motivo) { ok(await sb.rpc("cancelar_nota", { p_id: id, p_motivo: motivo })); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
     async notaPag(id) { return ok(await sb.from("nota_pagamentos").select("metodo,valor").eq("nota_id", id).order("id")); },
@@ -143,17 +162,19 @@ if (!MOCK && !CONFIGURED) {
     .map(([sku, marca, produto, tamanho, preco_venda], i) => ({ sku, marca, produto, tamanho, preco_venda, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4][i], estoque_minimo: 2, ativo: true }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }];
-  const N = [], IT = [], PG = [], MV = [], SE = [], PU = []; let id = 1, logged = qs.has("auto");
+  const N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = []; let id = 1, logged = qs.has("auto");
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
-  const mkNota = (items, pags, cliente, user, at) => {
+  const mkNota = (items, pags, cliente, user, at, clienteId) => {
+    if (pags.some(g => g.metodo === "prazo") && !clienteId) throw new Error("Paga Depois exige cliente cadastrado");
+    if (clienteId) cliente = (CL.find(c => c.id === clienteId) || {}).nome || cliente;
     const tot = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0), pt = pags.reduce((a, x) => a + Number(x.valor), 0);
     if (Math.round(tot * 100) !== Math.round(pt * 100)) throw new Error(`Pagamentos (${pt.toFixed(2)}) diferentes do total (${tot.toFixed(2)})`);
     for (const it of items) { const p = P.find(x => x.sku === it.sku); if (!p || p.estoque < it.qtd) throw new Error(`Estoque insuficiente ou produto inativo (${it.sku})`); }
     const nid = id++, ts = at || new Date().toISOString();
     for (const it of items) { const p = P.find(x => x.sku === it.sku); p.estoque -= it.qtd; IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo: K[p.sku] }); }
-    N.push({ nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
-    for (const g of pags) { PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", Number(g.valor), "Nota " + String(nid).padStart(6, "0"), nid, user, ts); }
+    N.push({ cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
+    for (const g of pags) { PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); if (g.metodo !== "prazo") mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", Number(g.valor), "Nota " + String(nid).padStart(6, "0"), nid, user, ts); }
     return nid; };
   const ready = Promise.resolve().then(() => {
     const kaio = U.find(u => u.handle === "@kaio") || meU, bia = U.find(u => u.handle === "@bianca");
@@ -161,8 +182,16 @@ if (!MOCK && !CONFIGURED) {
     mkNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "cartao", valor: 799 }], "Cliente A", kaio, H(30));
     mkNota([{ sku: "XIA-001", qtd: 1, preco_vendido: 199 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 200 }, { metodo: "dinheiro", valor: 98.8 }], null, bia, H(3));
     mkNota([{ sku: "ANK-001", qtd: 1, preco_vendido: 199 }], [{ metodo: "dinheiro", valor: 199 }], null, kaio, H(1));
+    CL.push({ id: 1, nome: "Maria Souza", doc: "52998224725", telefone: "(11) 99999-0000", email: "maria@exemplo.com", endereco: "Rua das Flores, 10", obs: "", ativo: true }, { id: 2, nome: "João Lima", doc: null, telefone: "(11) 98888-1111", email: "", endereco: "", obs: "", ativo: true });
+    mkNota([{ sku: "XIA-002", qtd: 1, preco_vendido: 1199 }], [{ metodo: "prazo", valor: 899 }, { metodo: "pix", valor: 300 }], null, kaio, H(26), 1);
+    FO.push({ id: 1, nome: "Distribuidora Tech SP", cnpj: "11222333000181", contato: "Ana", telefone: "(11) 3333-0000", email: "vendas@tech.com", obs: "", ativo: true });
+    CP.push({ id: 1, fornecedor_id: 1, valor: 3200, vencimento: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), descricao: "Lote fones JBL" }, { id: 2, fornecedor_id: 1, valor: 450, vencimento: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), descricao: "Frete" });
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2));
   });
+  const needFin = () => { if (role === "vendedor") throw new Error("Sem permissão (financeiro/admin)"); };
+  const fiado = cid => N.filter(n => n.cliente_id === cid && n.status === "ativa").reduce((a, n) => a + PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((b, g) => b + g.valor, 0), 0);
+  const recebido = cid => RC.filter(r => r.cliente_id === cid).reduce((a, r) => a + r.valor, 0);
+  const pago = k => CPG.filter(p => p.conta_id === k).reduce((a, p) => a + p.valor, 0);
   const vis = () => role === "admin" ? N : role === "vendedor" ? N.filter(n => n.handle === meU.handle) : [];
   const saldo = c => MV.filter(m => m.caixa_id === c).reduce((a, m) => a + sv(m), 0);
   const needCx = () => { if (role === "vendedor") throw new Error("Sem permissão de caixa"); };
@@ -175,14 +204,28 @@ if (!MOCK && !CONFIGURED) {
     async verify() { toast("Demonstração: 2FA ativado"); }, async unenroll() {},
     async status() { return { locked: qs.has("locked"), is_owner: role === "admin" }; }, async lock() { toast("Demonstração: nada bloqueado"); }, async unlock() {}, async signoutAll() { return 0; }, async reportFail() {},
     async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@loja.bgdstores.local", detail: {} }]; },
-    async dumpTable(t) { return ({ products: P, notas: N, nota_pagamentos: PG, caixas: CX, caixa_movimentos: MV, caixa_sessoes: SE, purchases: PU })[t] || []; },
+    async dumpTable(t) { return ({ clientes: CL, fornecedores: FO, contas_pagar: CP, conta_pagamentos: CPG, cliente_recebimentos: RC, products: P, notas: N, nota_pagamentos: PG, caixas: CX, caixa_movimentos: MV, caixa_sessoes: SE, purchases: PU })[t] || []; },
     async profile() { return meU; },
     async products() { await ready; return role === "financeiro" ? [] : P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
     async estoqueVendedor() { await ready; return role === "financeiro" ? [] : P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
     async repSeller(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...i, ...N.find(n => n.nota_id === i.nota_id), total: i.total })), "handle", (g, r) => { g.itens += r.qtd; g.faturamento += r.total; g.custo += r.qtd * r.custo; g._n = (g._n || new Set()).add(r.nota_id); g.vendas = g._n.size; }); },
     async repPay(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(PG.filter(g => ids.includes(g.nota_id)), "metodo", (g, r) => { g.vendas++; g.faturamento += r.valor; }).map(g => ({ ...g, forma_pagamento: g.metodo })); },
     async repProfit(d) { const r = await this.repSeller(d); return r.map(x => ({ ...x, lucro: x.faturamento - x.custo })); },
-    async criarNota(items, pags, cliente) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); return mkNota(items, pags, cliente, meU); },
+    async buscarClientes(q) { if (q.trim().length < 2) return []; const d = dig(q); return CL.filter(c => c.ativo && (norm(c.nome).includes(norm(q)) || (d.length >= 3 && (dig(c.doc).includes(d) || dig(c.telefone).includes(d))))).slice(0, 15).map(({ id, nome, telefone, doc }) => ({ id, nome, telefone, doc })); },
+    async criarCliente(c) { if (role === "financeiro" && false) return; if (!c.nome || c.nome.trim().length < 2) throw new Error("Informe o nome do cliente"); const d = dig(c.doc) || null; if (d && !docOk(d)) throw new Error("CPF/CNPJ inválido"); const ex = d && CL.find(x => x.doc === d); if (ex) return ex.id;
+      const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", ativo: true }; CL.push(nc); return nc.id; },
+    async clientes() { await ready; needFin(); return CL.map(c => ({ ...c, total_fiado: fiado(c.id), total_recebido: recebido(c.id), saldo: fiado(c.id) - recebido(c.id) })); },
+    async salvarCliente(cid, c) { needFin(); if (c.doc && !docOk(c.doc)) throw new Error("CPF/CNPJ inválido"); Object.assign(CL.find(x => x.id === cid), c); },
+    async fornecedores() { await ready; needFin(); return FO; },
+    async salvarFornecedor(fid, f) { needFin(); if (f.cnpj && !docOk(f.cnpj)) throw new Error("CNPJ inválido"); fid ? Object.assign(FO.find(x => x.id === fid), f) : FO.push({ id: FO.length + 1, ativo: true, ...f }); },
+    async contas() { await ready; needFin(); const hj = today(); return CP.map(k => { const p = pago(k.id); return { ...k, fornecedor: (FO.find(f => f.id === k.fornecedor_id) || {}).nome, pago: p, restante: k.valor - p, status: p >= k.valor ? "paga" : k.vencimento < hj ? "vencida" : p > 0 ? "parcial" : "aberta" }; }); },
+    async salvarConta(kid, c) { needFin(); kid ? Object.assign(CP.find(x => x.id === kid), c) : CP.push({ id: CP.length + 1, ...c }); },
+    async pagarConta(kid, v, cx, forma, data) { needFin(); const k = CP.find(x => x.id === kid); if (pago(kid) + v > k.valor + 0.001) throw new Error("Pagamento maior que o saldo da conta"); CPG.unshift({ id: id++, conta_id: kid, valor: v, caixa_id: cx, forma, data: data || today() }); mov(cx, "saida", v, `Pagamento fornecedor ${(FO.find(f => f.id === k.fornecedor_id) || {}).nome} — conta ${kid}`, null, meU); },
+    async contaPagamentos() { needFin(); return CPG; },
+    async recebimentos() { needFin(); return RC.map(r => ({ ...r, cliente: CL.find(c => c.id === r.cliente_id).nome, caixa: CX.find(c => c.caixa_id === r.caixa_id).nome, handle: meU.handle })); },
+    async receber(cli, v, cx, forma, data, obs) { needFin(); const sd = fiado(cli) - recebido(cli); if (v > sd + 0.001) throw new Error(`Valor maior que o saldo do cliente (${brl(sd)})`); RC.unshift({ id: id++, cliente_id: cli, valor: v, caixa_id: cx, forma, data: data || today(), obs }); mov(cx, "entrada", v, "Recebimento cliente " + CL.find(c => c.id === cli).nome, null, meU); },
+    async caixasLista() { needCx(); return CX; },
+    async criarNota(items, pags, cliente, clienteId) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); return mkNota(items, pags, cliente, meU, null, clienteId); },
     async cancelarNota(nid, motivo) { if (role !== "admin") throw new Error("Só admin cancela nota"); const n = N.find(x => x.nota_id === nid); if (n.status === "cancelada") throw new Error("Nota já cancelada");
       IT.filter(i => i.nota_id === nid).forEach(i => P.find(p => p.sku === i.sku).estoque += i.qtd);
       PG.filter(g => g.nota_id === nid).forEach(g => mov(CX.find(c => c.metodo === g.metodo).caixa_id, "estorno", g.valor, `Cancelamento nota ${String(nid).padStart(6, "0")}: ${motivo}`, nid, meU));
@@ -228,16 +271,17 @@ async function boot() {
   $("#who").textContent = `${me.nome} (${me.handle}) · ${ROLEL[me.role] || me.role}`;
   $("#nav").hidden = false;
   document.querySelectorAll("nav button[data-p]").forEach(b => b.hidden = !can(b.dataset.p));
+  if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
   go(location.hash.slice(1) || (can("vendas") ? "nota" : "caixa"));
 }
 function go(v) {
-  const need = { nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", caixa: "caixa" };
+  const need = { clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", caixa: "caixa" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : "seguranca";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -254,7 +298,7 @@ function viewBloqueado() {
   app.innerHTML = `<div class="card login"><h2>Sistema bloqueado</h2><p class="muted">O sistema foi bloqueado por segurança. Fale com o responsável.</p><button class="btn ghost" id="x">Sair</button></div>`;
   $("#x").onclick = async () => { await api.logout(); location.reload(); };
 }
-const BK_TABLES = ["profiles", "role_perms", "products", "product_costs", "purchases", "notas", "sales", "sale_costs", "nota_pagamentos", "caixas", "caixa_movimentos", "caixa_sessoes", "security_events"];
+const BK_TABLES = ["profiles", "role_perms", "products", "product_costs", "purchases", "notas", "sales", "sale_costs", "nota_pagamentos", "caixas", "caixa_movimentos", "caixa_sessoes", "clientes", "fornecedores", "contas_pagar", "conta_pagamentos", "cliente_recebimentos", "security_events"];
 async function backupAgora(b) {
   b.disabled = true; const out = { exportado_em: new Date().toISOString(), por: me.handle, tabelas: {} };
   try { for (const t of BK_TABLES) { b.textContent = "Exportando " + t + "…"; out.tabelas[t] = await api.dumpTable(t); }
@@ -389,7 +433,10 @@ async function viewNota() {
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>
   <h3>Pagamento</h3><div id="pgs"></div><button class="btn ghost" id="addpg" type="button">+ Dividir pagamento</button> <span id="pgok" class="muted"></span>
-  <label>Cliente (opcional)</label><input id="cl" maxlength="120">
+  <label>Cliente (obrigatório para Paga Depois)</label><input id="cl" type="search" autocomplete="off" maxlength="120" placeholder="Buscar por nome, telefone ou CPF…">
+  <ul id="csug" class="sug"></ul><div id="csel" class="muted"></div>
+  <button type="button" class="btn ghost" id="cnovo" style="margin-top:4px">+ Novo cliente</button>
+  <div id="cform" hidden class="grid" style="margin-top:8px"><div><label>Nome</label><input id="cn" maxlength="120"></div><div><label>Telefone</label><input id="ct" maxlength="30" inputmode="tel"></div><div><label>CPF/CNPJ</label><input id="cd" maxlength="18" inputmode="numeric"></div><div><button type="button" class="btn" id="csave">Salvar cliente</button></div></div>
   <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
   let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0))}</th><th></th></tr>`;
     document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
@@ -410,6 +457,15 @@ async function viewNota() {
     const ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
     if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
     items.push({ sku: p.sku, qtd: q, preco_vendido: +$("#pv").value, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); $("#f").reset(); $("#w").textContent = ""; draw(); };
+  let cli = null;
+  const setCli = c => { cli = c; $("#csel").innerHTML = c ? `Cliente: <b>${esc(c.nome)}</b> ${esc(c.telefone || "")} ${c.doc ? esc(fmtDoc(c.doc)) : ""} <button type="button" id="cx0">✕</button>` : ""; $("#csug").innerHTML = ""; if (c) { $("#cl").value = ""; $("#cx0").onclick = () => setCli(null); } };
+  let ct0; $("#cl").oninput = () => { clearTimeout(ct0); ct0 = setTimeout(async () => { const q = $("#cl").value; const L = q.trim().length >= 2 ? await api.buscarClientes(q).catch(e => (toast(e.message), [])) : [];
+    $("#csug").innerHTML = L.map((c, i) => `<li data-i="${i}"><b>${esc(c.nome)}</b> <small>${esc(c.telefone || "")} ${c.doc ? "· " + esc(fmtDoc(c.doc)) : ""}</small></li>`).join("") || (q.trim().length >= 2 ? '<li class="off">Nenhum cliente — use "+ Novo cliente"</li>' : "");
+    document.querySelectorAll("#csug li[data-i]").forEach(li => li.onmousedown = e => { e.preventDefault(); setCli(L[+li.dataset.i]); }); }, 200); };
+  $("#cnovo").onclick = () => { $("#cform").hidden = !$("#cform").hidden; $("#cn").value = $("#cl").value; $("#cn").focus(); };
+  $("#csave").onclick = async () => { const c = { nome: $("#cn").value.trim(), telefone: $("#ct").value.trim(), doc: dig($("#cd").value) };
+    if (c.nome.length < 2) return toast("Informe o nome do cliente"); if (c.doc && !docOk(c.doc)) return toast("CPF/CNPJ inválido");
+    try { const cid = await api.criarCliente(c); setCli({ id: +cid, ...c }); $("#cform").hidden = true; toast("Cliente salvo ✓"); } catch (e) { toast(e.message); } };
   let pgs = [{ metodo: "pix", valor: null }];
   const totalN = () => Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100;
   const drawPg = () => { const t = totalN(); if (pgs.length === 1) pgs[0].valor = t;
@@ -425,9 +481,10 @@ async function viewNota() {
   $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item");
     const t = totalN(), P2 = pgs.filter(g => +g.valor > 0).map(g => ({ metodo: g.metodo, valor: Math.round(+g.valor * 100) / 100 }));
     if (Math.round(P2.reduce((a, g) => a + g.valor, 0) * 100) !== Math.round(t * 100)) return toast("A soma dos pagamentos precisa ser igual ao total");
+    if (P2.some(g => g.metodo === "prazo") && !cli) return toast("Paga Depois exige cliente — busque ou cadastre o cliente");
     if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ")))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = t, pagTxt = P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ");
-    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), P2, $("#cl").value);
+    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), P2, cli ? cli.nome : $("#cl").value, cli ? cli.id : null);
       if (!nidOk(nid)) throw new Error("Servidor não confirmou o número da nota (retorno: " + JSON.stringify(nid) + ")");
       const R = await api.nota(+nid); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
       items = []; await viewRecibo(+nid);
@@ -443,7 +500,7 @@ async function viewRecibo(nid) {
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
   <div class="recibo"><div class="rh"><b>BAGDA STORES</b><small>bgdstores.com</small></div>
   <div class="rm2"><span>NOTA Nº <b>${String(nid).padStart(6, "0")}</b></span><span>${new Date(h.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span></div>
-  <div class="rm2"><span>Vendedor(a): ${esc(h.nome)} (${esc(h.handle)})</span>${h.cliente ? `<span>Cliente: ${esc(h.cliente)}</span>` : ""}</div>
+  <div class="rm2"><span>Vendedor(a): ${esc(h.nome)} (${esc(h.handle)})</span>${h.cliente ? `<span>Cliente: <b>${esc(h.cliente)}</b></span>` : ""}</div>
   <table class="ri"><tr><th>Item</th><th class="n">Total</th></tr>
   ${R.map(r => `<tr class="in"><td colspan="2">${esc(r.marca)} ${esc(r.produto)} ${esc(r.tamanho || "")}</td></tr><tr class="iq"><td>${r.qtd} x ${brl(r.preco_vendido)}</td><td class="n">${brl(r.total)}</td></tr>`).join("")}
   <tr class="tot"><td>TOTAL</td><td class="n">${brl(tot)}</td></tr></table>
@@ -505,6 +562,77 @@ async function viewUsuarios() {
     <td><input type="checkbox" class="ua" data-id="${esc(u.id)}" ${u.ativo ? "checked" : ""} style="width:auto"></td><td><button class="btn ghost us" data-id="${esc(u.id)}" style="margin:0">Salvar</button></td></tr>`).join("")}</table></div>`;
   document.querySelectorAll(".us").forEach(b => b.onclick = async () => { const i = b.dataset.id;
     try { await api.salvarUsuario(i, { role: document.querySelector(`.ur[data-id="${i}"]`).value, ativo: document.querySelector(`.ua[data-id="${i}"]`).checked }); toast("Salvo ✓"); } catch (e) { toast(e.message); } });
+}
+
+const PAYF = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["transferencia", "Transferência"], ["boleto", "Boleto"]];
+const STL = { aberta: "Aberta", parcial: "Parcial", paga: "Paga", vencida: "Vencida" };
+const STC = { aberta: "", parcial: "warn", paga: "", vencida: "low" };
+const dBR = d => d ? String(d).slice(0, 10).split("-").reverse().join("/") : "";
+const val = id => ($("#" + id).value || "").trim();
+async function viewClientes() {
+  const L = await api.clientes(); let ed = null;
+  app.innerHTML = `<div class="card"><h2>Cadastrar Clientes</h2><form id="f"><div class="grid">
+  <div><label>Nome *</label><input id="n" maxlength="120" required></div><div><label>CPF/CNPJ</label><input id="d" maxlength="18" inputmode="numeric"></div>
+  <div><label>Telefone</label><input id="t" maxlength="30" inputmode="tel"></div><div><label>E-mail</label><input id="e" type="email" maxlength="160"></div></div>
+  <label>Endereço</label><input id="a" maxlength="300"><label>Observações</label><input id="o" maxlength="500">
+  <button class="btn" id="sv">Salvar cliente</button> <button type="button" class="btn ghost" id="cn" hidden>Cancelar edição</button></form></div>
+  <div class="card"><h2>Clientes</h2><input id="b" type="search" placeholder="Buscar nome, telefone ou CPF…"><table id="tb" class="stk"></table></div>`;
+  const draw = () => { const q = norm($("#b").value), dq = dig($("#b").value); const F = L.filter(c => !q || norm(c.nome).includes(q) || (dq && (dig(c.doc).includes(dq) || dig(c.telefone).includes(dq))));
+    $("#tb").innerHTML = `<tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th class="n">Saldo a receber</th><th></th></tr>` + (F.map(c => `<tr><td>${esc(c.nome)}${c.email ? `<br><small class="muted">${esc(c.email)}</small>` : ""}</td><td>${esc(fmtDoc(c.doc))}</td><td>${esc(c.telefone || "")}</td><td class="n ${+c.saldo > 0 ? "low" : ""}">${brl(c.saldo)}</td><td><button class="ed" data-i="${c.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum cliente.</td></tr>');
+    document.querySelectorAll(".ed").forEach(b => b.onclick = () => { const c = L.find(x => x.id === +b.dataset.i); ed = c.id; $("#n").value = c.nome; $("#d").value = fmtDoc(c.doc); $("#t").value = c.telefone || ""; $("#e").value = c.email || ""; $("#a").value = c.endereco || ""; $("#o").value = c.obs || ""; $("#cn").hidden = false; $("#sv").textContent = "Salvar alterações"; scrollTo(0, 0); }); };
+  $("#b").oninput = draw; draw(); $("#cn").onclick = () => viewClientes();
+  $("#f").onsubmit = async ev => { ev.preventDefault(); const c = { nome: val("n"), doc: dig(val("d")) || null, telefone: val("t") || null, email: val("e") || null, endereco: val("a") || null, obs: val("o") || null };
+    if (c.doc && !docOk(c.doc)) return toast("CPF/CNPJ inválido"); ev.submitter && (ev.submitter.disabled = true);
+    try { ed ? await api.salvarCliente(ed, c) : await api.criarCliente(c); toast("Cliente salvo ✓"); viewClientes(); } catch (e) { toast(e.message); ev.submitter && (ev.submitter.disabled = false); } };
+}
+async function viewFornecedores() {
+  const L = await api.fornecedores(); let ed = null;
+  app.innerHTML = `<div class="card"><h2>Cadastrar Fornecedor</h2><form id="f"><div class="grid">
+  <div><label>Nome *</label><input id="n" maxlength="120" required></div><div><label>CNPJ</label><input id="d" maxlength="18" inputmode="numeric"></div>
+  <div><label>Contato</label><input id="c" maxlength="120"></div><div><label>Telefone</label><input id="t" maxlength="30"></div><div><label>E-mail</label><input id="e" type="email" maxlength="160"></div></div>
+  <label>Observações</label><input id="o" maxlength="500"><button class="btn" id="sv">Salvar fornecedor</button> <button type="button" class="btn ghost" id="cn" hidden>Cancelar edição</button></form></div>
+  <div class="card"><h2>Fornecedores</h2><table class="stk"><tr><th>Nome</th><th>CNPJ</th><th>Contato</th><th>Telefone / e-mail</th><th></th></tr>
+  ${L.map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(fmtDoc(f.cnpj))}</td><td>${esc(f.contato || "")}</td><td>${esc(f.telefone || "")} ${esc(f.email || "")}</td><td><button class="ed" data-i="${f.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum fornecedor.</td></tr>'}</table></div>`;
+  document.querySelectorAll(".ed").forEach(b => b.onclick = () => { const f = L.find(x => x.id === +b.dataset.i); ed = f.id; $("#n").value = f.nome; $("#d").value = fmtDoc(f.cnpj); $("#c").value = f.contato || ""; $("#t").value = f.telefone || ""; $("#e").value = f.email || ""; $("#o").value = f.obs || ""; $("#cn").hidden = false; scrollTo(0, 0); });
+  $("#cn").onclick = () => viewFornecedores();
+  $("#f").onsubmit = async ev => { ev.preventDefault(); const f = { nome: val("n"), cnpj: dig(val("d")) || null, contato: val("c") || null, telefone: val("t") || null, email: val("e") || null, obs: val("o") || null };
+    if (f.cnpj && !docOk(f.cnpj)) return toast("CNPJ inválido");
+    try { await api.salvarFornecedor(ed, f); toast("Fornecedor salvo ✓"); viewFornecedores(); } catch (e) { toast(e.message); } };
+}
+async function viewPagar() {
+  const [K, F, CX] = await Promise.all([api.contas(), api.fornecedores(), api.caixasLista()]);
+  const ord = { vencida: 0, aberta: 1, parcial: 1, paga: 2 }; K.sort((a, b) => (ord[a.status] - ord[b.status]) || String(a.vencimento).localeCompare(String(b.vencimento)));
+  const aberto = K.filter(k => k.status !== "paga").reduce((a, k) => a + Number(k.restante), 0), venc = K.filter(k => k.status === "vencida").reduce((a, k) => a + Number(k.restante), 0);
+  app.innerHTML = `<div class="card"><h2>Contas a pagar — dívidas com fornecedores</h2><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div></div>
+  <div class="card"><h2>Nova conta</h2><form id="f"><div class="grid"><div><label>Fornecedor</label><select id="fo" required>${F.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select></div>
+  <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Vencimento</label><input id="ve" type="date" required></div></div>
+  <label>Descrição</label><input id="ds" maxlength="300"><button class="btn">Salvar conta</button>${F.length ? "" : ' <span class="warn">Cadastre um fornecedor primeiro.</span>'}</form></div>
+  <div class="card"><h2>Contas</h2><table class="stk"><tr><th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th class="n">Valor</th><th class="n">Pago</th><th class="n">Restante</th><th>Status</th><th></th></tr>
+  ${K.map(k => `<tr><td>${dBR(k.vencimento)}</td><td>${esc(k.fornecedor)}</td><td>${esc(k.descricao || "")}</td><td class="n">${brl(k.valor)}</td><td class="n">${brl(k.pago)}</td><td class="n">${brl(k.restante)}</td><td class="${STC[k.status]}">${STL[k.status]}</td>
+    <td>${k.status !== "paga" ? `<button class="pg" data-i="${k.id}">Registrar pagamento</button>` : ""}</td></tr>
+    <tr class="pgf" id="pf${k.id}" hidden><td colspan="8"><div class="grid pgrow"><div><label>Valor</label><input class="pv" type="number" min="0.01" step="0.01" value="${Number(k.restante).toFixed(2)}"></div>
+    <div><label>Data</label><input class="pd" type="date" value="${today()}"></div><div><label>Forma</label><select class="pfm">${PAYF.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>
+    <div><label>Sai do caixa</label><select class="pcx">${CX.map(c => `<option value="${c.caixa_id}">${esc(c.nome)}</option>`).join("")}</select></div><div><button class="btn pok" data-i="${k.id}">Confirmar pagamento</button></div></div></td></tr>`).join("") || '<tr><td colspan="8" class="muted">Nenhuma conta.</td></tr>'}</table></div>`;
+  document.querySelectorAll(".pg").forEach(b => b.onclick = () => { const r = $("#pf" + b.dataset.i); r.hidden = !r.hidden; });
+  document.querySelectorAll(".pok").forEach(b => b.onclick = async () => { const r = $("#pf" + b.dataset.i), v = +r.querySelector(".pv").value; if (!(v > 0)) return toast("Informe o valor"); b.disabled = true;
+    try { await api.pagarConta(+b.dataset.i, Math.round(v * 100) / 100, +r.querySelector(".pcx").value, r.querySelector(".pfm").value, r.querySelector(".pd").value); toast("Pagamento registrado ✓ (saída no caixa)"); viewPagar(); } catch (e) { toast(e.message); b.disabled = false; } });
+  $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.salvarConta(null, { fornecedor_id: +$("#fo").value, valor: +$("#v").value, vencimento: $("#ve").value, descricao: val("ds") || null }); toast("Conta salva ✓"); viewPagar(); } catch (e) { toast(e.message); } };
+}
+async function viewReceber() {
+  const [C, RC, CX] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista()]);
+  const dev = C.filter(c => +c.saldo > 0).sort((a, b) => b.saldo - a.saldo), tot = dev.reduce((a, c) => a + Number(c.saldo), 0);
+  app.innerHTML = `<div class="card"><h2>Contas a receber — Paga Depois</h2><div class="grid"><div class="kpi"><small>Total a receber</small><b>${brl(tot)}</b></div><div class="kpi"><small>Clientes devendo</small><b>${dev.length}</b></div></div></div>
+  <div class="card"><h2>Registrar pagamento do cliente</h2><form id="f"><div class="grid"><div><label>Cliente</label><select id="c" required>${dev.map(c => `<option value="${c.id}">${esc(c.nome)} — deve ${brl(c.saldo)}</option>`).join("")}</select></div>
+  <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Data</label><input id="d" type="date" value="${today()}"></div>
+  <div><label>Entra no caixa</label><select id="cx">${CX.map(c => `<option value="${c.caixa_id}" data-m="${esc(c.metodo)}">${esc(c.nome)}</option>`).join("")}</select></div></div>
+  <label>Observação</label><input id="o" maxlength="300"><button class="btn gold">Registrar recebimento</button>${dev.length ? "" : ' <span class="muted">Nenhum cliente com saldo.</span>'}</form></div>
+  <div class="card"><h2>Saldos por cliente</h2><table class="stk"><tr><th>Cliente</th><th>Telefone</th><th class="n">Comprou (Paga Depois)</th><th class="n">Pagou</th><th class="n">Saldo</th></tr>
+  ${dev.map(c => `<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone || "")}</td><td class="n">${brl(c.total_fiado)}</td><td class="n">${brl(c.total_recebido)}</td><td class="n low">${brl(c.saldo)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Ninguém devendo.</td></tr>'}</table></div>
+  <div class="card"><h2>Últimos recebimentos</h2><table class="stk"><tr><th>Data</th><th>Cliente</th><th>Caixa</th><th>Por</th><th class="n">Valor</th></tr>
+  ${RC.map(r => `<tr><td>${dBR(r.data)}</td><td>${esc(r.cliente)}</td><td>${esc(r.caixa)}</td><td>${esc(r.handle || "")}</td><td class="n">${brl(r.valor)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Nenhum recebimento.</td></tr>'}</table></div>`;
+  const sc = () => { const c = dev.find(x => x.id === +$("#c").value); if (c) $("#v").value = Number(c.saldo).toFixed(2); }; if ($("#c")) { $("#c").onchange = sc; sc(); }
+  $("#f").onsubmit = async ev => { ev.preventDefault(); if (!dev.length) return; const b = ev.submitter; b.disabled = true; const o = $("#cx").selectedOptions[0];
+    try { await api.receber(+$("#c").value, Math.round(+$("#v").value * 100) / 100, +$("#cx").value, o.dataset.m, $("#d").value, val("o")); toast("Recebimento registrado ✓ (entrada no caixa)"); viewReceber(); } catch (e) { toast(e.message); b.disabled = false; } };
 }
 async function exportCSV() {
   const R = stockSort(await api.adminProducts()), cols = ["sku", "marca", "produto", "tamanho", "fornecedor", "custo", "preco_venda", "margem_pct", "estoque", "estoque_minimo", "ativo"];

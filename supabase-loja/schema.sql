@@ -5,6 +5,7 @@
 -- IMPORTANTE: copie do arquivo RAW (UTF-8), não de um editor que troque acentos:
 --   https://raw.githubusercontent.com/mahdibassal-cmd/bgdelectronic/main/supabase-loja/schema.sql
 --   depois: https://raw.githubusercontent.com/mahdibassal-cmd/bgdelectronic/main/supabase-loja/security.sql
+--   depois: https://raw.githubusercontent.com/mahdibassal-cmd/bgdelectronic/main/supabase-loja/migration-clientes.sql
 -- Segurança: RLS em TODAS as tabelas; custo só admin; caixa só admin/financeiro;
 -- notas/estoque só admin/vendedor. Permissões por papel ficam em public.role_perms (fácil de mudar).
 -- =====================================================================
@@ -310,6 +311,7 @@ create policy sessoes_read on public.caixa_sessoes for select to authenticated u
 -- criar_nota: atômica. Itens + pagamentos (dividido permitido, soma = total) + movimentos no caixa.
 -- p_items: [{"sku":"X","qtd":1,"preco_vendido":100}]  p_pagamentos: [{"metodo":"pix","valor":60},{"metodo":"dinheiro","valor":40}]
 drop function if exists public.criar_nota(jsonb, jsonb, text);
+drop function if exists public.criar_nota(jsonb, jsonb, text, bigint);  -- versão com cliente: recriada por migration-clientes.sql (rode de novo depois)
 create or replace function public.criar_nota(p_items jsonb, p_pagamentos jsonb, p_cliente text default null)
 returns bigint language plpgsql security definer set search_path = '' as $$
 declare v_id bigint; it jsonb; pg jsonb; v_tot numeric := 0; v_pag numeric := 0; v_cx smallint;
