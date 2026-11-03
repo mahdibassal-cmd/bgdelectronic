@@ -48,3 +48,32 @@ main{margin:0!important;padding:0!important;max-width:none!important;width:100%!
 @media print{.stk,.stk *{color:#000!important}.stk tr.sep th{background:#fff!important;border-top:2px solid #000!important}h2 .btn{display:none!important}}
 [hidden]{display:none!important}
 #rq{list-style:none;padding-left:0!important}
+
+/* Modo escuro (só tela; impressão/A4/nota continuam claras) */
+@media screen{
+html[data-theme=dark]{--blue:#7fa4ff;--gold:#e0a84a;--ink:#ece7dc;--dim:#a39d90;--ln:rgba(214,180,106,.18);--soft:#0f0e0c;color-scheme:dark}
+html[data-theme=dark] body{background:#0f0e0c;color:var(--ink)}
+html[data-theme=dark] .top{background:#17150f;border-bottom-color:var(--ln)}
+html[data-theme=dark] .brand{color:#e8c979}html[data-theme=dark] .brand span{color:#fff}
+html[data-theme=dark] nav button{background:#1d1a14;color:var(--ink)}
+html[data-theme=dark] nav button.on{background:#d6b46a;color:#111;border-color:#d6b46a}
+html[data-theme=dark] #mockbar{background:#7a5a1e}
+html[data-theme=dark] .card{background:#17150f;border-color:var(--ln)}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#0f0e0c;color:var(--ink);border-color:rgba(214,180,106,.28)}
+html[data-theme=dark] input::placeholder{color:#7d776b}
+html[data-theme=dark] .btn{background:#d6b46a;color:#111}html[data-theme=dark] .btn.gold{background:#e0a84a;color:#111}
+html[data-theme=dark] .btn.ghost{background:transparent;color:#e8c979;border-color:#d6b46a}
+html[data-theme=dark] .kpi{background:#1f1c15}html[data-theme=dark] .kpi b{color:#e8c979}
+html[data-theme=dark] .low,html[data-theme=dark] .warn{color:#ff9a6b}
+html[data-theme=dark] #toast{background:#e8c979;color:#111}
+html[data-theme=dark] .sug li{background:#17150f}html[data-theme=dark] .sug li.hi{background:#3a2f14;outline-color:#d6b46a}
+html[data-theme=dark] .stk tr.sep th{background:#24201a}
+html[data-theme=dark] a{color:#e8c979}
+/* recibo/nota na tela = papel (claro) */
+html[data-theme=dark] .recibo{background:#fff;color:#1a1a1a;--ink:#1a1a1a;--dim:#5b6475;--ln:rgba(30,40,70,.14)}
+html[data-theme=dark] .recibo th,html[data-theme=dark] .recibo td{color:#1a1a1a}
+html[data-theme=dark] .qr{background:#fff}
+}
+#theme-tg{position:fixed;left:14px;bottom:80px;z-index:9999;width:42px;height:42px;border-radius:50%;border:1px solid rgba(160,130,60,.55);background:#fff;color:#1a1a1a;font:20px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:0}
+html[data-theme=dark] #theme-tg{background:#17140f;color:#e8c979;border-color:rgba(214,180,106,.5)}
+@media print{#theme-tg{display:none!important}}

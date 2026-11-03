@@ -1,0 +1,29 @@
+/* BAGDA PERFUMES: modo escuro (só tela) — preto + dourado original */
+@media screen{
+html[data-theme=dark]{--bg:#0b0907;--bg2:#120e0a;--card:#16110c;--card2:#1c1610;--line:rgba(212,175,95,.18);--line2:rgba(212,175,95,.34);--ink:#f3ead8;--muted:#b9a98c;--dim:#9a8a72;--gold:#d4af5f;--gold2:#f0d79a;--gold3:#a8843e;color-scheme:dark}
+html[data-theme=dark] body{background:var(--bg);color:var(--ink)}
+html[data-theme=dark] .top.solid,html[data-theme=dark] .toolbar,html[data-theme=dark] .modal .mtop{background:rgba(11,9,7,.92)}
+html[data-theme=dark] .top:not(.solid) .logo b{color:var(--ink)}
+html[data-theme=dark] .hero{background:linear-gradient(160deg,#1a1208,#0b0907 55%,#160d14)}
+html[data-theme=dark] .hero:after{background:radial-gradient(900px 500px at 70% 20%,rgba(212,175,95,.12),transparent 60%),linear-gradient(180deg,rgba(11,9,7,.55) 0%,rgba(11,9,7,.75) 45%,rgba(11,9,7,.96) 80%,var(--bg) 100%)}
+html[data-theme=dark] .card .ph,html[data-theme=dark] .pd .pic,html[data-theme=dark] .ftile{background:#f4efe6}
+html[data-theme=dark] .search input,html[data-theme=dark] select.sort,html[data-theme=dark] .fgroup input[type=text],html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#16110c;color:var(--ink);border-color:var(--line2)}
+html[data-theme=dark] .opt,html[data-theme=dark] .frete,html[data-theme=dark] .tier .ns span,html[data-theme=dark] .dlv-i{background:#16110c;color:var(--ink)}
+html[data-theme=dark] .dlv-i.hot{background:linear-gradient(135deg,rgba(212,175,95,.16),#16110c)}
+html[data-theme=dark] .opt .ic{background:rgba(212,175,95,.12)}
+html[data-theme=dark] footer.site{background:linear-gradient(180deg,var(--bg),#120e0a)}
+html[data-theme=dark] .btn.gold{background:linear-gradient(135deg,#f0d79a,#d4af5f);color:#140e06}
+html[data-theme=dark] .hero-off{background:#16110c!important;color:#f0d79a!important;border-color:rgba(212,175,95,.45)!important}
+html[data-theme=dark] .hero-off .seal{color:#d4af5f}
+html[data-theme=dark] .tray{background:rgba(22,17,12,.97)!important;border-color:rgba(212,175,95,.3)!important}
+html[data-theme=dark] .tray .it button,html[data-theme=dark] .cmpbox.on,html[data-theme=dark] .cmp-count,html[data-theme=dark] .chip.on{background:#d4af5f;color:#140e06;border-color:#d4af5f}
+html[data-theme=dark] .cmpbox{background:rgba(22,17,12,.9);color:#d4af5f}
+html[data-theme=dark] .fab:after{background:#16110c;color:var(--ink)}
+html[data-theme=dark] .bc{--bcg:#d4af5f;--bcg2:#d4af5f;--bcbg:#15110c;--bcln:rgba(212,175,95,.2);--bcink:#f3ead8;--bcdim:#b9a98c}
+html[data-theme=dark] .bc-fab{background:#16110c;color:#d4af5f;border-color:rgba(212,175,95,.4)}
+html[data-theme=dark] .bc-n,html[data-theme=dark] .bc-pay,html[data-theme=dark] .bc-pixbtn{background:#d4af5f;color:#140e06}
+html[data-theme=dark] .bc-top,html[data-theme=dark] .bc-pixid b{color:#f3ead8}
+html[data-theme=dark] .bc-it img,html[data-theme=dark] .bc-ph,html[data-theme=dark] .bc-cep,html[data-theme=dark] .bc-pixcode,html[data-theme=dark] .bc-pixbox{background:#1c1610;color:#f3ead8}
+html[data-theme=dark] .bc-copy,html[data-theme=dark] .bc-add.pill{color:#d4af5f;border-color:#d4af5f}
+html[data-theme=dark] .nav-sorteio{color:#ff7a5c!important}
+}

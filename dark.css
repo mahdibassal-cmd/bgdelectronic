@@ -1,0 +1,35 @@
+/* BAGDA STORES: modo escuro (só tela). Preto + dourado. */
+@media screen{
+html[data-theme=dark]{--ink:#ece7dc;--paper:#0e0d0b;--soft:#17150f;--line:#2a261d;--muted:#a8a194;--gray:#8a8476;--navy:#0b1530;--navy2:#121f45;--navy-line:#24335f;--blue:#9db8ff;--gold:#d6b46a;--gold2:#b8913f;--black:#0c0b09;color-scheme:dark}
+html[data-theme=dark] body{background:#0e0d0b;color:#ece7dc}
+html[data-theme=dark] .hero-visual,html[data-theme=dark] .pv-pic,html[data-theme=dark] .pvisual.is-ph,html[data-theme=dark] .pv-pic.is-ph{background:radial-gradient(90% 70% at 50% 40%,#2a2418 0%,#15120d 60%,#0e0d0b 100%)!important}
+html[data-theme=dark] .navy-band{background:linear-gradient(180deg,#0b1530 0%,#0e0d0b 100%)!important;color:#ece7dc}
+html[data-theme=dark] .navy-band .soft{color:#9db8ff}html[data-theme=dark] .navy-band .muted,html[data-theme=dark] .navy-band .label,html[data-theme=dark] .navy-band .band-top,html[data-theme=dark] .navy-band .band-top *{color:#b9c4e6!important}
+html[data-theme=dark] .navy-band .chip,html[data-theme=dark] .gold-band .chip{color:#ece7dc;border-color:#3a3325;background:#17150f}
+html[data-theme=dark] .navy-band .chip.is-on,html[data-theme=dark] .gold-band .chip.is-on{background:#d6b46a;color:#111;border-color:#d6b46a}
+html[data-theme=dark] .gold-band,html[data-theme=dark] .dark-band{background:linear-gradient(180deg,#1a140b 0%,#0e0d0b 100%)!important;color:#ece7dc}
+html[data-theme=dark] .gold-band .soft,html[data-theme=dark] .dark-band .soft{color:#e8c979}
+html[data-theme=dark] .gold-band .muted,html[data-theme=dark] .gold-band .label,html[data-theme=dark] .gold-band p,html[data-theme=dark] .gold-band .band-top,html[data-theme=dark] .gold-band .band-top *,html[data-theme=dark] .dark-band .band-top,html[data-theme=dark] .dark-band .band-top *,html[data-theme=dark] .gold-band .section-bar.inv{color:#c9bfa9!important}
+html[data-theme=dark] .section-bar.inv{color:#b9b2a3;border-bottom-color:#2a261d}
+html[data-theme=dark] .price{color:#ece7dc}html[data-theme=dark] .pf .price,html[data-theme=dark] .pf .label{color:#e8c979}html[data-theme=dark] .is-out .price{color:#9a9180}
+html[data-theme=dark] .soft{color:#a8a194}
+html[data-theme=dark] .pf .pvisual{background:#f4f1ea}
+html[data-theme=dark] .btn-light{background:#17150f;color:#e8c979}
+html[data-theme=dark] .btn-ghost{color:#e8c979;border-color:#d6b46a}
+html[data-theme=dark] .hero-visual .tag{background:rgba(20,18,13,.88);border-color:rgba(214,180,106,.35);color:#ece7dc}
+html[data-theme=dark] a{color:inherit}
+/* carrinho */
+html[data-theme=dark] .bc{--bcg:#d6b46a;--bcg2:#d6b46a;--bcbg:#15130f;--bcln:rgba(214,180,106,.2);--bcink:#ece7dc;--bcdim:#a8a194}
+html[data-theme=dark] .bc-fab{background:#17150f;color:#e8c979;border-color:rgba(214,180,106,.4)}
+html[data-theme=dark] .bc-n,html[data-theme=dark] .bc-pay,html[data-theme=dark] .bc-pixbtn{background:#d6b46a;color:#111}
+html[data-theme=dark] .bc-top,html[data-theme=dark] .bc-pixid b{color:#ece7dc}
+html[data-theme=dark] .bc-it img,html[data-theme=dark] .bc-ph,html[data-theme=dark] .bc-cep,html[data-theme=dark] .bc-pixcode,html[data-theme=dark] .bc-pixbox{background:#1f1c15;color:#ece7dc}
+html[data-theme=dark] .bc-copy,html[data-theme=dark] .bc-add.pill{color:#e8c979;border-color:#d6b46a}
+/* páginas simples (política, sorteio claro) */
+html[data-theme=dark] .pol-page,html[data-theme=dark] body.pol{background:#0e0d0b;color:#ece7dc}
+html[data-theme=dark] .dlv-strip,html[data-theme=dark] .ent-card,html[data-theme=dark] .bf-ok,html[data-theme=dark] .pv-box,html[data-theme=dark] .pv-x,html[data-theme=dark] .hero-dlv a,html[data-theme=dark] .bf-cep{background:#17150f;color:#ece7dc;border-color:#2a261d}
+html[data-theme=dark] .pvisual,html[data-theme=dark] .pv-pic{background:#f4f1ea}
+html[data-theme=dark] .ptag{background:#0e0d0b;color:#e8c979}
+}
+/* política de devolução */
+@media screen{html[data-theme=dark] body.pd-pol{background:#0e0d0b;color:#ece7dc}}
