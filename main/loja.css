@@ -94,3 +94,4 @@ body>header,header.top{padding-right:52px!important}
 .exit{width:100%;margin:2px 0 6px;font-size:13px}.exit th{font-weight:600}.ext tr.tot th{border-top:2px solid var(--ink)}.ok-r{color:#1f7a3a;font-weight:600}
 html[data-theme=dark] .ext tr.exi>td{background:#1f1c15}html[data-theme=dark] .ok-r{color:#7fd39a}
 @media print{.ext tr.exi{display:table-row!important}.ext tr.exi>td{background:#fff!important}.ext tr.exc td{opacity:1!important}.ok-r{color:#000!important}#ext{break-before:auto}}
+.lanc td.cli{max-width:220px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.lanc tr.pz td{border-top:0;padding-top:2px;background:rgba(201,162,39,.06)}
