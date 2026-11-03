@@ -83,7 +83,7 @@ let api;
 if (!MOCK && !CONFIGURED) {
   api = null;
 } else if (!MOCK) {
-  const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, detectSessionInUrl: false, flowType: "pkce" } });
+  const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: sessionStorage, storageKey: (window.BGDSwitch ? BGDSwitch.storageKey(C.SUPABASE_URL) : undefined), detectSessionInUrl: false, flowType: "pkce" } });
   sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") needPassword = true; });
   const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
   api = {
@@ -108,6 +108,7 @@ if (!MOCK && !CONFIGURED) {
     async reportFail(e) { try { await sb.rpc("report_failed_login", { p_email: e }); } catch {} },
     async events() { const { data, error } = await sb.from("security_events").select("at,kind,email,detail").order("at", { ascending: false }).limit(50); return error ? null : data; },
     async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
+    async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
     async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("handle,nome,role,ativo").eq("id", u.id).single()); },
     async products() { return ok(await sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
@@ -259,7 +260,7 @@ async function boot() {
     }
   }
   const s = await api.session();
-  if (!s) return viewLogin();
+  if (!s) { viewLogin(); if (window.BGDSwitch) BGDSwitch.prefill(); return; }
   const a = await api.aal();
   if (a.nextLevel === "aal2" && a.currentLevel !== "aal2") return viewMfaChallenge();
   if (needPassword) return viewCriarSenha();
@@ -270,6 +271,7 @@ async function boot() {
   if (!me || me.ativo === false) { await api.logout(); return viewLogin("Conta sem perfil ativo. Fale com o administrador."); }
   $("#who").textContent = `${me.nome} (${me.handle}) · ${ROLEL[me.role] || me.role}`;
   $("#nav").hidden = false;
+  if (window.BGDSwitch) BGDSwitch.mount(me, MOCK ? "mb@demo.local" : await api.email().catch(() => ""));
   document.querySelectorAll("nav button[data-p]").forEach(b => b.hidden = !can(b.dataset.p));
   if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
