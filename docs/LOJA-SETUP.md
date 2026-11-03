@@ -1,7 +1,7 @@
-# Sistema BAGDA STORES — /loja/ (setup)
+# Sistema BAGDA STORES — /main/ (setup)
 
-Sistema **separado** do quiosque (/sistema). Projeto Supabase próprio: **bagda-loja**
-(`https://xvsxnicmpkvzzhkkqgam.supabase.co`, região sa-east-1). Frontend: `loja/` (GitHub Pages, bgdstores.com/loja/).
+Sistema **separado** do quiosque (/kiosk). Projeto Supabase próprio: **bagda-loja**
+(`https://xvsxnicmpkvzzhkkqgam.supabase.co`, região sa-east-1). Frontend: `main/` (GitHub Pages, bgdstores.com/main/).
 `loja/config.js` tem só a chave **publishable** — nunca a service_role.
 
 ## Papéis
@@ -31,9 +31,9 @@ Produtos: a loja começa **sem produtos** — cadastre em Produtos (admin) e dê
 - Extrato do dia: Caixa → "Imprimir extrato (A4)".
 
 ## Auth
-Sign-ups desligado, regra de senha forte, Site URL / Redirect URLs: `https://bgdstores.com/loja/` e `https://bgdstores.com/loja/**`.
+Sign-ups desligado, regra de senha forte, Site URL / Redirect URLs: `https://bgdstores.com/main/` e `https://bgdstores.com/main/**`.
 Login aceita nome (vira `nome@loja.bgdstores.local`) ou e-mail. Convite/recuperação abre "Criar sua senha".
 
 ## Testes
 `supabase-loja/tests/rls-test.mjs` (PGlite, auth simulado): `npm i @electric-sql/pglite && node supabase-loja/tests/rls-test.mjs`.
-Demo sem banco: `bgdstores.com/loja/?mock=admin&auto=1` (ou `mock=vendedor` / `mock=financeiro`).
+Demo sem banco: `bgdstores.com/main/?mock=admin&auto=1` (ou `mock=vendedor` / `mock=financeiro`).

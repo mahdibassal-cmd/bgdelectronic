@@ -1,6 +1,6 @@
 # Sistema da Loja — configuração do Supabase (plano gratuito, $0)
 
-Página: `https://bgdstores.com/sistema/` (noindex, sem link no site público).
+Página: `https://bgdstores.com/kiosk/` (noindex, sem link no site público).
 Enquanto `sistema/config.js` tiver os placeholders, a página roda em **modo demonstração** (dados fictícios).
 
 ## 1. Criar conta e projeto (MB faz o login — ninguém mais)
@@ -22,8 +22,8 @@ Enquanto `sistema/config.js` tiver os placeholders, a página roda em **modo dem
 
 ## 4. URLs
 **Authentication → URL Configuration**:
-- **Site URL**: `https://bgdstores.com/sistema/`
-- **Redirect URLs**: `https://bgdstores.com/sistema/**` (só isso).
+- **Site URL**: `https://bgdstores.com/kiosk/`
+- **Redirect URLs**: `https://bgdstores.com/kiosk/**` (só isso).
 
 ## 5. Rodar o banco (SQL Editor → New query, nesta ordem)
 **Projeto que JÁ rodou o schema antigo** (caso atual):
@@ -75,7 +75,7 @@ Para desativar alguém: `update public.profiles set ativo = false where handle =
 - Tentar criar conta pela API pública → deve falhar (signup desligado).
 
 ## Adicionar um novo usuário (convite por e-mail real)
-1. **Authentication → Users → Invite user** → e-mail real da pessoa. Ela recebe o link, abre `https://bgdstores.com/sistema/`, vê **"Criar sua senha"** (12+ caracteres, maiúscula, minúscula, número e símbolo) e já entra.
+1. **Authentication → Users → Invite user** → e-mail real da pessoa. Ela recebe o link, abre `https://bgdstores.com/kiosk/`, vê **"Criar sua senha"** (12+ caracteres, maiúscula, minúscula, número e símbolo) e já entra.
    (Alternativa sem e-mail: *Create new user* com `<nome>@sistema.bgdstores.local` + Auto Confirm + senha definida pelo MB.)
 2. No SQL Editor, rode **uma linha** (troque e-mail, handle e nome; handle = `@` + 2–20 letras minúsculas/números/_):
 ```sql
@@ -85,7 +85,7 @@ insert into public.profiles (id, handle, nome, role) select id, '@novo', 'Novo',
 3. (Opcional) adicione a mesma linha no `supabase/users.sql` para manter a lista em dia.
 
 ### Configurações de Auth necessárias para os links
-- **URL Configuration → Site URL:** `https://bgdstores.com/sistema/`; **Redirect URLs:** `https://bgdstores.com/sistema/` e `https://bgdstores.com/sistema/**`.
+- **URL Configuration → Site URL:** `https://bgdstores.com/kiosk/`; **Redirect URLs:** `https://bgdstores.com/kiosk/` e `https://bgdstores.com/kiosk/**`.
 - **Email Templates** (Invite user e Reset password): o link deve usar `{{ .ConfirmationURL }}` (padrão). Validade do link: padrão (24 h).
 
 ### Estoque para vendedores (migration-003)

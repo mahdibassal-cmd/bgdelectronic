@@ -1,4 +1,4 @@
-# Segurança — Sistema BAGDA (/sistema)
+# Segurança — Sistema BAGDA (/kiosk)
 
 ## Rodar no Supabase (bagda-sistema › SQL Editor), nesta ordem
 1. `supabase/migration-004.sql` (idempotente; pode rodar de novo).
@@ -37,3 +37,6 @@ Também: só o dono pode, pelo app/API, criar/remover/desativar admins (SQL Edit
 
 ## Loja (bagda-loja)
 Rodar `supabase-loja/security.sql` depois de `schema.sql`/`users.sql` — e de novo sempre que rodar `schema.sql`. Mesma trava, log e RPCs; o app /loja ainda não tem os botões (por SQL/RPC).
+
+## URLs (nov/2026)
+Apps em `/kiosk/` (quiosque) e `/main/` (BAGDA STORES). `/sistema/` e `/loja/` redirecionam mantendo ?query e #hash. Supabase: Site URL nova; manter as antigas em Redirect URLs.
