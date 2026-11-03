@@ -14,7 +14,7 @@
     const check = async () => {
       if (!api.acessoStatus) return true;
       const st = await api.acessoStatus().catch(() => null);
-      if (st && st.liberado === false) { clearInterval(timer); await api.logout().catch(() => {}); onBlocked(msgAcesso(st)); return false; }
+      if (st && st.liberado === false) { clearInterval(timer); if (api.registrarTentativa) await api.registrarTentativa().catch(() => {}); await api.logout().catch(() => {}); onBlocked(msgAcesso(st)); return false; }
       return true;
     };
     const okNow = await check();
@@ -27,6 +27,9 @@
     let L = [], err = "";
     try { L = (await api.adminUsers({ action: "list" })).users || []; } catch (e) { err = e.message; }
     const ac = api.acessoStatus ? await api.acessoStatus().catch(() => null) : null;
+    const T = api.tentativas ? await api.tentativas().catch(e => ({ erro: e.message })) : [];
+    const MOT = { fora_horario: "Fora do horário", bloqueio_manual: "Bloqueio manual" };
+    const dt = d => new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
     const ro = r => Object.entries(roles).map(([v, l]) => `<option value="${v}" ${r === v ? "selected" : ""}>${l}</option>`).join("");
     app.innerHTML = `
 <div class="card"><h2>Acesso da loja — ${esc(o.store)}</h2>
@@ -48,7 +51,10 @@ ${L.map(u => { const self = u.id === o.myId; return `<tr><td>${esc(u.nome)}<br><
 <td><select class="ur" data-id="${esc(u.id)}" ${self ? "disabled title='Você não pode mudar a própria função'" : ""}>${ro(u.role)}</select></td>
 <td>${u.ativo ? "Ativo" : "<b class='low'>Desativado</b>"}</td>
 <td><div class="cxa"><button class="btn ghost up" data-id="${esc(u.id)}">Nova senha</button>${self ? "" : `<button class="btn ghost ua" data-id="${esc(u.id)}" data-on="${u.ativo ? 0 : 1}">${u.ativo ? "Desativar" : "Ativar"}</button>`}</div></td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">${err ? "—" : "Nenhum usuário."}</td></tr>`}
-</table></div>`;
+</table></div>
+<div class="card"><h2>Tentativas fora do horário</h2><p class="muted">Quem tentou entrar/usar com o acesso bloqueado (horário de São Paulo; no máx. 1 registro por usuário a cada 5 min).</p>
+${T.erro ? `<p class="warn" role="alert">${esc(T.erro)}</p>` : `<table><tr><th>Quando</th><th>Usuário</th><th>Função</th><th>Motivo</th><th>Navegador</th></tr>
+${T.map(x => `<tr><td>${esc(dt(x.occurred_at))}</td><td>${esc(x.nome || "—")}<br><small class="muted">${esc(x.email || "")}</small></td><td>${esc(roles[x.role] || (x.role === "seller" && roles.vendedor) || x.role || "")}</td><td>${esc(MOT[x.motivo] || x.motivo)}</td><td><small class="muted">${esc((x.user_agent || "").slice(0, 60))}</small></td></tr>`).join("") || `<tr><td colspan="5" class="muted">Nenhuma tentativa registrada.</td></tr>`}</table>`}</div>`;
     const run = async (body, okMsg) => { try { await api.adminUsers(body); toast(okMsg); view(app, api, me, o); } catch (e) { toast(e.message); alert(e.message); } };
     const $ = s => app.querySelector(s);
     if (ac) {
@@ -79,6 +85,9 @@ ${L.map(u => { const self = u.id === o.myId; return `<tr><td>${esc(u.nome)}<br><
         throw new Error(m || error.message);
       },
       async acessoStatus() { const { data, error } = await sb.rpc("acesso_status"); if (error) return null; return data; },
+      async registrarTentativa() { await sb.rpc("registrar_tentativa_bloqueada", { p_user_agent: (navigator.userAgent || "").slice(0, 300) }); },
+      async tentativas() { const { data, error } = await sb.from("acesso_tentativas").select("occurred_at,nome,email,role,motivo,user_agent").order("occurred_at", { ascending: false }).limit(200);
+        if (error) { if (/acesso_tentativas|schema cache|does not exist/i.test(error.message)) throw new Error("Histórico ainda não instalado (rode migration-tentativas.sql)."); throw new Error(error.message); } return data || []; },
       async setAcesso(a) { const { error } = await sb.rpc("set_acesso", { p_bloqueado: a.bloqueado ?? null, p_fecha: a.fecha ?? null, p_abre: a.abre ?? null }); if (error) throw new Error(error.message); }
     };
   }
@@ -100,6 +109,10 @@ ${L.map(u => { const self = u.id === o.myId; return `<tr><td>${esc(u.nome)}<br><
         if (b.action === "set_role") u.role = b.role; else if (b.action === "set_active") u.ativo = !!b.ativo; return { ok: true };
       },
       async acessoStatus() { const lib = !A.bloqueado && !qs.has("fechado") && (qs.has("aberto") || !fora()); return { liberado: adm() || lib, liberado_staff: lib, bloqueado: A.bloqueado, fecha: A.fecha, abre: A.abre }; },
+      async registrarTentativa() {},
+      async tentativas() { if (!adm()) throw new Error("Só admin"); const h = 36e5; return [
+        { occurred_at: new Date(Date.now() - 2 * h).toISOString(), nome: "Ana Vendas", email: "ana@demo.local", role: "vendedor", motivo: "fora_horario", user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)" },
+        { occurred_at: new Date(Date.now() - 26 * h).toISOString(), nome: "Bruno Caixa", email: "bruno@demo.local", role: "financeiro", motivo: "bloqueio_manual", user_agent: "Mozilla/5.0 (Windows NT 10.0)" }]; },
       async setAcesso(a) { if (!adm()) throw new Error("Só admin"); if (a.bloqueado != null) A.bloqueado = a.bloqueado; if (a.fecha) A.fecha = a.fecha; if (a.abre) A.abre = a.abre; }
     };
   }

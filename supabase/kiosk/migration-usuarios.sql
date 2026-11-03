@@ -1,6 +1,19 @@
--- KIOSK (bagda-sistema, ref zoapljfhebbvbsrebtjt) — Usuários + controle de acesso (bloqueio manual + horário 17:30–08:00 SP)
--- Rodar DEPOIS de schema.sql, migration-002/003/004.sql. Idempotente. Papéis do Kiosk continuam ('admin','seller').
+-- KIOSK (bagda-sistema, ref zoapljfhebbvbsrebtjt) — Usuários + controle de acesso (17:30–08:00 SP) + tentativas bloqueadas
+-- SÓ PARA O KIOSK. Não referencia nada da loja (sem clientes, can(), has_perm()).
+-- Ordem no Kiosk: schema.sql -> migration-002.sql -> migration-003.sql -> migration-004.sql -> ESTE arquivo.
+-- Depende apenas de: profiles(id,nome,role app_role,ativo), system_unlocked(), security_events (migration-004).
+-- Idempotente: pode rodar de novo após falha parcial.
 begin;
+
+do $$ begin
+  if to_regtype('public.app_role') is null or to_regclass('public.security_events') is null
+     or to_regprocedure('public.system_unlocked()') is null then
+    raise exception 'Rode schema.sql e migration-002..004 do Kiosk antes deste arquivo';
+  end if;
+  if to_regclass('public.clientes') is not null then
+    raise notice 'Aviso: public.clientes existe — confirme que este é o projeto do KIOSK (zoapljfhebbvbsrebtjt)';
+  end if;
+end $$;
 
 alter table public.profiles add column if not exists tipo text not null default 'staff' check (tipo in ('staff','cliente'));
 
@@ -67,7 +80,7 @@ revoke all on function public.acesso_is_admin(), public.acesso_liberado(), publi
 grant execute on function public.acesso_is_admin(), public.acesso_liberado(), public.acesso_status(), public.set_acesso(boolean, time, time) to authenticated;
 
 -- ---------- Liga a trava em TODAS as policies/RPCs ----------
--- Toda policy usa mfa_ok() / can() / has_perm() / is_active_staff(); todas as RPCs (criar_nota incluída) usam can()/is_admin().
+-- Kiosk: toda policy usa mfa_ok() e/ou is_active_staff()/is_admin(); RPCs (criar_nota incluída) usam is_admin()/is_active_staff().
 -- Acrescentar acesso_liberado() nessas funções-base aplica o bloqueio em tudo, para não-admins.
 create or replace function public.mfa_ok() returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -80,5 +93,49 @@ create or replace function public.is_active_staff() returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.system_unlocked() and public.acesso_liberado() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.ativo);
 $$;
+-- ---------- Histórico de tentativas com acesso bloqueado ----------
+create table if not exists public.acesso_tentativas (
+  id          bigint generated always as identity primary key,
+  user_id     uuid references auth.users(id) on delete set null,
+  email       text check (length(email) <= 160),
+  nome        text check (length(nome) <= 120),
+  role        text check (length(role) <= 30),
+  motivo      text not null check (motivo in ('fora_horario','bloqueio_manual')),
+  occurred_at timestamptz not null default now(),
+  user_agent  text check (length(user_agent) <= 300)
+);
+create index if not exists acesso_tentativas_at_idx on public.acesso_tentativas(occurred_at desc);
+create index if not exists acesso_tentativas_user_at_idx on public.acesso_tentativas(user_id, occurred_at desc);
+alter table public.acesso_tentativas enable row level security;
+alter table public.acesso_tentativas force row level security;
+revoke all on public.acesso_tentativas from public, anon, authenticated;
+grant select on public.acesso_tentativas to authenticated;          -- só SELECT; nada de insert/update/delete direto
+drop policy if exists acesso_tentativas_admin_read on public.acesso_tentativas;
+create policy acesso_tentativas_admin_read on public.acesso_tentativas for select to authenticated
+  using (public.acesso_is_admin());
+
+-- Chamado pelo frontend quando detecta o bloqueio (login/checagem periódica). Motivo calculado no servidor.
+-- Dedup: no máximo 1 linha por usuário a cada 5 minutos. Retorna true se gravou.
+create or replace function public.registrar_tentativa_bloqueada(p_user_agent text default null) returns boolean
+language plpgsql volatile security definer set search_path = '' as $$
+declare uid uuid := auth.uid(); c public.acesso_config; t time := (now() at time zone 'America/Sao_Paulo')::time;
+        m text; p record; e text;
+begin
+  if uid is null or public.acesso_is_admin() then return false; end if;
+  select * into c from public.acesso_config where id = 1;
+  if not found then return false; end if;
+  if c.bloqueado then m := 'bloqueio_manual';
+  elsif (case when c.fecha > c.abre then (t >= c.fecha or t < c.abre) else (t >= c.fecha and t < c.abre) end) then m := 'fora_horario';
+  else return false; end if;
+  perform pg_advisory_xact_lock(hashtext('acesso_tentativas:' || uid::text));
+  if exists (select 1 from public.acesso_tentativas a where a.user_id = uid and a.occurred_at > now() - interval '5 minutes') then return false; end if;
+  select pr.nome, pr.role::text as role into p from public.profiles pr where pr.id = uid;
+  select u.email into e from auth.users u where u.id = uid;
+  insert into public.acesso_tentativas (user_id, email, nome, role, motivo, user_agent)
+    values (uid, left(e, 160), left(p.nome, 120), left(p.role, 30), m, left(p_user_agent, 300));
+  return true;
+end $$;
+revoke all on function public.registrar_tentativa_bloqueada(text) from public, anon;
+grant execute on function public.registrar_tentativa_bloqueada(text) to authenticated;
 commit;
 -- select public.acesso_status();
