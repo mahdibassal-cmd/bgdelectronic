@@ -181,6 +181,10 @@ if (!MOCK && !CONFIGURED) {
     async recebimentos() { return ok(await sb.from("v_recebimentos").select("*").order("id", { ascending: false }).limit(100)); },
     async estornarRecebimento(rid, m) { return ok(await sb.rpc("estornar_recebimento", { p_rec: rid, p_motivo: m })); },
     async estornarCredito(kid, m) { return ok(await sb.rpc("estornar_credito", { p_id: kid, p_motivo: m })); },
+    async cxEsp() { return ok(await sb.from("v_caixa_especial").select("*").order("id", { ascending: false }).limit(300)); },
+    async cxEspEntrada(v, m) { return ok(await sb.rpc("cx_esp_entrada", { p_valor: v, p_motivo: m })); },
+    async cxEspSaida(v, m, cid) { return ok(await sb.rpc("cx_esp_saida", { p_valor: v, p_motivo: m, p_cliente: cid || null })); },
+    async cxEspEstornar(i, m) { return ok(await sb.rpc("cx_esp_estornar", { p_id: i, p_motivo: m })); },
     async depEsp() { if (me.role !== "admin") return ok(await sb.rpc("dep_esp_lista")); return ok(await sb.from("v_deposito_especial").select("*").order("sku")); },
     async depEspMov() { if (me.role !== "admin") return ok(await sb.rpc("dep_esp_movs", { p_limit: 100 })); return ok(await sb.from("v_deposito_especial_mov").select("*").order("id", { ascending: false }).limit(100)); },
     async depEspLote(h, itens) { return ok(await sb.rpc("dep_esp_entrada_lote", { p_header: h, p_itens: itens })); },
@@ -242,7 +246,7 @@ if (!MOCK && !CONFIGURED) {
     .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }];
-  const AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
+  const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
@@ -324,6 +328,13 @@ if (!MOCK && !CONFIGURED) {
     async depEspTransf(sku, q, dir, m) { if (!["admin", "estoque"].includes(meU.role)) throw new Error("Sem permissão"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); const p = P.find(x => x.sku === sku); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: K[sku] || 0 }); const a = d.qtd;
       if (dir === "para_loja") { if (d.qtd < q) throw new Error(`Depósito Especial só tem ${d.qtd} un.`); d.qtd -= q; p.estoque += q; } else { if (p.estoque < q) throw new Error(`Loja só tem ${p.estoque} un.`); p.estoque -= q; d.qtd += q; }
       DEM.unshift({ id: id++, sku, tipo: dir, qtd: dir === "para_loja" ? -q : q, qtd_antes: a, qtd_depois: d.qtd, custo_unit: d.custo, motivo: m || (dir === "para_loja" ? "Transferência para a loja" : "Transferência da loja"), created_at: new Date().toISOString() }); return d; },
+    async cxEsp() { if (meU.role !== "admin") throw new Error("Somente admin"); let a = 0; return CXE.map(m => ({ ...m, saldo_apos: a += m.tipo === "entrada" ? m.valor : -m.valor, cliente: m.cliente_id ? CL.find(c => c.id === m.cliente_id).nome : null, estornado: CXE.some(x => x.estorno_de === m.id), handle: "mb" })).reverse(); },
+    async cxEspEntrada(v, m) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); CXE.push({ id: id++, tipo: "entrada", valor: v, motivo: m || "Entrada de dinheiro", created_at: new Date().toISOString() }); },
+    async cxEspSaida(v, m, cid) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (!m || m.length < 3) throw new Error("Informe o motivo / para onde vai o dinheiro"); const sd = CXE.reduce((a, x) => a + (x.tipo === "entrada" ? x.valor : -x.valor), 0); if (v > sd + 0.001) throw new Error(`Saldo da Caixa Especial insuficiente (${brl(sd)})`);
+      if (cid && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); const mid = id++; let cr = null; if (cid) { cr = id++; CR.push({ id: cr, cliente_id: cid, tipo: "uso", valor: v, obs: `Devolução em dinheiro (Caixa Especial #${mid}): ${m}`, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); }
+      CXE.push({ id: mid, tipo: "saida", valor: v, motivo: m, cliente_id: cid || null, credito_id: cr, created_at: new Date().toISOString() }); },
+    async cxEspEstornar(i, m) { if (meU.role !== "admin") throw new Error("Somente admin"); const x = CXE.find(y => y.id === i); if (CXE.some(y => y.estorno_de === i)) return { ja_estornado: true }; CXE.push({ id: id++, tipo: x.tipo === "entrada" ? "saida" : "entrada", valor: x.valor, motivo: `Estorno #${i}: ${m}`, cliente_id: x.cliente_id, estorno_de: i, created_at: new Date().toISOString() });
+      if (x.credito_id) CR.push({ id: id++, cliente_id: x.cliente_id, tipo: "entrada", valor: x.valor, obs: `Estorno devolução Caixa Especial #${i}: ${m}`, nota_id: null, estorno_de: x.credito_id, handle: meU.handle, created_at: new Date().toISOString() }); return {}; },
     async estornarCredito(kid, m) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar"); const k = CR.find(x => x.id === kid); if (CR.some(x => x.estorno_de === kid)) return { ja_estornado: true };
       if (k.estorno_de) throw new Error("Este lançamento já é um estorno"); if (k.nota_id) throw new Error("Uso ligado à nota: cancele a nota"); if (k.recebimento_id && RC.some(r => r.id === k.recebimento_id)) throw new Error(`Uso ligado ao recebimento #${k.recebimento_id}: estorne em Contas a receber`);
       if (k.tipo === "entrada" && k.valor > crSaldo(k.cliente_id) + 0.001) throw new Error(`Saldo de crédito ficaria negativo (saldo ${brl(crSaldo(k.cliente_id))})`);
@@ -456,12 +467,12 @@ async function boot() {
   go(location.hash.slice(1) || (can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca"));
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, imei: viewImei, comprovante: () => viewImei() }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei() }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -478,7 +489,7 @@ function viewBloqueado() {
   app.innerHTML = `<div class="card login"><h2>Sistema bloqueado</h2><p class="muted">O sistema foi bloqueado por segurança. Fale com o responsável.</p><button class="btn ghost" id="x">Sair</button></div>`;
   $("#x").onclick = async () => { await api.logout(); location.reload(); };
 }
-const BK_TABLES = ["profiles", "role_perms", "products", "product_costs", "purchases", "notas", "sales", "sale_costs", "nota_pagamentos", "caixas", "caixa_movimentos", "caixa_sessoes", "clientes", "fornecedores", "contas_pagar", "conta_pagamentos", "cliente_recebimentos", "recebimento_notas", "security_events"];
+const BK_TABLES = ["profiles", "role_perms", "products", "product_costs", "purchases", "notas", "sales", "sale_costs", "nota_pagamentos", "caixas", "caixa_movimentos", "caixa_sessoes", "clientes", "fornecedores", "contas_pagar", "conta_pagamentos", "cliente_recebimentos", "recebimento_notas", "security_events", "caixa_especial_mov"];
 async function backupAgora(b) {
   b.disabled = true; const out = { exportado_em: new Date().toISOString(), por: me.handle, tabelas: {} };
   try { for (const t of BK_TABLES) { b.textContent = "Exportando " + t + "…"; out.tabelas[t] = await api.dumpTable(t); }
@@ -1133,6 +1144,35 @@ async function viewHxDia(d = today()) {
   <p class="muted">Desligado (padrão): o financeiro vê só o dia de hoje no HX. Cada mudança fica registrada em Segurança.</p></div>` : ""}`;
   $("#hd").onchange = e => viewHxDia(e.target.value); $("#pr").onclick = () => window.print();
   if ($("#hxp")) $("#hxp").onchange = async e => { try { await api.hxConfigSet(e.target.checked); toast(e.target.checked ? "Financeiro agora vê dias anteriores do HX" : "Financeiro vê só hoje no HX"); } catch (x) { e.target.checked = !e.target.checked; toast(x.message); } };
+}
+// ---------- Caixa Especial (somente admin): entradas, saídas com motivo, devolução de crédito de cliente ----------
+async function viewCxEsp() {
+  if (me.role !== "admin") { app.innerHTML = '<div class="card"><h2>Sem acesso</h2><p class="muted">Somente admin.</p></div>'; return; }
+  let M, S, C; try { [M, S, C] = await Promise.all([api.cxEsp(), api.creditos().catch(() => []), api.clientes().catch(() => [])]); }
+  catch (e) { app.innerHTML = `<div class="card"><h2>Caixa Especial</h2><p class="warn">${esc(/v_caixa_especial|PGRST20[25]|42P01|schema cache|does not exist/i.test(e.message) ? "Falta rodar a atualização do banco (m10-caixa-especial.sql)." : e.message)}</p></div>`; return; }
+  const saldo = M.length ? Number(M[0].saldo_apos) : 0, cred = S.filter(c => +c.saldo > 0), dh = t => new Date(t).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const ent = M.filter(m => m.tipo === "entrada").reduce((a, m) => a + Number(m.valor), 0), sai = M.filter(m => m.tipo === "saida").reduce((a, m) => a + Number(m.valor), 0);
+  app.innerHTML = `<div class="card"><h2>Caixa Especial <small class="muted">(só admin)</small></h2><div class="grid"><div class="kpi"><small>Saldo atual</small><b>${brl(saldo)}</b></div><div class="kpi"><small>Entradas</small><b>${brl(ent)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(sai)}</b></div></div>
+  <p class="muted">Separada dos caixas do dia: não aparece em Caixa, Resumo nem relatórios. Quem lançou e a hora ficam gravados automaticamente.</p></div>
+  <div class="card"><h2>Novo lançamento</h2><form id="f"><div class="grid"><div><label>Tipo</label><select id="tp"><option value="saida">Saída (tirar dinheiro)</option><option value="entrada">Entrada (colocar dinheiro)</option></select></div>
+  <div><label>Valor (R$) *</label><input id="v" type="number" min="0.01" step="0.01" required></div>
+  <div id="dv"><label>Devolução de crédito do cliente (opcional)</label><select id="c"><option value="">— não é devolução —</option>${cred.map(c => `<option value="${c.cliente_id}" data-s="${c.saldo}">${esc(c.nome)} · crédito ${brl(c.saldo)}</option>`).join("")}</select></div></div>
+  <label id="lm">Motivo / para onde vai o dinheiro *</label><input id="m" maxlength="300" placeholder="Ex.: devolução excedente nota 000035 — negolu">
+  <p class="muted" id="hc" hidden>A saída também baixa o crédito do cliente na Caixa Geral (mesmo valor).</p><button class="btn gold">Salvar</button></form></div>
+  <div class="card"><h2>Extrato</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Motivo / destino</th><th>Cliente</th><th>Por</th><th class="n">Valor</th><th class="n">Saldo</th><th></th></tr>
+  ${M.map(m => `<tr class="${m.estornado ? "exc" : ""}"><td>${esc(dh(m.created_at))}</td><td>${m.tipo === "entrada" ? "Entrada" : "Saída"}</td><td>${esc(m.motivo)}</td><td>${esc(m.cliente || "")}${m.credito_id ? ' <small class="muted">devolução de crédito</small>' : ""}</td><td>${esc(m.handle || "")}</td><td class="n ${m.tipo === "saida" ? "low" : ""}">${m.tipo === "saida" ? "−" : "+"}${brl(m.valor)}</td><td class="n">${brl(m.saldo_apos)}</td>
+  <td>${m.estornado ? '<small class="muted">estornado</small>' : m.estorno_de ? '<small class="muted">estorno</small>' : `<button class="btn ghost estx" style="margin:0" data-i="${m.id}">Estornar</button>`}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Sem lançamentos. Comece com uma Entrada (saldo inicial).</td></tr>'}</table></div>`;
+  const sync = () => { const s = $("#tp").value === "saida"; $("#dv").hidden = !s; if (!s) $("#c").value = ""; $("#hc").hidden = !$("#c").value; $("#lm").textContent = s ? "Motivo / para onde vai o dinheiro *" : "Observação"; };
+  $("#tp").onchange = sync; $("#c").onchange = () => { const o = $("#c").selectedOptions[0]; if (o.value && !$("#v").value) $("#v").value = (+o.dataset.s).toFixed(2); sync(); }; sync();
+  document.querySelectorAll(".estx").forEach(b => b.onclick = async () => { const k = M.find(x => x.id === +b.dataset.i);
+    const mo = await motivoBox(`Estornar ${k.tipo === "entrada" ? "a entrada" : "a saída"} de <b>${brl(k.valor)}</b> (${esc(k.motivo)})?${k.credito_id ? `<br><small>O crédito de ${esc(k.cliente)} volta (${brl(k.valor)}).</small>` : ""}`); if (!mo) return;
+    b.disabled = true; try { const x = await api.cxEspEstornar(k.id, mo); toast(x && x.ja_estornado ? "Já estava estornado" : "Lançamento estornado ✓"); viewCxEsp(); } catch (e) { toast(e.message); b.disabled = false; } });
+  $("#f").onsubmit = async ev => { ev.preventDefault(); const tp = $("#tp").value, v = Math.round(+$("#v").value * 100) / 100, m = val("m"), cid = +$("#c").value || null;
+    if (!(v > 0)) return toast("Informe o valor"); if (tp === "saida" && m.length < 3) return toast("Informe o motivo / para onde vai o dinheiro");
+    const cn = cid ? $("#c").selectedOptions[0].textContent.split(" · ")[0] : "";
+    if (!(await confirmBox(tp === "entrada" ? `Colocar <b>${brl(v)}</b> na Caixa Especial?` : `Tirar <b>${brl(v)}</b> da Caixa Especial?<br>Motivo: ${esc(m)}${cid ? `<br>Devolução de crédito: <b>${esc(cn)}</b> (o crédito baixa ${brl(v)})` : ""}`))) return;
+    const b = ev.submitter; b.disabled = true;
+    try { if (tp === "entrada") await api.cxEspEntrada(v, m); else await api.cxEspSaida(v, m, cid); toast("Lançamento salvo ✓"); viewCxEsp(); } catch (e) { toast(e.message); b.disabled = false; } };
 }
 // ---------- Caixa Geral: crédito de cliente (entradas e usos; saldo calculado no banco) ----------
 async function viewCaixaGeral(sel) {
