@@ -273,7 +273,9 @@ if (!MOCK && !CONFIGURED) {
   const recebido = cid => RC.filter(r => r.cliente_id === cid).reduce((a, r) => a + r.valor, 0);
   const pago = k => CPG.filter(p => p.conta_id === k).reduce((a, p) => a + p.valor, 0);
   const vis = () => role === "admin" ? N : role === "vendedor" ? N.filter(n => n.handle === meU.handle) : [];
-  const saldo = c => MV.filter(m => m.caixa_id === c).reduce((a, m) => a + sv(m), 0);
+  const hxR = c => role !== "admin" && /HX/.test((CX.find(x => x.caixa_id === c) || {}).nome || ""); /* espelha caixa_dia_visivel no servidor */
+  const mvV = () => MV.filter(m => !(hxR(m.caixa_id) && m.data < today()));
+  const saldo = c => mvV().filter(m => m.caixa_id === c).reduce((a, m) => a + sv(m), 0);
   const needCx = () => { if (role === "vendedor") throw new Error("Sem permissão de caixa"); };
   const grp = (rows, key, f) => Object.values(rows.reduce((a, r) => { const k = r[key]; a[k] ||= { [key]: k, nome: r.nome, vendas: 0, itens: 0, faturamento: 0, custo: 0 }; f(a[k], r); return a; }, {}));
   api = {
@@ -365,15 +367,16 @@ if (!MOCK && !CONFIGURED) {
     async extrato(d) { const ns = vis().filter(n => n.data === d), ids = ns.map(n => n.nota_id), lucro = {}; const itens = IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...ns.find(n => n.nota_id === i.nota_id), ...i }));
       if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo); return { itens, pags: PG.filter(g => ids.includes(g.nota_id)), lucro }; },
     async caixaSaldos() { await ready; needCx(); return CX.map(c => ({ ...c, saldo: saldo(c.caixa_id), movimento_hoje: MV.filter(m => m.caixa_id === c.caixa_id && m.data === today()).reduce((a, m) => a + sv(m), 0) })); },
-    async caixaExtrato(d) { needCx(); return MV.filter(m => m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => ({ ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id) })); },
+    async caixaExtrato(d) { needCx(); return mvV().filter(m => m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => ({ ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id) })); },
     async caixaResumo(c, d) { needCx(); if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão");
-      const cx = CX.find(x => x.caixa_id === c), ini = MV.filter(m => m.caixa_id === c && m.data < d).reduce((a, m) => a + sv(m), 0);
+      if (hxR(c) && d < today()) throw new Error("Caixa HX: dias anteriores visíveis só para admin");
+      const cx = CX.find(x => x.caixa_id === c), ini = hxR(c) ? 0 : MV.filter(m => m.caixa_id === c && m.data < d).reduce((a, m) => a + sv(m), 0);
       const mv = MV.filter(m => m.caixa_id === c && m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id);
         return { id: m.id, hora: new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", ""), tipo: m.tipo, valor: m.valor, assinado: sv(m), forma: m.forma || cx.metodo, nota: m.nota_id ? String(m.nota_id).padStart(6, "0") : (m.notas || null), cliente: (n && n.cliente) || m.cliente || null, usuario: m.nome, motivo: m.motivo }; });
       const pf = {}; mv.forEach(m => pf[m.forma] = (pf[m.forma] || 0) + m.assinado); const s = SE.find(x => x.caixa_id === c && x.data === d);
       return { caixa: cx.nome, data: d, saldo_inicial: ini, saldo_final: ini + mv.reduce((a, m) => a + m.assinado, 0), sessao: s ? { abertura_valor: s.abertura_valor, aberto_por: meU.nome, aberto_em: new Date(s.aberto_em).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }), fechamento_contado: s.fechamento_contado ?? null, diferenca: s.diferenca ?? null } : null,
         movimentos: mv, por_forma: pf, entradas: mv.filter(m => m.assinado > 0).reduce((a, m) => a + m.valor, 0), saidas: mv.filter(m => m.assinado < 0).reduce((a, m) => a + m.valor, 0) }; },
-    async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d); },
+    async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d && !(hxR(x.caixa_id) && d < today())); },
     async estornarMov(mid, m, cn) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar movimento de caixa"); if (!m || m.trim().length < 3) throw new Error("Informe o motivo do estorno"); const o = MV.find(x => x.id === mid); if (!o) throw new Error("Movimento não encontrado");
       const e = MV.find(x => x.estorno_de === mid); if (e) return { ja_estornado: true, estorno_id: e.id }; if (o.estorno_de || o.tipo === "estorno") throw new Error("Este movimento já é um estorno");
       if (o.tipo === "venda") { const n = N.find(x => x.nota_id === o.nota_id), liq = MV.filter(x => x.nota_id === o.nota_id && x.caixa_id === o.caixa_id).reduce((a, x) => a + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0), 0);
@@ -898,7 +901,8 @@ async function viewCaixa(d = today()) {
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" };
   const ses = c => SE.find(x => x.caixa_id === c.caixa_id);
   const fin = me.role === "admin" || me.role === "financeiro", adm = me.role === "admin";
-  const card = c => { const x = ses(c); return `<div class="kpi cxk"><small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small><b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>
+  const hxN = c => !adm && /HX/.test(c.nome || "") ? `<small class="muted">Dias anteriores visíveis só para admin${hoje ? " · saldo = movimento de hoje" : ""}</small>` : "";
+  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small><b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>
     <small>${x ? (x.fechado_em ? `Fechado: contado ${brl(x.fechamento_contado)} · diferença <b class="${+x.diferenca ? "warn" : ""}">${brl(x.diferenca)}</b>` : `Aberto ${hm(x.aberto_em)} com ${brl(x.abertura_valor)}`) : "Não aberto hoje"}</small>
     ${hoje ? `<div class="noprint cxa">${!x ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="va"><button class="btn ghost ab" data-c="${c.caixa_id}">Abrir</button>` : !x.fechado_em ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="vf"><button class="btn ghost fe" data-c="${c.caixa_id}">Fechar</button>` : ""}</div>` : ""}</div>`; };
   const tot = EX.reduce((a, m) => a + Number(m.valor_assinado), 0);
@@ -910,7 +914,7 @@ async function viewCaixa(d = today()) {
     <div><label>Tipo</label><select id="lt"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
     <div><label>Valor (R$)</label><input id="lv" type="number" min="0.01" step="0.01" required></div></div>
     <label>Motivo (obrigatório)</label><input id="lm" minlength="3" maxlength="300" required><button class="btn">Lançar</button></form></div>` : ""}
-  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2><div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
+  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2>${!adm && !hoje && SA.some(c => /HX/.test(c.nome || "")) ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin.</p>' : ""}<div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
   ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Sem movimentos.</td></tr>'}
   ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="5">${esc(c.nome)} — movimento do dia</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
   <tr class="tot"><th colspan="5">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div></div>`;
@@ -1023,10 +1027,12 @@ const FORMAL = { dinheiro: "Dinheiro", pix: "PIX", cartao: "Cartão", transferen
 async function viewResumo(d = today(), c = null, back = false) {
   if (me.role !== "admin" && me.role !== "financeiro") { app.innerHTML = '<div class="card"><h2>Sem acesso</h2><p class="muted">Somente admin e financeiro.</p></div>'; return; }
   const L = await api.caixasLista(); c = c || (L.find(x => x.metodo === "pix") || L[0]).caixa_id;
-  let R; try { R = await api.caixaResumo(c, d); } catch (e) { app.innerHTML = `<div class="card"><h2>Resumo do dia</h2><p class="warn">${esc(e.message)}</p></div>`; return; }
+  let R; try { R = await api.caixaResumo(c, d); } catch (e) { app.innerHTML = `<div class="card"><h2>Resumo do dia</h2><p class="warn">${esc(e.message)}</p><div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div><div><label>Data</label><input id="rd" type="date" value="${d}"></div></div></div>`;
+    $("#rd").onchange = ev => viewResumo(ev.target.value, c, back); $("#rc").onchange = ev => viewResumo(d, +ev.target.value, back); return; }
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" }, s = R.sessao, dd = d.split("-").reverse().join("/");
   const VD = {}; if (R.movimentos.some(m => m.nota)) (await (api.notasLancar ? api.notasLancar() : Promise.resolve([])).catch(() => [])).forEach(n => VD[String(n.nota_id).padStart(6, "0")] = n.handle);
   const vend = m => m.nota ? VD[m.nota] || "" : "";
+  const hxNote = me.role !== "admin" && /HX/.test(R.caixa || "") ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin. Saldo inicial não inclui dias anteriores.</p>' : "";
   app.innerHTML = `<div class="card"><h2>Resumo do dia — ${esc(R.caixa)} · ${esc(dd)}
     <span class="noprint" style="float:right">${back ? '<button class="btn ghost" id="bk" style="margin:0">← Caixa (todos)</button> ' : ""}<button class="btn ghost" id="csv" style="margin:0">CSV</button> <button class="btn" id="pr" style="margin:0">Imprimir / PDF (A4)</button></span></h2>
   <div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
@@ -1036,7 +1042,7 @@ async function viewResumo(d = today(), c = null, back = false) {
     <div class="kpi"><small>Saldo inicial (sistema)</small><b>${brl(R.saldo_inicial)}</b></div>
     <div class="kpi"><small>Entradas</small><b>${brl(R.entradas)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(R.saidas)}</b></div>
     <div class="kpi"><small>Fechamento</small><b>${s && s.fechamento_contado != null ? brl(s.fechamento_contado) : "—"}</b><small>${s && s.diferenca != null ? "Diferença " + brl(s.diferenca) : "Não fechado"}</small></div>
-    <div class="kpi"><small>Saldo final</small><b>${brl(R.saldo_final)}</b></div></div></div>
+    <div class="kpi"><small>Saldo final</small><b>${brl(R.saldo_final)}</b></div></div>${hxNote}</div>
   <div class="card"><h2>Movimentos</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Nota nº</th><th>Cliente / fornecedor</th><th>Vendedor</th><th>Lançada por</th><th>Forma</th><th class="n">Valor</th></tr>
   ${R.movimentos.map(m => `<tr><td>${esc(m.hora)}</td><td>${TL[m.tipo] || esc(m.tipo)}</td><td>${esc(m.nota || "—")}</td><td>${esc(m.cliente || m.motivo || "")}</td><td>${esc(vend(m))}</td><td>${esc(m.usuario || "")}</td><td>${esc(FORMAL[m.forma] || m.forma || "")}</td><td class="n">${brl(m.assinado)}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Sem movimentos.</td></tr>'}
   ${Object.entries(R.por_forma).map(([f, v]) => `<tr class="sep"><th colspan="7">Total ${esc(FORMAL[f] || f)}</th><th class="n">${brl(v)}</th></tr>`).join("")}
