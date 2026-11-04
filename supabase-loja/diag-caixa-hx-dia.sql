@@ -23,3 +23,7 @@ from pg_proc p where p.pronamespace = 'public'::regnamespace
 order by 1;
 -- 7) Já migrado?
 select to_regprocedure('public.caixa_dia_visivel(smallint,date)') is not null as hx_migration_ja_rodou;
+-- 8) Chave (se já migrado) e funções novas
+select to_regclass('public.caixa_config') is not null as caixa_config_existe,
+       to_regprocedure('public.caixa_hx_dia(date)') is not null as caixa_hx_dia_existe;
+select pg_get_constraintdef(oid) as kinds from pg_constraint where conname = 'security_events_kind_check';

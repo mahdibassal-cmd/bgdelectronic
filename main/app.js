@@ -201,6 +201,9 @@ if (!MOCK && !CONFIGURED) {
     async caixaSaldos() { return ok(await sb.from("v_caixa_saldo").select("*").order("caixa_id")); },
     async caixaExtrato(d) { return ok(await sb.from("v_caixa_extrato").select("*").eq("data", d).order("created_at")); },
     async caixaResumo(c, d) { return ok(await sb.rpc("caixa_resumo", { p_caixa: c, p_data: d })); },
+    async caixaHxDia(d) { return ok(await sb.rpc("caixa_hx_dia", { p_data: d })); },
+    async hxConfig() { return ok(await sb.rpc("caixa_hx_config")); },
+    async hxConfigSet(on) { return ok(await sb.rpc("caixa_hx_config_set", { p_on: on })); },
     async caixaSessoes(d) { return ok(await sb.from("caixa_sessoes").select("*").eq("data", d)); },
     async caixaLancar(m) { ok(await sb.from("caixa_movimentos").insert(m)); },
     async estornarMov(mid, m, cn) { const r = await sb.rpc("estornar_movimento_caixa", { p_mov: mid, p_motivo: m, p_cancelar_nota: !!cn }); if (r.error && /PGRST202|42883|estornar_movimento_caixa/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Estornar movimento de caixa ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
@@ -273,7 +276,7 @@ if (!MOCK && !CONFIGURED) {
   const recebido = cid => RC.filter(r => r.cliente_id === cid).reduce((a, r) => a + r.valor, 0);
   const pago = k => CPG.filter(p => p.conta_id === k).reduce((a, p) => a + p.valor, 0);
   const vis = () => role === "admin" ? N : role === "vendedor" ? N.filter(n => n.handle === meU.handle) : [];
-  const hxR = c => role !== "admin" && /HX/.test((CX.find(x => x.caixa_id === c) || {}).nome || ""); /* espelha caixa_dia_visivel no servidor */
+  let HXP = false; const hxR = c => role !== "admin" && !HXP && /HX/.test((CX.find(x => x.caixa_id === c) || {}).nome || ""); /* espelha caixa_dia_visivel no servidor */
   const mvV = () => MV.filter(m => !(hxR(m.caixa_id) && m.data < today()));
   const saldo = c => mvV().filter(m => m.caixa_id === c).reduce((a, m) => a + sv(m), 0);
   const needCx = () => { if (role === "vendedor") throw new Error("Sem permissão de caixa"); };
@@ -376,6 +379,9 @@ if (!MOCK && !CONFIGURED) {
       const pf = {}; mv.forEach(m => pf[m.forma] = (pf[m.forma] || 0) + m.assinado); const s = SE.find(x => x.caixa_id === c && x.data === d);
       return { caixa: cx.nome, data: d, saldo_inicial: ini, saldo_final: ini + mv.reduce((a, m) => a + m.assinado, 0), sessao: s ? { abertura_valor: s.abertura_valor, aberto_por: meU.nome, aberto_em: new Date(s.aberto_em).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }), fechamento_contado: s.fechamento_contado ?? null, diferenca: s.diferenca ?? null } : null,
         movimentos: mv, por_forma: pf, entradas: mv.filter(m => m.assinado > 0).reduce((a, m) => a + m.valor, 0), saidas: mv.filter(m => m.assinado < 0).reduce((a, m) => a + m.valor, 0) }; },
+    async caixaHxDia(d) { if (role !== "admin") throw new Error("Somente admin"); const c = CX.find(x => /HX/.test(x.nome)).caixa_id, r = await api.caixaResumo(c, d); return { ...r, caixa_id: c, total_dia: r.movimentos.reduce((a, m) => a + m.assinado, 0) }; },
+    async hxConfig() { if (role !== "admin") throw new Error("Somente admin"); return { hx_fin_ve_passado: HXP }; },
+    async hxConfigSet(on) { if (role !== "admin") throw new Error("Somente admin"); const m = HXP !== on; HXP = on; return { hx_fin_ve_passado: on, mudou: m }; },
     async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d && !(hxR(x.caixa_id) && d < today())); },
     async estornarMov(mid, m, cn) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar movimento de caixa"); if (!m || m.trim().length < 3) throw new Error("Informe o motivo do estorno"); const o = MV.find(x => x.id === mid); if (!o) throw new Error("Movimento não encontrado");
       const e = MV.find(x => x.estorno_de === mid); if (e) return { ja_estornado: true, estorno_id: e.id }; if (o.estorno_de || o.tipo === "estorno") throw new Error("Este movimento já é um estorno");
@@ -442,12 +448,12 @@ async function boot() {
   go(location.hash.slice(1) || (can("vendas") ? "nota" : "caixa"));
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin", imei: "financas", caixa: "caixa" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin", hxdia: "admin", imei: "financas", caixa: "caixa" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : "seguranca";
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, imei: viewImei }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, imei: viewImei }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -901,8 +907,8 @@ async function viewCaixa(d = today()) {
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" };
   const ses = c => SE.find(x => x.caixa_id === c.caixa_id);
   const fin = me.role === "admin" || me.role === "financeiro", adm = me.role === "admin";
-  const hxN = c => !adm && /HX/.test(c.nome || "") ? `<small class="muted">Dias anteriores visíveis só para admin${hoje ? " · saldo = movimento de hoje" : ""}</small>` : "";
-  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small><b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>
+  const isHX = c => /HX/.test(c.nome || ""), hxN = c => isHX(c) ? `<small class="muted">Diário (hoje)${adm ? ' · <a href="#hxdia" class="hxl">HX por dia</a>' : " · dias anteriores só admin"}</small>` : "";
+  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small>${isHX(c) ? `<b>${brl(c.movimento_hoje)}</b><small>Total de hoje</small>` : `<b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>`}
     <small>${x ? (x.fechado_em ? `Fechado: contado ${brl(x.fechamento_contado)} · diferença <b class="${+x.diferenca ? "warn" : ""}">${brl(x.diferenca)}</b>` : `Aberto ${hm(x.aberto_em)} com ${brl(x.abertura_valor)}`) : "Não aberto hoje"}</small>
     ${hoje ? `<div class="noprint cxa">${!x ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="va"><button class="btn ghost ab" data-c="${c.caixa_id}">Abrir</button>` : !x.fechado_em ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="vf"><button class="btn ghost fe" data-c="${c.caixa_id}">Fechar</button>` : ""}</div>` : ""}</div>`; };
   const tot = EX.reduce((a, m) => a + Number(m.valor_assinado), 0);
@@ -918,6 +924,7 @@ async function viewCaixa(d = today()) {
   ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Sem movimentos.</td></tr>'}
   ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="5">${esc(c.nome)} — movimento do dia</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
   <tr class="tot"><th colspan="5">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div></div>`;
+  document.querySelectorAll(".hxl").forEach(a => a.onclick = ev => { ev.preventDefault(); go("hxdia"); });
   document.querySelectorAll(".emv").forEach(b => b.onclick = () => estornarMovBox(EX.find(m => m.id === +b.dataset.m), () => viewCaixa(d)));
   $("#d").onchange = e => viewCaixa(e.target.value); $("#pe").onclick = () => window.print();
   document.querySelectorAll(".so").forEach(b => b.onclick = () => viewResumo(d, +b.dataset.c, true));
@@ -1054,6 +1061,24 @@ async function viewResumo(d = today(), c = null, back = false) {
       ...Object.entries(R.por_forma).map(([f, v]) => ["Total " + (FORMAL[f] || f), n(v)]), ["Fechamento contado", s && s.fechamento_contado != null ? n(s.fechamento_contado) : ""], ["Saldo final", n(R.saldo_final)]];
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `resumo-${R.caixa.replace(/[^\w]+/g, "-").toLowerCase()}-${d}.csv`; a.click(); };
+}
+// ---------- HX por dia (SOMENTE ADMIN; servidor confere em caixa_hx_dia) ----------
+async function viewHxDia(d = today()) {
+  if (me.role !== "admin") { app.innerHTML = '<div class="card"><h2>Sem acesso</h2><p class="muted">Somente admin.</p></div>'; return; }
+  const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" }, dd = d.split("-").reverse().join("/");
+  let R, C; try { [R, C] = await Promise.all([api.caixaHxDia(d), api.hxConfig().catch(() => null)]); } catch (e) { app.innerHTML = `<div class="card"><h2>HX por dia</h2><p class="warn">${esc(/caixa_hx_dia|PGRST202|42883/.test(e.message) ? "Falta rodar a atualização do banco (migration-caixa-hx-dia)." : e.message)}</p></div>`; return; }
+  app.innerHTML = `<div class="card"><h2>HX por dia — ${esc(R.caixa)} · ${esc(dd)} <button class="btn noprint" id="pr" style="float:right;margin:0">Imprimir</button></h2>
+  <label class="noprint">Data (horário de São Paulo)</label><input id="hd" class="noprint" type="date" value="${d}" style="max-width:200px">
+  <div class="grid" style="margin-top:12px"><div class="kpi"><small>Total do dia</small><b>${brl(R.total_dia)}</b></div>
+    <div class="kpi"><small>Entradas</small><b>${brl(R.entradas)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(R.saidas)}</b></div>
+    <div class="kpi"><small>Saldo final (acumulado)</small><b>${brl(R.saldo_final)}</b></div></div></div>
+  <div class="card"><h2>Movimentos</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Nota nº</th><th>Cliente / motivo</th><th>Lançada por</th><th class="n">Valor</th></tr>
+  ${R.movimentos.map(m => `<tr><td>${esc(m.hora)}</td><td>${TL[m.tipo] || esc(m.tipo)}</td><td>${esc(m.nota || "—")}</td><td>${esc(m.cliente || m.motivo || "")}</td><td>${esc(m.usuario || "")}</td><td class="n">${brl(m.assinado)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Sem movimentos.</td></tr>'}
+  <tr class="tot"><th colspan="5">TOTAL DO DIA</th><th class="n">${brl(R.total_dia)}</th></tr></table></div>
+  ${C ? `<div class="card noprint"><h2>Configuração</h2><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="hxp" ${C.hx_fin_ve_passado ? "checked" : ""} style="width:auto"> Financeiro vê dias anteriores no Caixa HX</label>
+  <p class="muted">Desligado (padrão): o financeiro vê só o dia de hoje no HX. Cada mudança fica registrada em Segurança.</p></div>` : ""}`;
+  $("#hd").onchange = e => viewHxDia(e.target.value); $("#pr").onclick = () => window.print();
+  if ($("#hxp")) $("#hxp").onchange = async e => { try { await api.hxConfigSet(e.target.checked); toast(e.target.checked ? "Financeiro agora vê dias anteriores do HX" : "Financeiro vê só hoje no HX"); } catch (x) { e.target.checked = !e.target.checked; toast(x.message); } };
 }
 // ---------- Caixa Geral: crédito de cliente (entradas e usos; saldo calculado no banco) ----------
 async function viewCaixaGeral(sel) {

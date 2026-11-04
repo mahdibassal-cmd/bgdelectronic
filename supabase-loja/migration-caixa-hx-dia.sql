@@ -9,8 +9,41 @@
 -- Saldo do HX para o financeiro = só o movimento de hoje (nada carregado de dias anteriores).
 -- Sessão do HX (abrir/fechar): 'sistema' = movimento de hoje (para todos), assim a diferença do
 -- fechamento não revela o saldo acumulado.
--- Outros caixas: sem mudança. security_events: sem mudança (28 tipos mantidos).
+-- Chave admin 'Financeiro vê dias anteriores no Caixa HX' (caixa_config.hx_fin_ve_passado, padrão OFF).
+--   ON -> financeiro vê dias anteriores do HX (RLS, caixa_resumo, notas_lancar_financas, abrir/fechar).
+--   Muda só via caixa_hx_config_set (admin), log security_events 'caixa_hx_config'.
+-- caixa_hx_dia(p_data): SOMENTE ADMIN — total e movimentos do HX em qualquer data (página 'HX por dia').
+-- Outros caixas: sem mudança. security_events: 28 tipos + 'caixa_hx_config' = 29.
 -- =====================================================================
+
+-- ---------- Log: 28 tipos existentes + 1 novo ----------
+do $$ begin
+  if to_regclass('public.security_events') is not null then
+    alter table public.security_events drop constraint if exists security_events_kind_check;
+    alter table public.security_events add constraint security_events_kind_check check (kind in (
+      'failed_login','role_change','admin_added','profile_added','profile_removed','lock','unlock','signout_all',
+      'fin_pagamento','fin_recebimento','fin_alteracao',
+      'credito_entrada','credito_uso','credito_excedente','nota_lancada',
+      'estorno_recebimento','estorno_credito',
+      'dep_esp_entrada','dep_esp_ajuste','dep_esp_transferencia',
+      'nota_prazo_lancada','nota_dispensada','nota_dispensa_desfeita',
+      'nota_cancelada_financas','nota_pag_corrigido',
+      'compra_imei_registrado','compra_imei_removido',
+      'caixa_mov_estornado',
+      'caixa_hx_config')) not valid;
+  end if;
+end $$;
+
+-- ---------- Configuração (1 linha) ----------
+create table if not exists public.caixa_config (
+  id                boolean primary key default true check (id),
+  hx_fin_ve_passado boolean not null default false,
+  updated_at        timestamptz not null default now(),
+  updated_by        uuid references public.profiles(id)
+);
+insert into public.caixa_config(id) values (true) on conflict (id) do nothing;
+alter table public.caixa_config enable row level security;
+revoke all on public.caixa_config from anon, public, authenticated;   -- leitura/escrita só via RPC
 
 -- ---------- Helpers ----------
 create or replace function public.caixa_hx_id() returns smallint
@@ -23,7 +56,8 @@ $$;
 -- true = este caixa é o HX e quem consulta NÃO é admin.
 create or replace function public.caixa_hx_restrito(p_caixa smallint) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select p_caixa is not distinct from public.caixa_hx_id() and not public.has_perm('admin');
+  select p_caixa is not distinct from public.caixa_hx_id() and not public.has_perm('admin')
+     and not coalesce((select hx_fin_ve_passado from public.caixa_config where id), false);
 $$;
 
 -- true = pode ver este caixa nesta data.
@@ -58,7 +92,9 @@ language sql stable security definer set search_path = '' as $$
   select coalesce(sum(case when tipo in ('venda','entrada') then valor else -valor end), 0)
   from public.caixa_movimentos
   where caixa_id = p_caixa
-    and (p_caixa is distinct from public.caixa_hx_id() or data = (now() at time zone 'America/Sao_Paulo')::date);
+    and (p_caixa is distinct from public.caixa_hx_id()
+         or coalesce((select hx_fin_ve_passado from public.caixa_config where id), false)
+         or data = (now() at time zone 'America/Sao_Paulo')::date);
 $$;
 revoke all on function public.caixa_saldo_calc(smallint) from public, anon, authenticated;
 
@@ -136,5 +172,46 @@ grant execute on function public.notas_lancar_financas(int) to authenticated;
 
 -- estornar_movimento_caixa / lancar_nota_caixa / cancelar_nota_financas: não devolvem extrato nem saldo
 -- (estornar é só admin). Sem mudança.
+
+-- ---------- Chave admin ----------
+create or replace function public.caixa_hx_config() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.can('admin') then raise exception 'Somente admin' using errcode = '42501'; end if;
+  return (select jsonb_build_object('hx_fin_ve_passado', c.hx_fin_ve_passado, 'updated_at', c.updated_at, 'updated_by', p.handle)
+            from public.caixa_config c left join public.profiles p on p.id = c.updated_by where c.id);
+end $$;
+create or replace function public.caixa_hx_config_set(p_on boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_old boolean;
+begin
+  if not public.can('admin') then raise exception 'Somente admin' using errcode = '42501'; end if;
+  if p_on is null then raise exception 'Valor inválido' using errcode = 'P0001'; end if;
+  insert into public.caixa_config(id) values (true) on conflict (id) do nothing;
+  select hx_fin_ve_passado into v_old from public.caixa_config where id for update;
+  if v_old is distinct from p_on then
+    update public.caixa_config set hx_fin_ve_passado = p_on, updated_at = now(), updated_by = auth.uid() where id;
+    perform public.fin_log('caixa_hx_config', jsonb_build_object('hx_fin_ve_passado', p_on, 'antes', v_old));
+  end if;
+  return jsonb_build_object('hx_fin_ve_passado', p_on, 'mudou', v_old is distinct from p_on);
+end $$;
+revoke all on function public.caixa_hx_config(), public.caixa_hx_config_set(boolean) from public, anon;
+grant execute on function public.caixa_hx_config(), public.caixa_hx_config_set(boolean) to authenticated;
+
+-- ---------- HX por dia (SOMENTE ADMIN) ----------
+create or replace function public.caixa_hx_dia(p_data date) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v jsonb; v_hx smallint := public.caixa_hx_id();
+begin
+  if not public.can('admin') then raise exception 'Somente admin' using errcode = '42501'; end if;
+  if p_data is null then raise exception 'Informe a data' using errcode = 'P0001'; end if;
+  if v_hx is null then raise exception 'Caixa HX não encontrado' using errcode = 'P0001'; end if;
+  v := public.caixa_resumo(v_hx, p_data);   -- admin: sem restrição
+  return v || jsonb_build_object('caixa_id', v_hx,
+    'total_dia', coalesce((select sum(case when tipo in ('venda','entrada') then valor else -valor end)
+                             from public.caixa_movimentos where caixa_id = v_hx and data = p_data), 0));
+end $$;
+revoke all on function public.caixa_hx_dia(date) from public, anon;
+grant execute on function public.caixa_hx_dia(date) to authenticated;
 
 select 'caixa_hx_dia ok' as status, public.caixa_hx_id() as hx_caixa_id;
