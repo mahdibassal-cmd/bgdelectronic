@@ -1,8 +1,11 @@
 /* Código de indicação: campo opcional ao lado dos botões de compra e em todo contato via WhatsApp. */
 (function(){
   var KEY='bgd_ref_code', NUM=(typeof WHATSAPP_NUMBER!=='undefined'?String(WHATSAPP_NUMBER):'5511992873509').replace(/\D/g,'');
-  function get(){try{return (localStorage.getItem(KEY)||'').trim()}catch(e){return ''}}
-  function set(v){try{localStorage.setItem(KEY,v.trim())}catch(e){}}
+  var TTL=30*864e5;
+  function clean(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20)}
+  function get(){try{var t=+localStorage.getItem(KEY+'_t')||0;if(t&&Date.now()-t>TTL){localStorage.removeItem(KEY);localStorage.removeItem(KEY+'_t');return ''}return (localStorage.getItem(KEY)||'').trim()}catch(e){return ''}}
+  function set(v,url){try{v=v.trim();localStorage.setItem(KEY,v);if(url)localStorage.setItem(KEY+'_t',String(Date.now()));else localStorage.removeItem(KEY+'_t')}catch(e){}}
+  try{var qp=new URLSearchParams(location.search),qv=clean(qp.get('ref')||qp.get('indicacao')||qp.get('cupom'));if(qv)set(qv,1);}catch(e){}
   function tag(t){var c=get();return c&&!/Código de indicação/.test(t)?t+'\nCódigo de indicação: '+c:t;}
   window.BGDRef={get:get,tag:tag};
   var st=document.createElement('style');st.textContent='.refbox{width:100%;margin:4px 0 6px;flex:0 0 auto}.refbox input[type=text]{display:block;width:100%;box-sizing:border-box;height:38px;margin:0;padding:0 12px;text-overflow:ellipsis;background:transparent;color:inherit;font:inherit;font-size:13px;letter-spacing:.02em;text-align:inherit;border:1px solid var(--line2,var(--line,rgba(0,0,0,.14)));border-radius:var(--ref-r,999px);box-shadow:none;outline:none;transition:border-color .2s,box-shadow .2s}.refbox input[type=text]::placeholder{color:var(--muted,var(--dim,#8a8a8a));opacity:.85;letter-spacing:0}.refbox input[type=text]:focus{border-color:var(--gold,currentColor);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold,#888) 14%,transparent)}.refbox.solo{max-width:420px;margin:18px auto;padding:0 16px}';

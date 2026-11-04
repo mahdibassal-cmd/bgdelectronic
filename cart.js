@@ -31,6 +31,7 @@
     if (c.length === 8) { var w = cepInfo[c]; L.push('CEP: ' + c.slice(0, 5) + '-' + c.slice(5) + (w ? ' (' + (w.city ? w.city + '/' : '') + w.state + ')' : '')); }
     L.push('Código do pedido: ' + txid());
     L.push('Pagamento: PIX, débito ou crédito em até 12x — aguardo o link/frete');
+    var rc = window.BGDRef && BGDRef.get(); if (rc) L.push('Código de indicação: ' + rc);
     return L.join('\n');
   }
 
