@@ -902,6 +902,7 @@ function estornarMovBox(m, after) { if (!m) return; const nota = m.tipo === "ven
     y.disabled = true; try { const r = await api.estornarMov(m.id, mot, cn); o.remove(); toast(r && r.ja_estornado ? "Já estava estornado" : cn ? `Estornado ✓ nota ${nn} cancelada` : nota ? `Estornado ✓ nota ${nn} voltou para lançar` : "Movimento estornado ✓"); after && after(); }
     catch (e) { w.textContent = e.message; y.disabled = false; } }; }
 async function viewCaixa(d = today()) {
+  if (!can("caixa") || me.role === "vendedor") return go("nota"); /* vendedor: sem caixa (o banco também recusa) */
   const [SA, EX, SE] = await Promise.all([api.caixaSaldos(), api.caixaExtrato(d), api.caixaSessoes(d)]), hoje = d === today();
   const TZ = "America/Sao_Paulo", hm = t => new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" };

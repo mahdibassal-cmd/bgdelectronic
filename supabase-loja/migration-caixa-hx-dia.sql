@@ -13,6 +13,11 @@
 --   ON -> financeiro vê dias anteriores do HX (RLS, caixa_resumo, notas_lancar_financas, abrir/fechar).
 --   Muda só via caixa_hx_config_set (admin), log security_events 'caixa_hx_config'.
 -- caixa_hx_dia(p_data): SOMENTE ADMIN — total e movimentos do HX em qualquer data (página 'HX por dia').
+-- VENDEDOR: NENHUM acesso a caixa (antes já não tinha: role_perms vendedor = só 'vendas' e tudo de caixa
+--   exige can('caixa')). Agora travado no banco: role_perms não aceita vendedor+caixa/financas/admin e as
+--   policies/RPCs de caixa exigem caixa_acesso() (can('caixa') E papel <> vendedor). Notas continuam salvando:
+--   criar_nota/lancar_nota_caixa são SECURITY DEFINER e não precisam de leitura de caixa pelo vendedor.
+--   Local do pagamento na nota é lista fixa (MAQUINA/HX/DINHEIRO/CAIXA GERAL) — não lê a tabela caixas.
 -- Outros caixas: sem mudança. security_events: 28 tipos + 'caixa_hx_config' = 29.
 -- =====================================================================
 
@@ -45,6 +50,26 @@ insert into public.caixa_config(id) values (true) on conflict (id) do nothing;
 alter table public.caixa_config enable row level security;
 revoke all on public.caixa_config from anon, public, authenticated;   -- leitura/escrita só via RPC
 
+-- ---------- Vendedor sem caixa ----------
+delete from public.role_perms where role::text = 'vendedor' and perm in ('caixa','financas','admin');
+alter table public.role_perms drop constraint if exists role_perms_vendedor_sem_caixa;
+alter table public.role_perms add constraint role_perms_vendedor_sem_caixa
+  check (not (role::text = 'vendedor' and perm in ('caixa','financas','admin')));
+
+create or replace function public.caixa_acesso() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.can('caixa')
+     and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.role::text = 'vendedor');
+$$;
+revoke all on function public.caixa_acesso() from public, anon;
+grant execute on function public.caixa_acesso() to authenticated;
+
+drop policy if exists caixas_read on public.caixas;
+create policy caixas_read on public.caixas for select to authenticated using (public.caixa_acesso());
+drop policy if exists mov_manual_insert on public.caixa_movimentos;
+create policy mov_manual_insert on public.caixa_movimentos for insert to authenticated
+  with check (public.caixa_acesso() and tipo in ('entrada','saida') and nota_id is null);
+
 -- ---------- Helpers ----------
 create or replace function public.caixa_hx_id() returns smallint
 language sql stable security definer set search_path = '' as $$
@@ -72,10 +97,10 @@ grant execute on function public.caixa_hx_id(), public.caixa_hx_restrito(smallin
 -- ---------- RLS (views security_invoker herdam: v_caixa_saldo, v_caixa_extrato) ----------
 drop policy if exists mov_read on public.caixa_movimentos;
 create policy mov_read on public.caixa_movimentos for select to authenticated
-  using (public.can('caixa') and public.caixa_dia_visivel(caixa_id, data));
+  using (public.caixa_acesso() and public.caixa_dia_visivel(caixa_id, data));
 drop policy if exists sessoes_read on public.caixa_sessoes;
 create policy sessoes_read on public.caixa_sessoes for select to authenticated
-  using (public.can('caixa') and public.caixa_dia_visivel(caixa_id, data));
+  using (public.caixa_acesso() and public.caixa_dia_visivel(caixa_id, data));
 -- cliente_recebimentos / conta_pagamentos NÃO são filtrados: v_clientes_saldo e v_contas_pagar somam
 -- esses registros (security_invoker) e filtrar quebraria a dívida dos clientes e o saldo das contas.
 
@@ -98,12 +123,38 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.caixa_saldo_calc(smallint) from public, anon, authenticated;
 
+-- ---------- Abrir / fechar: vendedor nunca ----------
+create or replace function public.caixa_abrir(p_caixa smallint, p_valor numeric, p_obs text default null)
+returns bigint language plpgsql security definer set search_path = '' as $$
+declare v_id bigint;
+begin
+  if not public.caixa_acesso() then raise exception 'Sem permissão de caixa' using errcode = '42501'; end if;
+  insert into public.caixa_sessoes(caixa_id, abertura_valor, abertura_sistema, aberto_por, obs)
+  values (p_caixa, p_valor, public.caixa_saldo_calc(p_caixa), auth.uid(), p_obs) returning id into v_id;
+  return v_id;
+exception when unique_violation then raise exception 'Caixa já aberto hoje' using errcode = 'P0001';
+end $$;
+create or replace function public.caixa_fechar(p_caixa smallint, p_contado numeric, p_obs text default null)
+returns numeric language plpgsql security definer set search_path = '' as $$
+declare v_sis numeric; v_dif numeric;
+begin
+  if not public.caixa_acesso() then raise exception 'Sem permissão de caixa' using errcode = '42501'; end if;
+  v_sis := public.caixa_saldo_calc(p_caixa); v_dif := p_contado - v_sis;
+  update public.caixa_sessoes set fechamento_contado = p_contado, fechamento_sistema = v_sis, diferenca = v_dif,
+         fechado_por = auth.uid(), fechado_em = now(), obs = coalesce(p_obs, obs)
+   where caixa_id = p_caixa and data = (now() at time zone 'America/Sao_Paulo')::date and fechado_em is null;
+  if not found then raise exception 'Caixa não está aberto hoje (ou já foi fechado)' using errcode = 'P0001'; end if;
+  return v_dif;
+end $$;
+revoke all on function public.caixa_abrir(smallint, numeric, text), public.caixa_fechar(smallint, numeric, text) from public, anon;
+grant execute on function public.caixa_abrir(smallint, numeric, text), public.caixa_fechar(smallint, numeric, text) to authenticated;
+
 -- ---------- Resumo do dia (security definer: checagem explícita) ----------
 create or replace function public.caixa_resumo(p_caixa smallint, p_data date) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v jsonb; v_ini numeric; v_fim numeric;
 begin
-  if not (public.can('caixa') and (public.has_perm('admin') or public.has_perm('financas'))) then
+  if not (public.caixa_acesso() and (public.has_perm('admin') or public.has_perm('financas'))) then
     raise exception 'Sem permissão (admin/financeiro)' using errcode = '42501'; end if;
   -- Caixa HX: não-admin só vê o dia de hoje (SP) e sem saldo carregado de dias anteriores.
   if not public.caixa_dia_visivel(p_caixa, p_data) then
