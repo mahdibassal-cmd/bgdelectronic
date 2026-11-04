@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'">
 <script src="/theme-mode.js?v=20261103d"></script>
 <title>Sistema - BAGDA STORES</title>
-<link rel="stylesheet" href="loja.css?v=20261103zb">
+<link rel="stylesheet" href="loja.css?v=20261104d">
 </head>
 <body>
 <header class="top">
@@ -16,7 +16,7 @@
   <nav id="nav" hidden>
     <button data-v="nota" data-p="vendas">Nova nota</button>
     <button data-v="notas" data-p="vendas">Notas</button>
-    <button data-v="estoque" data-p="vendas">Estoque</button>
+    <button data-v="estoque" data-p="vendas|estoque">Estoque</button>
     <button data-v="caixa" data-p="caixa">Caixa</button>
     <button data-v="lancar" data-p="financas">Notas a lançar</button>
     <button data-v="caixageral" data-p="financas">Caixa Geral</button>
@@ -27,9 +27,9 @@
     <button data-v="pagar" data-p="financas">Contas a pagar</button>
     <button data-v="relatorio" data-p="admin">Relatório</button>
     <button data-v="compras" data-p="admin">Compras</button>
-    <button data-v="imei" data-p="financas">Compras &amp; IMEI</button>
+    <button data-v="imei" data-p="financas|estoque">Compras &amp; IMEI</button>
     <button data-v="produtos" data-p="admin">Produtos</button>
-    <button data-v="depesp" data-p="admin">Depósito Especial</button>
+    <button data-v="depesp" data-p="admin|estoque">Depósito Especial</button>
     <button data-v="hxdia" data-p="admin">HX por dia</button>
     <button data-v="usuarios" data-p="admin">Usuários</button>
     <button data-v="seguranca">Segurança</button>
@@ -44,6 +44,6 @@
 <script src="/switcher.js?v=20261103c"></script>
 <script src="/usuarios.js?v=20261103r"></script>
 <script src="config.js?v=20261103r"></script>
-<script src="app.js?v=20261104c"></script>
+<script src="app.js?v=20261104d"></script>
 </body>
 </html>

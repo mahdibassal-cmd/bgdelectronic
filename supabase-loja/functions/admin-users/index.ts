@@ -11,7 +11,7 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // bagda-sistema (kiosk) usa o enum ('admin','seller'); bagda-loja usa ('admin','vendedor','financeiro').
 const KIOSK = URL_.includes("zoapljfhebbvbsrebtjt");
 const STORE = KIOSK ? "Kiosk" : "BAGDA STORES";
-const UI_ROLES = KIOSK ? ["vendedor", "admin"] : ["vendedor", "financeiro", "admin"];
+const UI_ROLES = KIOSK ? ["vendedor", "admin"] : ["vendedor", "financeiro", "estoque", "admin"];
 const toDb = (r: string) => (KIOSK && r === "vendedor" ? "seller" : r);
 const toUi = (r: string) => (KIOSK && r === "seller" ? "vendedor" : r);
 const BAN = "876000h"; // ~100 anos
