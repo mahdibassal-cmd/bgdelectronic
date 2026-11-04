@@ -739,12 +739,34 @@ async function viewImei(o = {}) {
   $("#cd").hidden = true; if (o.numero) await abrir(o.numero, o.nova);
 }
 const stB = x => x && x.status ? `<span class="badge ${x.status === "completo" ? "ok-b" : "pend-b"}">${x.status === "completo" ? "✓ completo" : `pendente${x.recebidos != null && (x.unidades ?? x.qtd) != null ? ` ${x.recebidos}/${x.unidades ?? x.qtd}` : ""}`}</span>` : "";
+const compraTxt = (D, usr) => { const W = rcW(), TZ = "America/Sao_Paulo", dt = D.created_at ? new Date(D.created_at) : null, E = "=".repeat(W), Dd = "-".repeat(W);
+  const tot = D.itens.reduce((a, i) => a + Number(i.total ?? i.qtd * i.custo_unit), 0), qt = D.itens.reduce((a, i) => a + Number(i.qtd), 0);
+  const L = [rcC("BAGDA STORES"), E, "COMPRAS",
+    rcL("Data emissao: " + (dt ? dt.toLocaleDateString("pt-BR", { timeZone: TZ }) : String(D.data || "").split("-").reverse().join("/")), dt ? dt.toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }) : ""),
+    "Numero...: " + D.numero, rcWrap("Usuario..: " + (D.usuario || usr || "-")), rcWrap("Fornec...: " + (D.fornecedor || "-")), "Deposito.: " + (D.deposito === "especial" ? "DEPOSITO ESPECIAL" : "LOJA"),
+    ...(D.observacao ? [rcWrap("Obs......: " + D.observacao)] : []), E,
+    "Codigo Produto / Variante", rc3("Qtd", "Preco unit", "Valor"), Dd,
+    ...D.itens.flatMap(i => [rcWrap([i.sku, i.marca, i.produto, i.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(i.qtd + " Un", rnum(i.custo_unit), rnum(i.total ?? i.qtd * i.custo_unit))]), Dd,
+    rcL("Itens: " + D.itens.length, "Unidades: " + qt), Dd,
+    rcL("Total:", rnum(tot)), rcL("Desc.:", rnum(D.desconto || 0)), rcL("TOTAL:", "R$ " + rnum(tot - Number(D.desconto || 0))), Dd,
+    rcWrap("Pago: " + (D.forma_pagamento || "NAO INFORMADO")), E, "", "", "Conferido: ____________________", "", "", "Responsavel: __________________", "", "", "", ".", ""];
+  return `<div class="recibo"><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 async function viewComprovante(n, nova) {
   if (me.role !== "admin") return viewImei();
   document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
   let D; try { D = await api.compraDetalhe(n); } catch (e) { app.innerHTML = `<div class="card"><p class="warn">${esc(e.message)}</p></div>`; return; }
+  app.innerHTML = `<div class="noprint" style="margin-bottom:12px">${nova ? `<p class="ok" style="color:#1a7f37"><b>✓ Compra ${esc(D.numero)} salva.</b></p>` : ""}<button class="btn gold" id="pr">🖨️ ${nova ? "Imprimir de novo" : "Imprimir"}</button> ${nova ? '<button class="btn ghost" id="cpn">Nova compra</button> ' : ""}<button class="btn ghost" id="cpi">${nova ? "Cadastrar IMEIs agora" : "Voltar para Compras &amp; IMEI"}</button> <button class="btn ghost" id="cpa">Versao A4</button></div>
+  ${compraTxt(D, D.usuario ? "" : (nova ? me.handle : ""))}`;
+  $("#pr").onclick = () => window.print(); $("#cpi").onclick = () => viewImei({ numero: D.numero, nova }); $("#cpa").onclick = () => viewComprovanteA4(D.numero);
+  if ($("#cpn")) $("#cpn").onclick = () => go("compras");
+  if (nova) setTimeout(() => window.print(), 350);
+}
+async function viewComprovanteA4(n, nova) {
+  if (me.role !== "admin") return viewImei();
+  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
+  let D; try { D = await api.compraDetalhe(n); } catch (e) { app.innerHTML = `<div class="card"><p class="warn">${esc(e.message)}</p></div>`; return; }
   const tot = D.itens.reduce((a, i) => a + Number(i.total ?? i.qtd * i.custo_unit), 0), un = D.itens.reduce((a, i) => a + +i.qtd, 0), dd = D.created_at ? new Date(D.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : String(D.data || "").split("-").reverse().join("/");
-  app.innerHTML = `<div class="card noprint">${nova ? `<p class="ok" style="color:#1a7f37"><b>✓ Compra ${esc(D.numero)} salva.</b> Imprima o comprovante abaixo.</p>` : ""}<button class="btn gold" id="cpp">Imprimir / Salvar PDF</button> ${nova ? '<button class="btn ghost" id="cpn">Nova compra</button> ' : ""}<button class="btn ghost" id="cpi">${nova ? "Cadastrar IMEIs agora" : "Voltar para Compras &amp; IMEI"}</button></div>
+  app.innerHTML = `<div class="card noprint">${nova ? `<p class="ok" style="color:#1a7f37"><b>✓ Compra ${esc(D.numero)} salva.</b> Imprima o comprovante abaixo.</p>` : ""}<button class="btn gold" id="cpp">Imprimir A4</button> <button class="btn ghost" id="cpt">Voltar ao cupom 80mm</button> ${nova ? '<button class="btn ghost" id="cpn">Nova compra</button> ' : ""}<button class="btn ghost" id="cpi">${nova ? "Cadastrar IMEIs agora" : "Voltar para Compras &amp; IMEI"}</button></div>
   <div class="cpa4"><div class="cph"><div><b class="cpl">BAGDA STORES</b><br><b class="cpt2">Comprovante de Compra</b></div><div class="cpn">Compra <b>${esc(D.numero)}</b><br>Data/hora: <b>${esc(dd)}</b></div></div>
   <table class="cpi2"><tr><td><b>Fornecedor:</b> ${esc(D.fornecedor || "—")}</td><td><b>Emitido em:</b> ${esc(new Date().toLocaleString("pt-BR"))} por ${esc(me.handle)}</td></tr>${D.observacao ? `<tr><td colspan="2"><b>Observação:</b> ${esc(D.observacao)}</td></tr>` : ""}</table>
   <table class="cpt"><thead><tr><th>#</th><th>SKU</th><th>Produto / variante</th><th class="n">Qtd</th><th class="n">Custo unit.</th><th class="n">Subtotal</th></tr></thead><tbody>
@@ -752,7 +774,7 @@ async function viewComprovante(n, nova) {
   <tfoot><tr><td colspan="3"><b>${D.itens.length}</b> item(ns)</td><td class="n"><b>${un}</b></td><td class="n">TOTAL</td><td class="n"><b>${brl(tot)}</b></td></tr></tfoot></table>
   <div class="cps"><div><span></span>Responsável pela compra</div><div><span></span>Conferido / recebido (estoque)</div><div><span></span>Fornecedor</div></div>
   <p class="cpf">Documento interno · não é nota fiscal · ${esc(D.numero)}</p></div>`;
-  $("#cpp").onclick = () => window.print(); $("#cpi").onclick = () => viewImei({ numero: D.numero, nova }); if ($("#cpn")) $("#cpn").onclick = () => go("compras");
+  $("#cpp").onclick = () => window.print(); $("#cpt").onclick = () => viewComprovante(D.numero); $("#cpi").onclick = () => viewImei({ numero: D.numero, nova }); if ($("#cpn")) $("#cpn").onclick = () => go("compras");
 }
 const DEPT = { entrada: "Entrada", ajuste: "Ajuste", para_loja: "→ Loja", da_loja: "← Loja" };
 async function viewDepEsp(o = {}) {
