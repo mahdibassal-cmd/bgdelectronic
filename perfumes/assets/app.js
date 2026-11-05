@@ -128,7 +128,7 @@ function card(p,extra,cls){
   var on=CMP.indexOf(p.id)>-1;
   return '<article class="card'+(p.soldOut?' sold':'')+(cls?' '+cls:'')+'" data-id="'+p.id+'" tabindex="0" aria-label="'+esc(p.brand+' '+p.name)+'">'+
    '<div class="ph"><img loading="lazy" decoding="async" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name+' '+p.size)+'" width="640" height="800">'+
-   (p.bf?'<span class="badge bf-badge">-50%</span>':(p.familyGroup?'<span class="badge">'+esc(p.familyGroup)+'</span>':''))+
+   (p.bf&&p.bfOff>0?'<span class="badge bf-badge">-'+p.bfOff+'%</span>':(p.familyGroup?'<span class="badge">'+esc(p.familyGroup)+'</span>':''))+
    '<button class="cmpbox'+(on?' on':'')+'" data-cmp="'+p.id+'" aria-label="Comparar" title="Comparar">'+(on?ICON.check:ICON.cmp)+'</button>'+
    (lowStock(p)?'<span class="lowb">Últimas unidades</span>':'')+(OFFICIAL[p.brand]?OFFB:'')+
    (p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+(extra||'')+'</div>'+
