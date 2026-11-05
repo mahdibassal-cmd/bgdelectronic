@@ -22,8 +22,8 @@ declare v_id bigint; it jsonb; pg jsonb; v_tot numeric := 0; v_pag numeric := 0;
 begin
   if not public.can('vendas') then raise exception 'Sem permissão para criar nota' using errcode = '42501'; end if;
   if v_frete < 0 then raise exception 'Frete inválido' using errcode = 'P0001'; end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 30
-     or (jsonb_array_length(p_items) = 0 and v_frete <= 0) then
+  -- Sem teto de linhas (MB 05/11/2026): não recolocar "> 30" aqui.
+  if jsonb_typeof(p_items) is distinct from 'array' or (jsonb_array_length(p_items) = 0 and v_frete <= 0) then
     raise exception 'Nota sem itens' using errcode = 'P0001'; end if;
   if jsonb_typeof(p_pagamentos) is distinct from 'array' or jsonb_array_length(p_pagamentos) = 0 or jsonb_array_length(p_pagamentos) > 5 then
     raise exception 'Informe a forma de pagamento' using errcode = 'P0001'; end if;

@@ -71,7 +71,8 @@ create or replace function public.criar_nota(p_forma public.pay_method, p_items 
 returns bigint language plpgsql security invoker set search_path = '' as $$
 declare v_id bigint; it jsonb;
 begin
-  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 30 then
+  -- Sem teto de linhas (MB 05/11/2026): não recolocar "> 30" aqui.
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'Nota sem itens' using errcode = 'P0001';
   end if;
   insert into public.notas(forma_pagamento, cliente) values (p_forma, nullif(trim(p_cliente), ''))
