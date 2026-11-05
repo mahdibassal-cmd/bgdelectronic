@@ -21,8 +21,8 @@ declare v_id bigint; it jsonb; v_frete numeric := round(coalesce(p_frete, 0), 2)
 begin
   if v_frete < 0 then raise exception 'Frete inválido' using errcode = 'P0001'; end if;
   if v_cx < 0 then raise exception 'Caxinha d Natal inválido' using errcode = 'P0001'; end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 30
-     or (jsonb_array_length(p_items) = 0 and v_frete <= 0 and v_cx <= 0) then
+  -- Sem teto de linhas (MB 05/11/2026). O "> 30" recusava carrinho grande como "Nota sem itens".
+  if jsonb_typeof(p_items) is distinct from 'array' or (jsonb_array_length(p_items) = 0 and v_frete <= 0 and v_cx <= 0) then
     raise exception 'Nota sem itens' using errcode = 'P0001';
   end if;
   insert into public.notas(forma_pagamento, cliente, frete, caxinha_natal) values (p_forma, nullif(trim(p_cliente), ''), v_frete, v_cx)

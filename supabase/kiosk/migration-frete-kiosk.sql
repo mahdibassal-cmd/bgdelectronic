@@ -18,8 +18,8 @@ returns bigint language plpgsql security invoker set search_path = '' as $$
 declare v_id bigint; it jsonb; v_frete numeric := round(coalesce(p_frete, 0), 2);
 begin
   if v_frete < 0 then raise exception 'Frete inválido' using errcode = 'P0001'; end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 30
-     or (jsonb_array_length(p_items) = 0 and v_frete <= 0) then
+  -- Sem teto de linhas (MB 05/11/2026): não recolocar "> 30" aqui.
+  if jsonb_typeof(p_items) is distinct from 'array' or (jsonb_array_length(p_items) = 0 and v_frete <= 0) then
     raise exception 'Nota sem itens' using errcode = 'P0001';
   end if;
   insert into public.notas(forma_pagamento, cliente, frete) values (p_forma, nullif(trim(p_cliente), ''), v_frete)

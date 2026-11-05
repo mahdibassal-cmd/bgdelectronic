@@ -24,8 +24,9 @@ begin
   if not public.can('vendas') then raise exception 'Sem permissão para criar nota' using errcode = '42501'; end if;
   if v_frete < 0 then raise exception 'Frete inválido' using errcode = 'P0001'; end if;
   if v_cx < 0 then raise exception 'Caxinha d Natal inválido' using errcode = 'P0001'; end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 30
-     or (jsonb_array_length(p_items) = 0 and v_frete <= 0 and v_cx <= 0) then
+  -- Sem teto de linhas (MB 05/11/2026). O "> 30" recusava um carrinho real (~45 linhas) com o mesmo
+  -- texto "Nota sem itens". Continua recusando array inválido e carrinho vazio quando frete e caxinha são 0.
+  if jsonb_typeof(p_items) is distinct from 'array' or (jsonb_array_length(p_items) = 0 and v_frete <= 0 and v_cx <= 0) then
     raise exception 'Nota sem itens' using errcode = 'P0001'; end if;
   if jsonb_typeof(p_pagamentos) is distinct from 'array' or jsonb_array_length(p_pagamentos) = 0 or jsonb_array_length(p_pagamentos) > 5 then
     raise exception 'Informe a forma de pagamento' using errcode = 'P0001'; end if;
