@@ -26,7 +26,7 @@ const err = async q => { try { await db.query(q); return null; } catch (e) { ret
 const one = async q => (await db.query(q)).rows[0];
 const num = async q => Number(Object.values(await one(q))[0]);
 const ui = fs.readFileSync(new URL("../../main/app.js", import.meta.url), "utf8");
-ok(/isAdm \? `<option value="cxesp" data-m="">CAIXA SPECIAL<\/option>` : ""/.test(ui), "UI option CAIXA SPECIAL only inside admin branch");
+ok(/isAdm \? `<option value="cxesp" data-m="dinheiro">Entrada dinheiro — CAIXA SPECIAL<\/option>` : ""/.test(ui), "UI option Entrada dinheiro — CAIXA SPECIAL is admin-only and cash");
 ok(ui.includes("migration-receber-caixa-especial.sql") && ui.includes("Nada foi lançado"), "UI names the SQL file when the RPC is missing");
 ok(ui.includes('sb.rpc("registrar_recebimento_credito"'), "ordinary receipt still calls registrar_recebimento_credito");
 ok(!/insert into public\.caixas[\s\S]{0,200}CAIXA SPECIAL/.test(S("migration-receber-caixa-especial.sql")), "migration does not insert a CAIXA SPECIAL caixa");
