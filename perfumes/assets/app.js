@@ -16,10 +16,10 @@ var ICON={
 var DATA=window.BAGDA_DATA, P=[], META={};
 var X=window.BAGDA_EXTRAS||{}; X.installments=X.installments||{max:12,noInterest:false}; X.products=X.products||{}; X.decants=X.decants||[]; X.bestSellers=X.bestSellers||[]; X.lowStockAt=X.lowStockAt||3;
 function ext(p){ return X.products[p.id]||{}; }
-function payLink(p){ var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
+function payLink(p){ return ""; /* BF preview: Getnet amounts mismatch new Por prices — Comprar via WhatsApp only */ }
 function lowStock(p){ var st=ext(p).stock; if(st==null) st=p.stock; return !p.soldOut&&typeof st==="number"&&st>0&&st<=X.lowStockAt; }
 function instText(p,long){ var n=X.installments.max||12; if(X.installments.noInterest) return (long?'ou ':'')+n+'x de '+money(p.price/n)+' sem juros'; return long?'ou em até '+n+'x no cartão':'em até '+n+'x no cartão'; }
-var OFFB='<span class="offb">✦ Distribuidor oficial</span>';
+var OFFB=''; /* BF preview: never show distribuidor oficial */
 function boot(d){
   DATA=d; META=d.meta; P=d.perfumes;
   P.forEach(function(p,i){
@@ -121,14 +121,14 @@ function inspTag(p){
 }
 function priceHTML(p){
   if(p.soldOut) return '<div class="price">Esgotado</div>';
-  return '<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div>';
+  return '<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s><span class="por-lab">Por </span>':'')+esc(p.priceLabel)+'</div>';
 }
 function soldWA(p,cls){ return '<a class="soldwa'+(cls?' '+cls:'')+'" href="'+waSold(p)+'" target="_blank" rel="noopener">'+ICON.wa+'<span>Esgotado · avise-me no WhatsApp</span></a>'; }
 function card(p,extra,cls){
   var on=CMP.indexOf(p.id)>-1;
   return '<article class="card'+(p.soldOut?' sold':'')+(cls?' '+cls:'')+'" data-id="'+p.id+'" tabindex="0" aria-label="'+esc(p.brand+' '+p.name)+'">'+
    '<div class="ph"><img loading="lazy" decoding="async" src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name+' '+p.size)+'" width="640" height="800">'+
-   (p.familyGroup?'<span class="badge">'+esc(p.familyGroup)+'</span>':'')+
+   (p.bf?'<span class="badge bf-badge">-50%</span>':(p.familyGroup?'<span class="badge">'+esc(p.familyGroup)+'</span>':''))+
    '<button class="cmpbox'+(on?' on':'')+'" data-cmp="'+p.id+'" aria-label="Comparar" title="Comparar">'+(on?ICON.check:ICON.cmp)+'</button>'+
    (lowStock(p)?'<span class="lowb">Últimas unidades</span>':'')+(OFFICIAL[p.brand]?OFFB:'')+
    (p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+(extra||'')+'</div>'+
@@ -170,7 +170,7 @@ function detail(p){
   var hasNotes=p.notes&&((p.notes.top||[]).length+(p.notes.heart||[]).length+(p.notes.base||[]).length)>0;
   var acc=(p.accords||[]).slice(0,6);
   var h='<div class="pd"><div class="pic"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'">'+(p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+'</div><div class="txt">';
-  h+='<span class="kicker">'+esc(p.brand)+'</span>'+(OFFICIAL[p.brand]?'<span class="offb inl">✦ Distribuidor oficial</span>':'')+'<h2>'+esc(p.name)+'</h2>';
+  h+='<span class="kicker">'+esc(p.brand)+'</span>'+''+'<h2>'+esc(p.name)+'</h2>';
   h+='<div class="tags">'+(p.familyGroup?'<span class="tag g">'+esc(p.familyGroup)+'</span>':'')+(p.gender?'<span class="tag">'+esc(p.gender)+'</span>':'')+'<span class="tag">'+p.ml+' ml</span>'+(p.soldOut?'<span class="tag">Esgotado</span>':'')+'</div>';
   if(p.inspiredBy) h+='<div class="inspbox"><div class="k">Inspiração olfativa</div><div class="v">'+esc(p.inspiredBy)+'</div></div>';
   else if(p.originalCreation) h+='<div class="inspbox"><div class="k">Assinatura própria</div><div class="v">Criação original '+esc(p.brand)+'</div></div>';

@@ -1,0 +1,49 @@
+/* Black Friday theme — BAGDA PERFUMES */
+:root{
+  --bf-black:#050505;
+  --bf-gold:#d4af37;
+  --bf-gold2:#f0d78c;
+  --bf-red:#c41e3a;
+}
+.bf-topbar{
+  display:block; text-align:center; padding:10px 14px;
+  background:linear-gradient(90deg,#000 0%,#1a1408 40%,#3a2a0a 50%,#1a1408 60%,#000 100%);
+  color:var(--bf-gold2); font-weight:700; letter-spacing:.04em; text-decoration:none;
+  border-bottom:1px solid rgba(212,175,55,.45);
+  font-family:system-ui,sans-serif; font-size:13px;
+}
+.bf-topbar:hover{ color:#fff; }
+.bf-banner{
+  margin:18px 0 8px; border:1px solid rgba(212,175,55,.55);
+  background:
+    radial-gradient(800px 200px at 10% 0%, rgba(212,175,55,.18), transparent 60%),
+    linear-gradient(180deg,#12100a,#050505);
+  border-radius:16px; padding:18px 20px;
+  box-shadow:0 10px 40px rgba(0,0,0,.45);
+}
+.bf-banner-inner{ display:flex; flex-direction:column; gap:6px; max-width:52ch; }
+.bf-kicker{
+  align-self:flex-start; font-size:11px; letter-spacing:.14em; font-weight:700;
+  color:#140f0a; background:var(--bf-gold); padding:4px 10px; border-radius:999px;
+  font-family:system-ui,sans-serif;
+}
+.bf-banner strong{
+  font-family:var(--serif),Georgia,serif; font-size:clamp(28px,5vw,42px);
+  background:linear-gradient(90deg,#f6ead4,#d4af37 45%,#f6ead4);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  letter-spacing:.02em;
+}
+.bf-banner p{ margin:0; color:rgba(255,255,255,.78); font-size:14px; line-height:1.45; }
+.bf-banner em{ color:var(--bf-gold2); font-style:normal; }
+.bf-hero-off{ color:var(--bf-gold2)!important; }
+.bf-strip{ padding:36px 0 10px; background:#000; border-top:1px solid rgba(212,175,55,.25); border-bottom:1px solid rgba(212,175,55,.25); }
+.bf-strip h2{ margin:6px 0 8px; }
+.badge.bf-badge{
+  background:linear-gradient(135deg,#c41e3a,#8b0000)!important;
+  color:#fff!important; border:0!important; font-weight:800; letter-spacing:.04em;
+  box-shadow:0 4px 14px rgba(196,30,58,.45);
+}
+.price s{ opacity:.65; margin-right:8px; font-size:.85em; }
+.price .por-lab{ color:var(--bf-gold2); font-size:.75em; margin-right:4px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+.card .price{ color:var(--bf-gold2); }
+body{ background:#050505; }
