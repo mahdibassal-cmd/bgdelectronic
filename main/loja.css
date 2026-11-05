@@ -1,9 +1,24 @@
 :root{--blue:#1747d6;--gold:#ff8a1f;--ink:#1a1a1a;--dim:#5b6475;--ln:rgba(30,40,70,.14);--soft:#f2f6ff;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 *{box-sizing:border-box}body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--soft)}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 20px;background:#fff;border-bottom:1px solid var(--ln)}
-.brand{font-weight:800;letter-spacing:.08em;color:var(--blue)}.brand span{color:var(--gold)}
-nav{display:flex;flex-wrap:wrap;gap:6px}nav button{border:1px solid var(--ln);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
-nav button.on{background:var(--blue);color:#fff;border-color:var(--blue)}#who{font-size:13px;color:var(--dim)}
+.top{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"brand who" "nav nav";gap:8px 12px;align-items:center;padding:12px 20px;background:#fff;border-bottom:1px solid var(--ln)}
+.brand{grid-area:brand;font-weight:800;letter-spacing:.08em;color:var(--blue)}.brand span{color:var(--gold)}
+nav{grid-area:nav;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start}
+.navg{display:flex;flex-direction:column;gap:4px;min-width:0;padding-left:10px;border-left:1px solid var(--ln)}
+.navg:first-child{padding-left:0;border-left:0}
+.ngh{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);line-height:1.2}
+.ngb{display:flex;flex-wrap:wrap;gap:6px}
+nav button{border:1px solid var(--ln);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+nav button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+nav button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#who{grid-area:who;justify-self:end;font-size:13px;color:var(--dim)}
+@media(max-width:720px){
+  nav{flex-direction:column;gap:12px}
+  .navg{border-left:0;padding-left:0;padding-top:8px;border-top:1px solid var(--ln)}
+  .navg:first-child{padding-top:0;border-top:0}
+}
+@media screen and (max-width:720px){
+  html[data-theme=dark] .navg{border-top-color:var(--ln)}
+}
 #mockbar{background:var(--gold);color:#fff;text-align:center;font-size:12px;font-weight:700;padding:4px;letter-spacing:.05em}
 main{max-width:1000px;margin:24px auto;padding:0 16px}
 .card{background:#fff;border:1px solid var(--ln);border-radius:14px;padding:20px;margin-bottom:16px}
@@ -66,6 +81,8 @@ html[data-theme=dark] .top{background:#17150f;border-bottom-color:var(--ln)}
 html[data-theme=dark] .brand{color:#e8c979}html[data-theme=dark] .brand span{color:#fff}
 html[data-theme=dark] nav button{background:#1d1a14;color:var(--ink)}
 html[data-theme=dark] nav button.on{background:#d6b46a;color:#111;border-color:#d6b46a}
+html[data-theme=dark] nav button:focus-visible{outline-color:#e8c979}
+html[data-theme=dark] .navg{border-left-color:var(--ln)}
 html[data-theme=dark] #mockbar{background:#7a5a1e}
 html[data-theme=dark] .card{background:#17150f;border-color:var(--ln)}
 html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#0f0e0c;color:var(--ink);border-color:rgba(214,180,106,.28)}
