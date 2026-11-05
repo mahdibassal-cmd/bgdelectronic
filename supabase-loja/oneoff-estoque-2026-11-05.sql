@@ -1,3 +1,7 @@
+-- SUPERSEDED - DO NOT RUN. Already applied 2026-11-05 via fix-hayati-cdn-liquidbrun-2026-11-05.sql
+-- (Hayati 13->2, PERF-008 +720 @155, PERF-150 Liquid Brun +48 @194). Running this would double the compras.
+do $$ begin raise exception 'SUPERSEDED: oneoff-estoque-2026-11-05.sql was already applied - do not run'; end $$;
+
 -- 05/11 MB (bagda-loja xvsxnicmpkvzzhkkqgam). Uma transação. NÃO rodar sem o "yes" do MB. Nunca "Run without RLS".
 -- 1) PERF-125 Hayati: estoque 13 -> 2 (erro da contagem 04/11). Custo NÃO muda. Log em estoque_contagem_log.
 -- 2) Compra PERF-008 Club de Nuit Intense Man: +720 @ 155,00 (insert em purchases; trigger purchase_ai soma estoque + product_costs).
