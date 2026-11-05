@@ -64,7 +64,7 @@ create table if not exists public.sales (
   id              bigint generated always as identity primary key,
   data            date not null default (now() at time zone 'America/Sao_Paulo')::date,
   sku             text not null references public.products(sku) on update cascade,
-  qtd             integer not null check (qtd > 0 and qtd <= 50),
+  qtd             integer not null check (qtd > 0 and qtd <= 9999),
   preco_tabela    numeric(10,2),                       -- preenchido pelo trigger
   preco_vendido   numeric(10,2) not null check (preco_vendido > 0),  -- OBRIGATÓRIO, vendedor digita
   forma_pagamento public.pay_method not null,
