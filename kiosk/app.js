@@ -299,7 +299,7 @@ async function viewVenda() {
   const P = (await api.products()).filter(p => p.ativo);
   app.innerHTML = `<div class="card"><h2>Nova venda</h2><form id="f">
   <label>Produto</label><select id="sku" required><option value="">Escolha…</option>${P.map(p => `<option value="${esc(p.sku)}" ${p.estoque < 1 ? "disabled" : ""}>${esc(p.sku)} · ${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")} — ${brl(p.preco_venda)} (${p.estoque} em estoque)</option>`).join("")}</select>
-  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="9999" step="1" value="1" required></div>
+  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" step="1" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div>
   <div><label>Forma de pagamento</label><select id="fp" required>${PAY.map(x => `<option>${x}</option>`).join("")}</select></div></div>
   <label>Observação (opcional)</label><input id="ob" maxlength="300">
@@ -481,7 +481,7 @@ async function viewNota() {
   app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
   <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter seleciona)" autofocus>
   <ul id="sug" class="sug"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
-  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="9999" step="1" value="1" required></div>
+  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" step="1" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>

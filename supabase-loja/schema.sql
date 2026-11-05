@@ -94,7 +94,7 @@ create table if not exists public.sales (
   nota_id       bigint not null references public.notas(id) on delete cascade,
   data          date not null default (now() at time zone 'America/Sao_Paulo')::date,
   sku           text not null references public.products(sku) on update cascade,
-  qtd           integer not null check (qtd > 0 and qtd <= 9999),
+  qtd           integer not null check (qtd > 0),
   preco_tabela  numeric(10,2),
   preco_vendido numeric(10,2) not null check (preco_vendido > 0),
   seller_id     uuid not null default auth.uid() references public.profiles(id),

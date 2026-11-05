@@ -845,7 +845,7 @@ async function viewNota() {
   app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
   <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter seleciona)" autofocus>
   <ul id="sug" class="sug"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
-  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" max="9999" step="1" value="1" required></div>
+  <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" step="1" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>
