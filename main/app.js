@@ -38,9 +38,9 @@ const app = $("#app");
 const banner = (ok, html) => { document.querySelectorAll(".nb").forEach(x => x.remove()); const d = document.createElement("div"); d.className = "nb noprint"; d.setAttribute("role", ok ? "status" : "alert"); d.style.cssText = `background:${ok ? "#15803d" : "#b91c1c"};color:#fff;padding:18px 20px;border-radius:12px;margin:0 0 14px;font-size:1.35em;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.25)`; d.innerHTML = html; app.prepend(d); d.scrollIntoView({ block: "start" }); return d; };
 const nidOk = n => Number.isInteger(+n) && +n > 0 && n !== null && n !== "";
 let notaSaving = false;
-const confirmNota = (items, total, pag) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+const confirmNota = (items, total, pag, frete = 0) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
   o.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;color:#111;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.35)"><h2 style="margin:0 0 12px">Confirmar nota</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}</table>
+  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}</table>
   <p style="font-size:1.4em;margin:14px 0 6px"><b>TOTAL: ${brl(total)}</b></p><p style="font-size:1.1em;margin:0 0 18px">Pagamento: <b>${pag}</b></p>
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
@@ -69,13 +69,14 @@ const rcC = (s, W = rcW()) => { s = asc(s).slice(0, W); return s.length >= W ? s
 const rcWrap = (s, W = rcW()) => { const o = []; let l = ""; for (const w of asc(s).split(/\s+/).filter(Boolean)) { if (!l) l = w; else if ((l + " " + w).length <= W) l += " " + w; else { o.push(l); l = w; } while (l.length > W) { o.push(l.slice(0, W)); l = l.slice(W); } } if (l) o.push(l); return o.join("\n"); };
 const rc3 = (a, b, c, W = rcW()) => { const cw = W >= 40 ? 13 : 11; a = asc(a); return a + " ".repeat(Math.max(1, W - 2 * cw - a.length)) + asc(b).padStart(cw) + asc(c).padStart(cw); };
 const rcEsc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
+const rcDot = (a, b, W = rcW()) => { a = asc(a); b = asc(b); const n = W - a.length - b.length - 2; return n >= 2 ? a + " " + ".".repeat(n) + " " + b : rcL(a, b, W); };
+const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.round(Number(h.frete || 0) * 100) / 100; const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
   const head = [rcC(store), rcC("bgdstores.com"), E].join("\n") + "\n";
   const L = ["PEDIDO DE VENDA", rcL("Data: " + dt.toLocaleDateString("pt-BR", { timeZone: TZ }), dt.toLocaleTimeString("pt-BR", { timeZone: TZ })),
     ...(h.cliente ? [rcWrap("Cliente: " + h.cliente)] : []), rcWrap("Vendedor: " + h.nome + " (" + h.handle + ")"), "Nota No.: " + String(nid).padStart(6, "0"), E,
     "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
     ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
-    rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot)), D,
+    rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), ...(fr > 0 ? [rcDot("FRETE", rnum(fr))] : []), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot + fr)), D,
     ...pays.map(p => rcWrap("Pago: " + p)), ...(h.local_pagamento ? [rcWrap("Local pagto: " + h.local_pagamento)] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -151,7 +152,11 @@ if (!MOCK && !CONFIGURED) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
-    async criarNota(items, pagamentos, cliente, clienteId, local, obs) { return ok(await sb.rpc("criar_nota_local", { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null })); },
+    async criarNota(items, pagamentos, cliente, clienteId, local, obs, frete) { const a = { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null }, f = Math.round((+frete || 0) * 100) / 100;
+      if (!(f > 0)) return ok(await sb.rpc("criar_nota_local", a)); /* sem frete: chamada antiga (funciona antes e depois da migration-frete) */
+      const r = await sb.rpc("criar_nota_local", { ...a, p_frete: f }); if (r.error && /PGRST202|42883|p_frete/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Frete depende de atualização do banco — avise o admin."); return ok(r); },
+    async freteDia(d) { const r = await sb.rpc("frete_dia", { p_data: d }); return r.error ? null : r.data; },
+    async notaHead(id) { return ok(await sb.from("v_notas").select("*").eq("nota_id", id)); },
     async notasLancar() { const r = await sb.rpc("notas_lancar_financas", { p_limit: 300 }); /* RPC definer: financeiro não tem 'vendas' e a view (security_invoker) voltava vazia */
       if (!r.error) return r.data || []; if (!/PGRST202|42883|notas_lancar_financas/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error(r.error.message);
       return ok(await sb.from("v_notas_lancar").select("*").order("created_at", { ascending: false }).limit(300)); },
@@ -161,7 +166,8 @@ if (!MOCK && !CONFIGURED) {
     async dispensarNota(nid, m) { const r = await sb.rpc("dispensar_nota", { p_nota: nid, p_motivo: m || null }); if (r.error && /PGRST202|42883|dispensar_nota/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("'Não lançar' ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
     async desfazerDispensa(nid) { return ok(await sb.rpc("desfazer_dispensa_nota", { p_nota: nid })); },
     async lancarNotaCG(nid) { const r = await sb.rpc("lancar_nota_caixa_geral", { p_nota: nid }); if (r.error && /PGRST202|42883|lancar_nota_caixa_geral/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Caixa Geral (débito do cliente) ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
-    async notasInfo(ids) { if (!ids.length) return []; const r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
+    async notasInfo(ids) { if (!ids.length) return []; let r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
+    async fretesDia(d) { const r = await sb.from("notas").select("id,frete").eq("data", d).gt("frete", 0).limit(5000); return r.error ? [] : r.data; },
     async creditos() { return ok(await sb.from("v_cliente_credito").select("*").order("nome")); },
     async creditoMov(cid) { let q = sb.from("v_cliente_creditos_mov").select("*").order("id", { ascending: false }).limit(200); if (cid) q = q.eq("cliente_id", cid); return ok(await q); },
     async lancarCredito(cid, tipo, v, obs) { return ok(await sb.rpc("lancar_credito", { p_cliente: cid, p_tipo: tipo, p_valor: v, p_obs: obs || null })); },
@@ -197,11 +203,12 @@ if (!MOCK && !CONFIGURED) {
     async cancelarNota(id, motivo) { ok(await sb.rpc("cancelar_nota", { p_id: id, p_motivo: motivo })); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
     async notaPag(id) { return ok(await sb.from("nota_pagamentos").select("metodo,valor").eq("nota_id", id).order("id")); },
-    async extrato(d, adm) { const itens = ok(await sb.from("v_nota_itens").select("*").eq("data", d).order("created_at").order("nota_id").limit(5000)), ids = [...new Set(itens.map(r => r.nota_id))], lucro = {}; if (!ids.length) return { itens, pags: [], lucro };
+    async extrato(d, adm) { const itens = ok(await sb.from("v_nota_itens").select("*").eq("data", d).order("created_at").order("nota_id").limit(5000)), lucro = {}, fre = {}; (await api.fretesDia(d)).forEach(x => fre[x.id] = Number(x.frete));
+      const so = Object.keys(fre).map(Number).filter(k => !itens.some(r => r.nota_id === k)), heads = so.length ? ok(await sb.from("v_notas").select("*").in("nota_id", so)) : [], ids = [...new Set([...itens.map(r => r.nota_id), ...so])]; if (!ids.length) return { itens, pags: [], lucro, fre, heads };
       const pags = ok(await sb.from("nota_pagamentos").select("nota_id,metodo,valor").in("nota_id", ids).order("id"));
       if (adm) { const S = ok(await sb.from("sales").select("id,nota_id,qtd,total").in("nota_id", ids).limit(5000)), C = S.length ? ok(await sb.from("sale_costs").select("sale_id,custo_unit").in("sale_id", S.map(x => x.id)).limit(5000)) : [], cm = Object.fromEntries(C.map(c => [c.sale_id, Number(c.custo_unit)]));
         S.forEach(x => { if (x.id in cm) lucro[x.nota_id] = (lucro[x.nota_id] || 0) + Number(x.total) - Number(x.qtd) * cm[x.id]; }); }
-      return { itens, pags, lucro }; },
+      return { itens, pags, lucro, fre, heads }; },
     async notas() { return ok(await sb.from("v_notas").select("*").order("created_at", { ascending: false }).order("nota_id", { ascending: false }).limit(300)); },
     async caixaSaldos() { return ok(await sb.from("v_caixa_saldo").select("*").order("caixa_id")); },
     async caixaExtrato(d) { return ok(await sb.from("v_caixa_extrato").select("*").eq("data", d).order("created_at")); },
@@ -250,15 +257,15 @@ if (!MOCK && !CONFIGURED) {
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
-  const mkNota = (items, pags, cliente, user, at, clienteId, local, obs) => {
+  const mkNota = (items, pags, cliente, user, at, clienteId, local, obs, frete = 0) => { frete = Math.round((+frete || 0) * 100) / 100; if (frete < 0) throw new Error("Frete inválido"); if (!items.length && !(frete > 0)) throw new Error("Nota sem itens");
     if (pags.some(g => g.metodo === "prazo") && !clienteId) throw new Error("Paga Depois exige cliente cadastrado");
     if (clienteId) cliente = (CL.find(c => c.id === clienteId) || {}).nome || cliente;
-    const tot = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0), pt = pags.reduce((a, x) => a + Number(x.valor), 0);
+    const tot = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + frete, pt = pags.reduce((a, x) => a + Number(x.valor), 0);
     if (Math.round(tot * 100) !== Math.round(pt * 100)) throw new Error(`Pagamentos (${pt.toFixed(2)}) diferentes do total (${tot.toFixed(2)})`);
     for (const it of items) { const p = P.find(x => x.sku === it.sku); if (!p || p.estoque < it.qtd) throw new Error(`Estoque insuficiente ou produto inativo (${it.sku})`); }
     const nid = id++, ts = at || new Date().toISOString();
     for (const it of items) { const p = P.find(x => x.sku === it.sku); p.estoque -= it.qtd; IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo: K[p.sku] }); }
-    N.push({ local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
+    N.push({ frete, local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
     for (const g of pags) PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); /* pendente: o financeiro lança no caixa */
     return nid; };
   const ready = Promise.resolve().then(() => {
@@ -352,10 +359,13 @@ if (!MOCK && !CONFIGURED) {
         if (open <= 0) continue; const a = Math.min(open, rest); AL.push({ nota_id: n.nota_id, valor: a, rec: RC[0].id }); al.push(String(n.nota_id).padStart(6, "0") + " (" + brl(a) + ")"); rest -= a; }
       mm.notas = al.join(", "); },
     async caixasLista() { needCx(); return CX; },
-    async criarNota(items, pags, cliente, clienteId, local, obs) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); if (local ? !LOCAIS.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
-      if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
-        const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
-      return mkNota(items, pags, cliente, meU, null, clienteId, local, obs); },
+    async criarNota(items, pags, cliente, clienteId, local, obs, frete = 0) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); if (local ? !LOCAIS.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
+      if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + (+frete || 0)) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
+        const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs, frete); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
+      if (+frete > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin."); return mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete); },
+    async freteDia(d) { if (role !== "admin" && role !== "financeiro") return null; const L = N.filter(n => n.data === d && n.status === "ativa"); return { data: d, frete: L.reduce((a, n) => a + (n.frete || 0), 0), notas: L.filter(n => n.frete > 0).length }; },
+    async notaHead(nid) { return vis().filter(x => x.nota_id === nid); },
+    async fretesDia(d) { return vis().filter(n => n.data === d && n.frete > 0).map(n => ({ id: n.nota_id, frete: n.frete })); },
     async notasLancar() { await ready; needFin(); return N.filter(n => n.status === "ativa").map(n => { const liq = {}; MV.filter(m => m.nota_id === n.nota_id).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0));
         return { ...n, valor_caixa: PG.filter(g => g.nota_id === n.nota_id && !["prazo", "credito"].includes(g.metodo)).reduce((a, g) => a + g.valor, 0), pagamentos: PG.filter(g => g.nota_id === n.nota_id).map(g => g.metodo + ":" + g.valor).join("+"), caixa_lancada_id: n.caixa_lancada_id || null, cliente_nome: n.cliente_id ? (CL.find(c => c.id === n.cliente_id) || {}).nome || null : null, valor_prazo: PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0), prazo_lancada_em: n.prazo_lancada_em || null, dispensada_em: n.dispensada_em || null, dispensa_motivo: n.dispensa_motivo || null, dispensada_por: n.dispensada_por || null, tem_movimento: MV.some(m => m.nota_id === n.nota_id), caixas_mov: Object.entries(liq).filter(([, v]) => v > 0.001).map(([k]) => CX.find(c => c.caixa_id === +k).nome).join(", ") }; }).reverse(); },
     async lancarNota(nid, cx) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada não pode ser lançada"); const P2 = PG.filter(g => g.nota_id === nid && !["prazo", "credito"].includes(g.metodo)); if (!P2.length) throw new Error("Nota sem valor para caixa (Paga Depois / Caixa Geral)");
@@ -370,7 +380,7 @@ if (!MOCK && !CONFIGURED) {
     async dispensarNota(nid, m) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada"); if (n.dispensada_em) return { mudou: false }; Object.assign(n, { dispensada_em: new Date().toISOString(), dispensa_motivo: m || null, dispensada_por: meU.handle }); SE.push({ kind: "nota_dispensada", detail: { nota_id: nid, motivo: m } }); return { mudou: true }; },
     async desfazerDispensa(nid) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n.dispensada_em) return { mudou: false }; Object.assign(n, { dispensada_em: null, dispensa_motivo: null, dispensada_por: null }); SE.push({ kind: "nota_dispensa_desfeita", detail: { nota_id: nid } }); return { mudou: true }; },
     async lancarNotaCG(nid) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada não pode ser lançada"); if (!n.cliente_id) throw new Error("Nota sem cliente cadastrado — não dá para lançar como débito"); const v = PG.filter(g => g.nota_id === nid && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0); if (!(v > 0)) throw new Error("Nota sem parte Paga Depois"); if (n.prazo_lancada_em) return { mudou: false, valor: v }; n.prazo_lancada_em = new Date().toISOString(); SE.push({ kind: "nota_prazo_lancada", detail: { nota_id: nid, cliente_id: n.cliente_id, valor: v } }); return { mudou: true, valor: v }; },
-    async notasInfo(ids) { return N.filter(n => ids.includes(n.nota_id)).map(n => ({ id: n.nota_id, local_pagamento: n.local_pagamento, obs_pagamento: n.obs_pagamento })); },
+    async notasInfo(ids) { return N.filter(n => ids.includes(n.nota_id)).map(n => ({ id: n.nota_id, local_pagamento: n.local_pagamento, obs_pagamento: n.obs_pagamento, frete: n.frete || 0 })); },
     async creditos() { await ready; needFin(); return [...new Set(CR.map(k => k.cliente_id))].map(cid => { const c = CL.find(x => x.id === cid), L = CR.filter(k => k.cliente_id === cid && crOk(k)); return { cliente_id: cid, nome: c.nome, telefone: c.telefone, doc: c.doc, total_entradas: L.filter(k => k.tipo === "entrada").reduce((a, k) => a + k.valor, 0), total_usos: L.filter(k => k.tipo === "uso").reduce((a, k) => a + k.valor, 0), saldo: crSaldo(cid), ultimo_mov: L.length ? L[L.length - 1].created_at : null }; }).sort((a, b) => a.nome.localeCompare(b.nome)); },
     async creditoMov(cid) { needFin(); return CR.filter(k => !cid || k.cliente_id === cid).map(k => ({ ...k, cliente: CL.find(c => c.id === k.cliente_id).nome, nota_status: k.nota_id ? (N.find(n => n.nota_id === k.nota_id) || {}).status : null, estornado: CR.some(x => x.estorno_de === k.id) })).reverse(); },
     async lancarCredito(cid, tipo, v, obs) { needFin(); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (tipo === "uso" && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); CR.push({ id: id++, cliente_id: cid, tipo, valor: v, obs: obs || null, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); },
@@ -383,7 +393,8 @@ if (!MOCK && !CONFIGURED) {
     async notaPag(nid) { return vis().some(x => x.nota_id === nid) ? PG.filter(g => g.nota_id === nid) : []; },
     async notas() { return vis(); },
     async extrato(d) { const ns = vis().filter(n => n.data === d), ids = ns.map(n => n.nota_id), lucro = {}; const itens = IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...ns.find(n => n.nota_id === i.nota_id), ...i }));
-      if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo); return { itens, pags: PG.filter(g => ids.includes(g.nota_id)), lucro }; },
+      if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo); const fre = {}; ns.forEach(n => { if (n.frete > 0) fre[n.nota_id] = n.frete; });
+      return { itens, pags: PG.filter(g => ids.includes(g.nota_id)), lucro, fre, heads: ns.filter(n => n.frete > 0 && !IT.some(i => i.nota_id === n.nota_id)) }; },
     async caixaSaldos() { await ready; needCx(); return CX.map(c => ({ ...c, saldo: saldo(c.caixa_id), movimento_hoje: MV.filter(m => m.caixa_id === c.caixa_id && m.data === today()).reduce((a, m) => a + sv(m), 0) })); },
     async caixaExtrato(d) { needCx(); return mvV().filter(m => m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => ({ ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id) })); },
     async caixaResumo(c, d) { needCx(); if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão");
@@ -591,28 +602,30 @@ async function viewExtrato(d, adm, K, cfg) {
   if ($("#d") && $("#d").value !== d) return;
   const by = {};
   X.itens.forEach(r => { const n = by[r.nota_id] ||= { nota_id: r.nota_id, created_at: r.created_at, handle: r.handle, nome: r.nome, cliente: r.cliente, status: r.status || "ativa", itens: [], qtd: 0, total: 0, pags: [], lucro: null }; n.itens.push(r); n.qtd += Number(r.qtd); n.total += Number(r.total); });
+  (X.heads || []).forEach(r => { by[r.nota_id] ||= { nota_id: r.nota_id, created_at: r.created_at, handle: r.handle, nome: r.nome, cliente: r.cliente, status: r.status || "ativa", itens: [], qtd: 0, total: 0, pags: [], lucro: null }; }); /* nota só de frete */
+  Object.entries(X.fre || {}).forEach(([k, v]) => by[k] && (by[k].frete = Number(v)));
   X.pags.forEach(g => by[g.nota_id] && by[g.nota_id].pags.push(g));
   if (api.notasInfo) (await api.notasInfo(Object.keys(by).map(Number)).catch(() => [])).forEach(x => by[x.id] && Object.assign(by[x.id], { local: x.local_pagamento, obs: x.obs_pagamento }));
   if (adm) Object.entries(X.lucro || {}).forEach(([k, v]) => by[k] && (by[k].lucro = Number(v)));
   const L = Object.values(by).sort((a, b) => (new Date(a.created_at) - new Date(b.created_at)) || (a.nota_id - b.nota_id));
   const A = L.filter(n => n.status !== "cancelada"), C = L.filter(n => n.status === "cancelada");
   const sum = (a, f) => a.reduce((s, n) => s + Number(f(n) || 0), 0), c2 = v => Math.round(Number(v || 0) * 100);
-  const T = { n: cfg.linhas ? sum(A, n => n.itens.length) : A.length, it: sum(A, n => n.qtd), fat: sum(A, n => n.total), luc: sum(A, n => n.lucro) };
+  const T = { n: cfg.linhas ? sum(A, n => n.itens.length) : A.filter(n => n.itens.length).length, it: sum(A, n => n.qtd), fat: sum(A, n => n.total), luc: sum(A, n => n.lucro), fr: sum(A, n => n.frete) }; /* Total = produtos (confere com o resumo); Frete à parte */
   const PF = {}; A.forEach(n => n.pags.forEach(g => { const k = cfg.pl(g.metodo); PF[k] ||= { n: 0, v: 0 }; PF[k].n++; PF[k].v += Number(g.valor); }));
   const dif = []; if (T.n !== K.n) dif.push(`vendas ${T.n} × ${K.n}`); if (T.it !== K.it) dif.push(`itens ${T.it} × ${K.it}`); if (c2(T.fat) !== c2(K.fat)) dif.push(`faturamento ${brl(T.fat)} × ${brl(K.fat)}`); if (adm && c2(T.luc) !== c2(K.luc)) dif.push(`lucro ${brl(T.luc)} × ${brl(K.luc)}`);
   const hm = t => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const nn = id => String(id).padStart(6, "0"), pg = n => n.pags.map(g => `${cfg.pl(g.metodo)} ${brl(g.valor)}`).join(" + ");
-  const cols = adm ? 10 : 9, dd = d.split("-").reverse().join("/");
+  const cols = adm ? 11 : 10, dd = d.split("-").reverse().join("/");
   const rows = L.map(n => { const cx = n.status === "cancelada";
-    return `<tr class="${cx ? "exc" : ""}"><td class="noprint"><button class="ext-t" data-n="${n.nota_id}" title="Ver itens" aria-expanded="false">▸</button></td><td>${nn(n.nota_id)}</td><td>${esc(hm(n.created_at))}</td><td>${esc(n.handle || "")}</td><td>${esc(n.cliente || "—")}</td><td>${esc(pg(n))}${n.local ? `<br><small><b>Local:</b> ${esc(n.local)}</small>` : ""}${n.obs ? `<br><small class="muted">Obs: ${esc(n.obs)}</small>` : ""}</td><td class="n">${n.qtd}</td><td class="n">${brl(n.total)}</td>${adm ? `<td class="n">${n.lucro == null ? "—" : brl(n.lucro)}</td>` : ""}<td>${cx ? '<b class="warn">CANCELADA</b><br><small class="muted">fora dos totais</small>' : "Ativa"}</td><td class="noprint"><button class="ext-o" data-n="${n.nota_id}">Abrir nota</button></td></tr>
+    return `<tr class="${cx ? "exc" : ""}"><td class="noprint"><button class="ext-t" data-n="${n.nota_id}" title="Ver itens" aria-expanded="false">▸</button></td><td>${nn(n.nota_id)}</td><td>${esc(hm(n.created_at))}</td><td>${esc(n.handle || "")}</td><td>${esc(n.cliente || "—")}</td><td>${esc(pg(n))}${n.local ? `<br><small><b>Local:</b> ${esc(n.local)}</small>` : ""}${n.obs ? `<br><small class="muted">Obs: ${esc(n.obs)}</small>` : ""}</td><td class="n">${n.qtd}</td><td class="n">${brl(n.total)}</td><td class="n">${n.frete ? brl(n.frete) : "—"}</td>${adm ? `<td class="n">${n.lucro == null ? "—" : brl(n.lucro)}</td>` : ""}<td>${cx ? '<b class="warn">CANCELADA</b><br><small class="muted">fora dos totais</small>' : "Ativa"}</td><td class="noprint"><button class="ext-o" data-n="${n.nota_id}">Abrir nota</button></td></tr>
     <tr class="exi" data-p="${n.nota_id}" hidden><td class="noprint"></td><td colspan="${cols - 2}"><table class="exit"><tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço un.</th><th class="n">Subtotal</th></tr>
-    ${n.itens.map(i => `<tr><td>${esc(i.sku ? i.sku + " · " : "")}${esc(i.marca)} ${esc(i.produto)} ${esc(i.tamanho || "")}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco_vendido)}</td><td class="n">${brl(i.total)}</td></tr>`).join("")}</table></td><td class="noprint"></td></tr>`; }).join("");
+    ${n.itens.map(i => `<tr><td>${esc(i.sku ? i.sku + " · " : "")}${esc(i.marca)} ${esc(i.produto)} ${esc(i.tamanho || "")}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco_vendido)}</td><td class="n">${brl(i.total)}</td></tr>`).join("")}${n.frete ? `<tr><td><b>FRETE</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(n.frete)}</td></tr>` : ""}</table></td><td class="noprint"></td></tr>`; }).join("");
   host.innerHTML = `<h2>Extrato de vendas — ${esc(dd)} <span class="noprint" style="float:right"><button class="btn ghost" id="exa" style="margin:0">Expandir itens</button> <button class="btn ghost" id="excsv" style="margin:0">CSV</button> <button class="btn" id="expr" style="margin:0">Imprimir / PDF (A4)</button></span></h2>
   <p class="muted">${L.length} nota(s)${C.length ? ` · ${C.length} cancelada(s) mostrada(s) mas fora dos totais` : ""}${cfg.linhas ? " · “Vendas” no resumo = linhas de item" : ""}</p>
-  <div style="overflow-x:auto"><table class="stk ext"><tr><th class="noprint"></th><th>Nº</th><th>Hora</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th class="n">Itens</th><th class="n">Total</th>${adm ? '<th class="n">Lucro</th>' : ""}<th>Status</th><th class="noprint"></th></tr>
+  <div style="overflow-x:auto"><table class="stk ext"><tr><th class="noprint"></th><th>Nº</th><th>Hora</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th class="n">Itens</th><th class="n">Total</th><th class="n">Frete</th>${adm ? '<th class="n">Lucro</th>' : ""}<th>Status</th><th class="noprint"></th></tr>
   ${rows || `<tr><td colspan="${cols + 1}" class="muted">Nenhuma nota nesta data.</td></tr>`}
-  ${Object.entries(PF).map(([k, v]) => `<tr class="sep"><th class="noprint"></th><th colspan="5">Total ${esc(k)} (${v.n} ${v.n === 1 ? "nota" : "notas"})</th><th></th><th class="n">${brl(v.v)}</th>${adm ? "<th></th>" : ""}<th></th><th class="noprint"></th></tr>`).join("")}
-  <tr class="tot"><th class="noprint"></th><th colspan="5">TOTAL (${A.length} nota(s) ativas${cfg.linhas ? `, ${T.n} linhas` : ""})</th><th class="n">${T.it}</th><th class="n">${brl(T.fat)}</th>${adm ? `<th class="n">${brl(T.luc)}</th>` : ""}<th></th><th class="noprint"></th></tr></table></div>
+  ${Object.entries(PF).map(([k, v]) => `<tr class="sep"><th class="noprint"></th><th colspan="5">Total ${esc(k)} (${v.n} ${v.n === 1 ? "nota" : "notas"})</th><th></th><th class="n">${brl(v.v)}</th><th></th>${adm ? "<th></th>" : ""}<th></th><th class="noprint"></th></tr>`).join("")}
+  <tr class="tot"><th class="noprint"></th><th colspan="5">TOTAL (${A.length} nota(s) ativas${cfg.linhas ? `, ${T.n} linhas` : ""})</th><th class="n">${T.it}</th><th class="n">${brl(T.fat)}</th><th class="n">${brl(T.fr)}</th>${adm ? `<th class="n">${brl(T.luc)}</th>` : ""}<th></th><th class="noprint"></th></tr></table></div>${T.fr ? `<p class="muted">Frete (motoboy) do dia: <b>${brl(T.fr)}</b> — fora do Total de produtos e do lucro; os pagamentos acima já incluem o frete.</p>` : ""}
   ${K.on ? (dif.length ? `<p class="warn"><b>⚠ Não confere com o resumo:</b> ${esc(dif.join(" · "))}</p>` : `<p class="ok-r">✓ Confere com o resumo: ${T.n} vendas · ${T.it} itens · ${brl(T.fat)}${adm ? " · lucro " + brl(T.luc) : ""}</p>`) : ""}`;
   const tog = (id, on) => { const r = host.querySelector(`tr.exi[data-p="${id}"]`), b = host.querySelector(`.ext-t[data-n="${id}"]`); if (!r) return; r.hidden = on == null ? !r.hidden : !on; b.textContent = r.hidden ? "▸" : "▾"; b.setAttribute("aria-expanded", String(!r.hidden)); };
   host.querySelectorAll(".ext-t").forEach(b => b.onclick = () => tog(b.dataset.n));
@@ -620,10 +633,10 @@ async function viewExtrato(d, adm, K, cfg) {
   $("#exa").onclick = () => { const open = $("#exa").textContent.startsWith("Expandir"); L.forEach(n => tog(n.nota_id, open)); $("#exa").textContent = open ? "Recolher itens" : "Expandir itens"; };
   $("#expr").onclick = () => window.print();
   $("#excsv").onclick = () => { const q = v => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; }, m = v => v == null ? "" : Number(v).toFixed(2).replace(".", ",");
-    const H = ["Nº", "Data", "Hora", "Vendedor", "Cliente", "Pagamento", "Itens", "Total", ...(adm ? ["Lucro"] : []), "Status", "Nos totais"];
-    const out = [["Extrato de vendas", dd], [], H, ...L.map(n => [nn(n.nota_id), dd, hm(n.created_at), n.handle || "", n.cliente || "", n.pags.map(g => `${cfg.pl(g.metodo)} ${m(g.valor)}`).join(" + "), n.qtd, m(n.total), ...(adm ? [m(n.lucro)] : []), n.status === "cancelada" ? "CANCELADA" : "Ativa", n.status === "cancelada" ? "não" : "sim"]), [],
+    const H = ["Nº", "Data", "Hora", "Vendedor", "Cliente", "Pagamento", "Itens", "Total", "Frete", ...(adm ? ["Lucro"] : []), "Status", "Nos totais"];
+    const out = [["Extrato de vendas", dd], [], H, ...L.map(n => [nn(n.nota_id), dd, hm(n.created_at), n.handle || "", n.cliente || "", n.pags.map(g => `${cfg.pl(g.metodo)} ${m(g.valor)}`).join(" + "), n.qtd, m(n.total), m(n.frete || 0), ...(adm ? [m(n.lucro)] : []), n.status === "cancelada" ? "CANCELADA" : "Ativa", n.status === "cancelada" ? "não" : "sim"]), [],
       ["Nº", "SKU", "Produto", "Qtd", "Preço un.", "Subtotal", "Status"], ...L.flatMap(n => n.itens.map(i => [nn(n.nota_id), i.sku || "", `${i.marca || ""} ${i.produto || ""} ${i.tamanho || ""}`.trim(), i.qtd, m(i.preco_vendido), m(i.total), n.status === "cancelada" ? "CANCELADA" : "Ativa"])), [],
-      ...Object.entries(PF).map(([k, v]) => ["Total " + k, v.n + " nota(s)", m(v.v)]), ["TOTAL (ativas)", A.length + " nota(s)", m(T.fat), "Itens", T.it, ...(adm ? ["Lucro", m(T.luc)] : [])], ...(C.length ? [["Canceladas (fora dos totais)", C.length + " nota(s)", m(sum(C, n => n.total))]] : [])];
+      ...Object.entries(PF).map(([k, v]) => ["Total " + k, v.n + " nota(s)", m(v.v)]), ["TOTAL (ativas)", A.length + " nota(s)", m(T.fat), "Itens", T.it, "Frete", m(T.fr), ...(adm ? ["Lucro", m(T.luc)] : [])], ...(C.length ? [["Canceladas (fora dos totais)", C.length + " nota(s)", m(sum(C, n => n.total))]] : [])];
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + out.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `extrato-vendas-${d}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 }
@@ -849,6 +862,7 @@ async function viewNota() {
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>
+  <div class="grid"><div><label>Frete (motoboy) R$ — opcional</label><input id="fre" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div><div><p class="muted" style="margin-top:28px">Entra no total da nota. Sem estoque/custo. Nota só de frete é permitida.</p></div></div>
   <h3>Pagamento</h3><div id="pgs"></div><button class="btn ghost" id="addpg" type="button">+ Dividir pagamento</button> <span id="pgok" class="muted"></span>
   <div class="grid" id="lpbox"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.map(l => `<option>${l}</option>`).join("")}</select></div>
   <div><label>Observação (opcional)</label><input id="obp" maxlength="200" placeholder="Ex.: maquininha 2, pago pelo marido…"></div></div><p class="muted" id="lpinfo"></p>
@@ -858,7 +872,7 @@ async function viewNota() {
   <button type="button" class="btn ghost" id="cnovo" style="margin-top:4px">+ Novo cliente</button>
   <div id="cform" hidden class="grid" style="margin-top:8px"><div><label>Nome do cliente</label><input id="cn" maxlength="120"></div><div><label>Atendimento número</label><select id="cat"><option value="">— selecione —</option>${ATEND.map(a => `<option>${a}</option>`).join("")}</select></div><div><button type="button" class="btn" id="csave">Salvar cliente</button></div></div>
   <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
-  let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0))}</th><th></th></tr>`;
+  let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + (freN() > 0 ? `<tr><td><b>Frete</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(freN())}</td><td></td></tr>` : "") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(totalN())}</th><th></th></tr>`;
     document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
   const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = ""; }; /* sem trava/aviso de preço mínimo (MB 05/11) */
   let hi = 0, M = [];
@@ -893,7 +907,8 @@ async function viewNota() {
   let pgs = [{ metodo: "", valor: null }]; /* sem forma pré-escolhida: antes vinha PIX e uma nota refeita podia sair como PIX sem querer */
   const lpNeed = () => pgs.length === 1 ? !!pgs[0].metodo && pgs[0].metodo !== "prazo" : pgs.some(g => g.metodo && g.metodo !== "prazo" && +g.valor > 0);
   const lpSync = () => { const n = lpNeed(); $("#lpbox").style.display = n ? "" : "none"; $("#lp").required = n; $("#lpinfo").hidden = !n; };
-  const totalN = () => Math.round(items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) * 100) / 100;
+  function freN() { const v = Math.round(+String(($("#fre") || {}).value || "0").replace(",", ".") * 100) / 100; return v > 0 ? v : 0; }
+  function totalN() { return Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + freN()) * 100) / 100; }
   const drawPg = () => { const t = totalN(); if (pgs.length === 1) pgs[0].valor = t;
     $("#pgs").innerHTML = pgs.map((g, i) => `<div class="grid pgrow"><div><select data-i="${i}" class="pm"><option value="" ${g.metodo ? "" : "selected"}>— forma de pagamento —</option>${PAY.map(([v, l]) => `<option value="${v}" ${g.metodo === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div><input data-i="${i}" class="pv2" type="number" min="0.01" step="0.01" value="${g.valor ?? ""}" ${pgs.length === 1 ? "readonly" : ""}></div>${pgs.length > 1 ? `<div><button type="button" class="rmpg" data-i="${i}">✕</button></div>` : ""}</div>`).join("");
@@ -905,29 +920,30 @@ async function viewNota() {
     document.querySelectorAll(".rmpg").forEach(x => x.onclick = () => { pgs.splice(+x.dataset.i, 1); drawPg(); }); };
   $("#addpg").onclick = () => { if (pgs.length >= 3) return; const t = totalN(), soma = pgs.reduce((a, g) => a + (+g.valor || 0), 0); if (pgs.length === 1) pgs[0].valor = t; pgs.push({ metodo: PAY.map(x => x[0]).find(m => !pgs.some(g => g.metodo === m)) || "dinheiro", valor: Math.max(Math.round((t - soma) * 100) / 100, 0) || null }); drawPg(); };
   const draw0 = draw; draw = () => { draw0(); drawPg(); };
-  $("#fin").onclick = async () => { if (!items.length) return toast("Adicione pelo menos 1 item"); if (items.some(x => !(+x.preco_vendido >= 0))) return toast("Há item com preço inválido — remova e adicione de novo");
+  $("#fre").oninput = () => draw();
+  $("#fin").onclick = async () => { const FR = freN(); if (+String($("#fre").value || "0").replace(",", ".") < 0) return toast("Frete inválido"); if (!items.length && !(FR > 0)) return toast("Adicione pelo menos 1 item (ou informe o Frete)"); if (items.some(x => !(+x.preco_vendido >= 0))) return toast("Há item com preço inválido — remova e adicione de novo");
     const t = totalN(), P2 = pgs.filter(g => +g.valor > 0).map(g => ({ metodo: g.metodo, valor: Math.round(+g.valor * 100) / 100 }));
     if (P2.some(g => !g.metodo)) return toast("Escolha a forma de pagamento (PIX, Dinheiro, Cartão ou Paga Depois)");
     if (Math.round(P2.reduce((a, g) => a + g.valor, 0) * 100) !== Math.round(t * 100)) return toast("A soma dos pagamentos precisa ser igual ao total");
     if (P2.some(g => g.metodo === "prazo") && !cli) return toast("Paga Depois exige cliente — busque ou cadastre o cliente");
     const lpN = P2.some(g => g.metodo !== "prazo"), LP = lpN ? $("#lp").value : null, OBP = lpN ? $("#obp").value.trim() : ""; if (lpN && !LP) { toast("Escolha o Local do pagamento"); return $("#lp").focus(); }
     if (LP === "CAIXA GERAL") { if (!cli) return toast("Caixa Geral exige cliente cadastrado — busque ou cadastre o cliente"); P2.splice(0, P2.length, { metodo: "credito", valor: t }); }
-    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ")))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
+    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + "), FR))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = t, pagTxt = P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ");
-    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP);
+    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP, FR);
       if (!nidOk(nid)) throw new Error("Servidor não confirmou o número da nota (retorno: " + JSON.stringify(nid) + ")");
-      const R = await api.nota(+nid); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
+      const R = await api.nota(+nid).then(r => r && r.length ? r : api.notaHead(+nid)); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
       items = []; await viewRecibo(+nid);
-      banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b> · Pagamento: <b>${pagTxt}</b>`);  printBtns();}
+      banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b>${FR > 0 ? ` (frete ${brl(FR)})` : ""} · Pagamento: <b>${pagTxt}</b>`);  printBtns();}
     catch (e) { console.error("Nota NÃO salva:", e); fb.disabled = false; fb.textContent = lbl;
-      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); }
+      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); if (FR > 0 && /Frete depende/.test(e.message || "")) toast("Frete depende de atualização do banco — avise o admin"); }
     finally { notaSaving = false; } };
   $("#lp").onchange = () => { $("#lpinfo").textContent = $("#lp").value === "CAIXA GERAL" ? "Caixa Geral: o total sai do crédito do cliente cadastrado (as formas acima são ignoradas)." : ""; };
   draw(); $("#bq").focus();
 }
 async function viewRecibo(nid) {
-  const [R, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]); if (!R.length) return toast("Nota não encontrada");
-  const h = { ...R[0], ...((await api.notasInfo([nid]).catch(() => []))[0] || {}) }, tot = R.reduce((a, r) => a + Number(r.total), 0);
+  const [R0, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]), HD = R0.length ? [] : await api.notaHead(nid).catch(() => []); if (!R0.length && !HD.length) return toast("Nota não encontrada");
+  const R = R0, h = { ...(R0[0] || HD[0]), ...((await api.notasInfo([nid]).catch(() => []))[0] || {}) }, tot = R.reduce((a, r) => a + Number(r.total), 0);
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
   ${reciboTxt("BAGDA STORES", nid, h, R, tot, PGN.map(g => (PAYL[g.metodo] || g.metodo) + (PGN.length > 1 ? " R$ " + rnum(g.valor) : "")), h.status === "cancelada")}`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
@@ -1104,11 +1120,12 @@ async function viewResumo(d = today(), c = null, back = false) {
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" }, s = R.sessao, dd = d.split("-").reverse().join("/");
   const VD = {}; if (R.movimentos.some(m => m.nota)) (await (api.notasLancar ? api.notasLancar() : Promise.resolve([])).catch(() => [])).forEach(n => VD[String(n.nota_id).padStart(6, "0")] = n.handle);
   const vend = m => m.nota ? VD[m.nota] || "" : "";
+  const FD = api.freteDia ? await api.freteDia(d).catch(() => null) : null;
   const hxNote = me.role !== "admin" && /HX/.test(R.caixa || "") ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin. Saldo inicial não inclui dias anteriores.</p>' : "";
   app.innerHTML = `<div class="card"><h2>Resumo do dia — ${esc(R.caixa)} · ${esc(dd)}
     <span class="noprint" style="float:right">${back ? '<button class="btn ghost" id="bk" style="margin:0">← Caixa (todos)</button> ' : ""}<button class="btn ghost" id="csv" style="margin:0">CSV</button> <button class="btn" id="pr" style="margin:0">Imprimir / PDF (A4)</button></span></h2>
   <div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
-  <div><label>Data (horário de São Paulo)</label><input id="rd" type="date" value="${d}"></div></div>
+  <div><label>Data (horário de São Paulo)</label><input id="rd" type="date" value="${d}"></div></div>${FD && FD.frete > 0 ? `<p><b>Frete (motoboy) do dia — todas as notas ativas:</b> ${brl(FD.frete)} em ${FD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}
   <div class="grid" style="margin-top:12px">
     <div class="kpi"><small>Abertura</small><b>${s ? brl(s.abertura_valor) : "—"}</b><small>${s ? `${esc(s.aberto_por || "")} ${esc(s.aberto_em || "")}` : "Não aberto"}</small></div>
     <div class="kpi"><small>Saldo inicial (sistema)</small><b>${brl(R.saldo_inicial)}</b></div>
