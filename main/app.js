@@ -489,16 +489,24 @@ async function boot() {
   $("#nav").hidden = false;
   if (window.BGDSwitch) BGDSwitch.mount(me, MOCK ? "mb@demo.local" : await api.email().catch(() => ""));
   document.querySelectorAll("nav button[data-p]").forEach(b => b.hidden = !can(b.dataset.p));
+  document.querySelectorAll("nav .navg").forEach(g => { const bs = [...g.querySelectorAll("button")]; g.hidden = bs.length > 0 && bs.every(b => b.hidden); });
   if (MOCK && qs.get("demo") === "resumo") { const L = await api.caixasLista(), px = L.find(x => x.metodo === "pix").caixa_id; await api.caixaAbrir(px, 0).catch(() => {}); await api.receber(1, 500, px, "pix", null, "parcial"); return viewResumo(today(), px); }
   if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
   go(location.hash.slice(1) || (can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca"));
 }
+function navMark(v) {
+  document.querySelectorAll("nav button[data-v]").forEach(b => {
+    const on = b.dataset.v === v;
+    b.classList.toggle("on", on);
+    if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+}
 function go(v) {
   const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
   if (!need[v] && v !== "seguranca") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
-  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  navMark(v);
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
   ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei() }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
@@ -741,7 +749,7 @@ const CEL = /iphone|celular|smartphone|galaxy|redmi|poco|xiaomi.*note|motorola|m
 const luhn = s => { let t = 0; for (let i = 0; i < 15; i++) { let d = +s[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } t += d; } return t % 10 === 0; };
 async function viewImei(o = {}) {
   const adm = me.role === "admin", ed = can("admin|estoque"); if (!api.comprasListar) { app.innerHTML = '<div class="card"><h2>Compras & IMEI</h2><p class="warn">Indisponível.</p></div>'; return; }
-  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
+  navMark("imei"); history.replaceState(null, "", location.pathname + location.search + "#imei");
   let C, err = ""; try { C = await api.comprasListar(o.q || ""); } catch (e) { if (/PGRST202|could not find the function|schema cache|does not exist/i.test(e.message)) { app.innerHTML = '<div class="card"><h2>Compras & IMEI</h2><p class="warn">Ainda não instalado no banco (falta rodar migration-compras-imei.sql).</p></div>'; return; } C = []; err = e.message; }
   app.innerHTML = `<div class="card"><h2>🔎 Buscar IMEI</h2><div class="grid"><div><label>IMEI (mín. 4 dígitos)</label><input id="iq" inputmode="numeric" autocomplete="off" placeholder="Ex.: 356938035643809" value="${esc(o.iq || "")}"></div><div><label>&nbsp;</label><button class="btn" id="ib">Buscar</button></div></div><div id="ir"></div></div>
   <div class="card" id="cd"></div>
@@ -795,7 +803,7 @@ const compraTxt = (D, usr) => { const W = rcW(), TZ = "America/Sao_Paulo", dt = 
   return `<div class="recibo"><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 async function viewComprovante(n, nova) {
   if (me.role !== "admin") return viewImei();
-  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
+  navMark("imei"); history.replaceState(null, "", location.pathname + location.search + "#imei");
   let D; try { D = await api.compraDetalhe(n); } catch (e) { app.innerHTML = `<div class="card"><p class="warn">${esc(e.message)}</p></div>`; return; }
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px">${nova ? `<p class="ok" style="color:#1a7f37"><b>✓ Compra ${esc(D.numero)} salva.</b></p>` : ""}<button class="btn gold" id="pr">🖨️ ${nova ? "Imprimir de novo" : "Imprimir"}</button> ${nova ? '<button class="btn ghost" id="cpn">Nova compra</button> ' : ""}<button class="btn ghost" id="cpi">${nova ? "Cadastrar IMEIs agora" : "Voltar para Compras &amp; IMEI"}</button> <button class="btn ghost" id="cpa">Versao A4</button></div>
   ${compraTxt(D, D.usuario ? "" : (nova ? me.handle : ""))}`;
@@ -805,7 +813,7 @@ async function viewComprovante(n, nova) {
 }
 async function viewComprovanteA4(n, nova) {
   if (me.role !== "admin") return viewImei();
-  document.querySelectorAll("nav button[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === "imei")); history.replaceState(null, "", location.pathname + location.search + "#imei");
+  navMark("imei"); history.replaceState(null, "", location.pathname + location.search + "#imei");
   let D; try { D = await api.compraDetalhe(n); } catch (e) { app.innerHTML = `<div class="card"><p class="warn">${esc(e.message)}</p></div>`; return; }
   const tot = D.itens.reduce((a, i) => a + Number(i.total ?? i.qtd * i.custo_unit), 0), un = D.itens.reduce((a, i) => a + +i.qtd, 0), dd = D.created_at ? new Date(D.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : String(D.data || "").split("-").reverse().join("/");
   app.innerHTML = `<div class="card noprint">${nova ? `<p class="ok" style="color:#1a7f37"><b>✓ Compra ${esc(D.numero)} salva.</b> Imprima o comprovante abaixo.</p>` : ""}<button class="btn gold" id="cpp">Imprimir A4</button> <button class="btn ghost" id="cpt">Voltar ao cupom 80mm</button> ${nova ? '<button class="btn ghost" id="cpn">Nova compra</button> ' : ""}<button class="btn ghost" id="cpi">${nova ? "Cadastrar IMEIs agora" : "Voltar para Compras &amp; IMEI"}</button></div>
