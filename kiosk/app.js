@@ -29,9 +29,9 @@ const app = $("#app");
 const banner = (ok, html) => { document.querySelectorAll(".nb").forEach(x => x.remove()); const d = document.createElement("div"); d.className = "nb noprint"; d.setAttribute("role", ok ? "status" : "alert"); d.style.cssText = `background:${ok ? "#15803d" : "#b91c1c"};color:#fff;padding:18px 20px;border-radius:12px;margin:0 0 14px;font-size:1.35em;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.25)`; d.innerHTML = html; app.prepend(d); d.scrollIntoView({ block: "start" }); return d; };
 const nidOk = n => Number.isInteger(+n) && +n > 0 && n !== null && n !== "";
 let notaSaving = false;
-const confirmNota = (items, total, pag, frete = 0) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+const confirmNota = (items, total, pag, frete = 0, caixinho = 0) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
   o.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;color:#111;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.35)"><h2 style="margin:0 0 12px">Confirmar nota</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}</table>
+  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}${caixinho > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Caixinho do Natal</b></td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(caixinho)}</td></tr>` : ""}</table>
   <p style="font-size:1.4em;margin:14px 0 6px"><b>TOTAL: ${brl(total)}</b></p><p style="font-size:1.1em;margin:0 0 18px">Pagamento: <b>${pag}</b></p>
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
@@ -49,24 +49,30 @@ const rcWrap = (s, W = rcW()) => { const o = []; let l = ""; for (const w of asc
 const rc3 = (a, b, c, W = rcW()) => { const cw = W >= 40 ? 13 : 11; a = asc(a); return a + " ".repeat(Math.max(1, W - 2 * cw - a.length)) + asc(b).padStart(cw) + asc(c).padStart(cw); };
 const rcEsc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const rcDot = (a, b, W = rcW()) => { a = asc(a); b = asc(b); const n = W - a.length - b.length - 2; return n >= 2 ? a + " " + ".".repeat(n) + " " + b : rcL(a, b, W); };
-const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.round(Number(h.frete || 0) * 100) / 100; const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
+const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.round(Number(h.frete || 0) * 100) / 100, cx = Math.round(Number(h.caixinho_natal || 0) * 100) / 100; const W = rcW(), dt = new Date(h.created_at), TZ = "America/Sao_Paulo", E = "=".repeat(W), D = "-".repeat(W), qt = R.reduce((a, r) => a + Number(r.qtd), 0);
   const head = [rcC(store), rcC("bgdstores.com"), E].join("\n") + "\n";
   const L = ["PEDIDO DE VENDA", rcL("Data: " + dt.toLocaleDateString("pt-BR", { timeZone: TZ }), dt.toLocaleTimeString("pt-BR", { timeZone: TZ })),
     ...(h.cliente ? [rcWrap("Cliente: " + h.cliente)] : []), rcWrap("Vendedor: " + h.nome + " (" + h.handle + ")"), "Nota No.: " + String(nid).padStart(6, "0"), E,
     "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
     ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
-    rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), ...(fr > 0 ? [rcDot("FRETE", rnum(fr))] : []), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot + fr)), D,
+    rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(tot)), ...(fr > 0 ? [rcDot("FRETE", rnum(fr))] : []), ...(cx > 0 ? [rcDot("CAIXINHO DO NATAL", rnum(cx))] : []), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(tot + fr + cx)), D,
     ...pays.map(p => rcWrap("Pago: " + p)), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-/* Frete no extrato: valor por nota (fre), notas só de frete (heads) e pagamento (forma única da nota) somando o frete */
-const freMerge = (X, F) => { X.fre = {}; X.heads = []; F.forEach(f => { X.fre[f.nota_id] = f.frete; const g = X.pags.find(p => p.nota_id === f.nota_id); if (g) g.valor = Number(g.valor) + f.frete; else { X.pags.push({ nota_id: f.nota_id, metodo: f.forma_pagamento, valor: f.frete }); X.heads.push(f); } }); return X; };
+/* Frete/Caixinho no extrato: valor por nota (fre/cn), notas só de fee (heads) e pagamento somando fees */
+const freMerge = (X, F, C = []) => { X.fre = {}; X.cn = {}; X.heads = [];
+  F.forEach(f => { X.fre[f.nota_id] = f.frete; const g = X.pags.find(p => p.nota_id === f.nota_id); if (g) g.valor = Number(g.valor) + f.frete; else { X.pags.push({ nota_id: f.nota_id, metodo: f.forma_pagamento, valor: f.frete }); X.heads.push(f); } });
+  C.forEach(f => { const v = Number(f.caixinho_natal); X.cn[f.nota_id] = v; const g = X.pags.find(p => p.nota_id === f.nota_id); if (g) g.valor = Number(g.valor) + v; else { X.pags.push({ nota_id: f.nota_id, metodo: f.forma_pagamento, valor: v }); if (!X.heads.some(h => h.nota_id === f.nota_id)) X.heads.push(f); } });
+  return X; };
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
 const coll = new Intl.Collator("pt-BR", { sensitivity: "base" });
 const stockSort = L => [...L].sort((a, b) => ((+b.estoque > 0) - (+a.estoque > 0)) || coll.compare(a.produto || "", b.produto || "") || coll.compare(a.marca || "", b.marca || ""));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+/* Caixinho do Natal: campo só até 24/12/2026 inclusive (calendário America/Sao_Paulo). Histórico permanece. */
+const CAIXINHO_ATE = "2026-12-24";
+const caixinhoOn = () => today() <= CAIXINHO_ATE;
 const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase();
   const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   return n ? n + "@sistema.bgdstores.local" : ""; };
@@ -125,18 +131,25 @@ if (!MOCK) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
-    async criarNota(forma, items, cliente, frete) { const a = { p_forma: forma, p_items: items, p_cliente: cliente || null }, f = Math.round((+frete || 0) * 100) / 100;
-      if (!(f > 0)) return ok(await sb.rpc("criar_nota", a)); /* sem frete: chamada antiga (funciona antes e depois da migration-frete-kiosk) */
-      const r = await sb.rpc("criar_nota", { ...a, p_frete: f }); if (r.error && /PGRST202|42883|p_frete/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Frete depende de atualização do banco — avise o admin."); return ok(r); },
+    async criarNota(forma, items, cliente, frete, caixinho) { const a = { p_forma: forma, p_items: items, p_cliente: cliente || null }, f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caixinho || 0) * 100) / 100;
+      if (!(f > 0) && !(c > 0)) return ok(await sb.rpc("criar_nota", a)); /* sem fee: chamada antiga */
+      const extra = { ...a, p_frete: f, ...(c > 0 ? { p_caixinho_natal: c } : {}) };
+      const r = await sb.rpc("criar_nota", extra); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && c > 0 && /PGRST202|42883|p_caixinho/.test(em)) throw new Error("Caixinho do Natal depende de atualização do banco — avise o admin.");
+      if (r.error && f > 0 && /PGRST202|42883|p_frete/.test(em)) throw new Error("Frete depende de atualização do banco — avise o admin.");
+      return ok(r); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
     async fretes(q) { let x = sb.from("notas").select("id,data,created_at,forma_pagamento,cliente,frete,seller_id").gt("frete", 0); x = q.id ? x.eq("id", q.id) : q.data ? x.eq("data", q.data) : x.order("created_at", { ascending: false }).limit(300); const r = await x; if (r.error || !r.data) return [];
       const ids = [...new Set(r.data.map(n => n.seller_id))], pf = ids.length ? await sb.from("profiles").select("id,handle,nome").in("id", ids) : { data: [] }, pm = Object.fromEntries((pf.data || []).map(p => [p.id, p]));
       return r.data.map(n => ({ nota_id: n.id, data: n.data, created_at: n.created_at, forma_pagamento: n.forma_pagamento, cliente: n.cliente, frete: Number(n.frete), handle: (pm[n.seller_id] || {}).handle || "", nome: (pm[n.seller_id] || {}).nome || "" })); },
+    async caixinhos(q) { let x = sb.from("notas").select("id,data,created_at,forma_pagamento,cliente,caixinho_natal,seller_id").gt("caixinho_natal", 0); x = q.id ? x.eq("id", q.id) : q.data ? x.eq("data", q.data) : x.order("created_at", { ascending: false }).limit(300); const r = await x; if (r.error || !r.data) return [];
+      const ids = [...new Set(r.data.map(n => n.seller_id))], pf = ids.length ? await sb.from("profiles").select("id,handle,nome").in("id", ids) : { data: [] }, pm = Object.fromEntries((pf.data || []).map(p => [p.id, p]));
+      return r.data.map(n => ({ nota_id: n.id, data: n.data, created_at: n.created_at, forma_pagamento: n.forma_pagamento, cliente: n.cliente, caixinho_natal: Number(n.caixinho_natal), handle: (pm[n.seller_id] || {}).handle || "", nome: (pm[n.seller_id] || {}).nome || "" })); },
     async extrato(d, adm) { const itens = ok(await sb.from("v_nota_itens").select("*").eq("data", d).order("created_at").order("nota_id").limit(5000)), ids = [...new Set(itens.map(r => r.nota_id))], lucro = {}, seen = {};
       const pags = itens.filter(r => !seen[r.nota_id] && (seen[r.nota_id] = 1)).map(r => ({ nota_id: r.nota_id, metodo: r.forma_pagamento, valor: itens.filter(x => x.nota_id === r.nota_id).reduce((a, x) => a + Number(x.total), 0) }));
       if (adm && ids.length) { const S = ok(await sb.from("sales").select("id,nota_id,qtd,total").in("nota_id", ids).limit(5000)), C = S.length ? ok(await sb.from("sale_costs").select("sale_id,custo_unit").in("sale_id", S.map(x => x.id)).limit(5000)) : [], cm = Object.fromEntries(C.map(c => [c.sale_id, Number(c.custo_unit)]));
         S.forEach(x => { if (x.id in cm) lucro[x.nota_id] = (lucro[x.nota_id] || 0) + Number(x.total) - Number(x.qtd) * cm[x.id]; }); }
-      return freMerge({ itens, pags, lucro }, await api.fretes({ data: d })); },
+      return freMerge({ itens, pags, lucro }, await api.fretes({ data: d }), await api.caixinhos({ data: d }).catch(() => [])); },
     async notas() { return ok(await sb.from("v_nota_itens").select("nota_id,data,created_at,forma_pagamento,handle,total").order("created_at", { ascending: false }).order("nota_id", { ascending: false }).limit(300)); },
     async productsFull() { return ok(await sb.from("products").select("*").order("sku")); },
     async adminProducts() { return ok(await sb.from("v_admin_products").select("*").order("sku")); },
@@ -151,7 +164,7 @@ if (!MOCK) {
 } else {
   $("#mockbar").hidden = false;
   const role = qs.get("mock") === "seller" ? "seller" : "admin";
-  let P = [], S = [], PU = [], K = {}, id = 1, logged = qs.has("auto"); const NF = []; /* demo: notas com frete */
+  let P = [], S = [], PU = [], K = {}, id = 1, logged = qs.has("auto"); const NF = [], NC = []; /* demo: notas frete / caixinho */
   const ready = fetch("mock-produtos.json").then(r => r.json()).then(j => {
     P = j.map((p, i) => ({ ...p, estoque: (i * 7) % 9, estoque_minimo: 2, ativo: true }));
     [["LAT-901", "Lattafa", "Khamrah", "100ml", "Edição Qahwa", "Distribuidora Árabe"], ["LAT-902", "Lattafa", "Khamrah", "100ml", null, "Distribuidora Árabe"], ["LAT-903", "Lattafa", "Khamrah", "30ml", "Travel", null]]
@@ -177,12 +190,13 @@ if (!MOCK) {
     async addSale(s) { const p = P.find(x => x.sku === s.sku); if (!p || p.estoque < s.qtd) throw new Error("Estoque insuficiente ou produto inativo"); p.estoque -= s.qtd; S.unshift({ id: id++, data: today(), ...s, marca: p.marca, produto: p.produto, preco_tabela: p.preco_venda, total: s.qtd * s.preco_vendido, handle: me.handle, nome: me.nome, custo: K[p.sku], aviso: s.preco_vendido < p.preco_venda ? "Abaixo da tabela" : null, created_at: new Date().toISOString() }); },
     async sales() { return S; }, async repSeller() { return grp(S, "handle"); }, async repPay() { return grp(S, "forma_pagamento"); },
     async repProfit() { return role === "admin" ? grp(S, "handle").map(r => ({ ...r, lucro: r.faturamento - r.custo })) : []; },
-    async criarNota(forma, items, cliente, frete = 0) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); const f = Math.round((+frete || 0) * 100) / 100; if (f < 0) throw new Error("Frete inválido"); if (!items.length && !(f > 0)) throw new Error("Nota sem itens"); if (f > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin.");
-      for (const it of items) { const p = P.find(x => x.sku === it.sku); if (!p || p.estoque < it.qtd) throw new Error("Estoque insuficiente ou produto inativo"); } const nid = 1000 + id++; if (f > 0) NF.push({ nota_id: nid, data: today(), created_at: new Date().toISOString(), forma_pagamento: forma, cliente: cliente || null, frete: f, handle: me.handle, nome: me.nome }); for (const it of items) { await this.addSale({ ...it, forma_pagamento: forma }); S[0].nota_id = nid; S[0].cliente = cliente; } return nid; },
+    async criarNota(forma, items, cliente, frete = 0, caixinho = 0) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); const f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caixinho || 0) * 100) / 100; if (f < 0) throw new Error("Frete inválido"); if (c < 0) throw new Error("Caixinho do Natal inválido"); if (!items.length && !(f > 0) && !(c > 0)) throw new Error("Nota sem itens"); if (c > 0 && qs.has("nocaixinho")) throw new Error("Caixinho do Natal depende de atualização do banco — avise o admin."); if (f > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin.");
+      for (const it of items) { const p = P.find(x => x.sku === it.sku); if (!p || p.estoque < it.qtd) throw new Error("Estoque insuficiente ou produto inativo"); } const nid = 1000 + id++; const base = { nota_id: nid, data: today(), created_at: new Date().toISOString(), forma_pagamento: forma, cliente: cliente || null, handle: me.handle, nome: me.nome }; if (f > 0) NF.push({ ...base, frete: f }); if (c > 0) NC.push({ ...base, caixinho_natal: c }); for (const it of items) { await this.addSale({ ...it, forma_pagamento: forma }); S[0].nota_id = nid; S[0].cliente = cliente; } return nid; },
     async nota(nid) { return S.filter(s => s.nota_id === nid); },
     async extrato(d) { const itens = S.filter(s => s.data === d && s.nota_id), lucro = {}, seen = {}; if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo);
-      return freMerge({ itens, lucro, pags: itens.filter(r => !seen[r.nota_id] && (seen[r.nota_id] = 1)).map(r => ({ nota_id: r.nota_id, metodo: r.forma_pagamento, valor: itens.filter(x => x.nota_id === r.nota_id).reduce((a, x) => a + x.total, 0) })) }, await api.fretes({ data: d })); },
+      return freMerge({ itens, lucro, pags: itens.filter(r => !seen[r.nota_id] && (seen[r.nota_id] = 1)).map(r => ({ nota_id: r.nota_id, metodo: r.forma_pagamento, valor: itens.filter(x => x.nota_id === r.nota_id).reduce((a, x) => a + x.total, 0) })) }, await api.fretes({ data: d }), await api.caixinhos({ data: d })); },
     async fretes(q) { const L = NF.filter(n => role === "admin" || n.handle === me.handle); return q.id ? L.filter(n => n.nota_id === q.id) : q.data ? L.filter(n => n.data === q.data) : L; },
+    async caixinhos(q) { const L = NC.filter(n => role === "admin" || n.handle === me.handle); return q.id ? L.filter(n => n.nota_id === q.id) : q.data ? L.filter(n => n.data === q.data) : L; },
     async notas() { return S.filter(s => s.nota_id); },
     async estoqueVendedor() { await ready; return P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
     async adminProducts() { return P.map(p => ({ ...p, custo: K[p.sku] })); },
@@ -353,6 +367,7 @@ async function viewRelatorio(d = today()) {
   ${RP.map(r => `<tr><td>${esc(r.forma_pagamento)}</td><td class="n">${r.vendas}</td><td class="n">${r.itens}</td><td class="n">${brl(r.faturamento)}</td></tr>`).join("")}</table></div><div class="card" id="ext"><h2>Extrato de vendas</h2><p class="muted">Carregando notas…</p></div>`;
   $("#d").onchange = e => viewRelatorio(e.target.value);
   api.fretes({ data: d }).then(F => { const t = F.reduce((a, f) => a + f.frete, 0); if (t > 0 && $("#d") && $("#d").value === d) { const k = document.createElement("div"); k.className = "kpi"; k.innerHTML = `<small>Frete (motoboy) · ${F.length} nota(s)</small><b>${brl(t)}</b>`; document.querySelector(".card .grid").append(k); } }).catch(() => {});
+  (api.caixinhos ? api.caixinhos({ data: d }) : Promise.resolve([])).then(C => { const t = C.reduce((a, f) => a + f.caixinho_natal, 0); if (t > 0 && $("#d") && $("#d").value === d) { const k = document.createElement("div"); k.className = "kpi"; k.innerHTML = `<small>Caixinho do Natal · ${C.length} nota(s)</small><b>${brl(t)}</b>`; document.querySelector(".card .grid").append(k); } }).catch(() => {});
   viewExtrato(d, adm, { on: adm, n, it, fat, luc }, { pl: m => m, linhas: true });
 }
 // ---------- Extrato de vendas (Relatório diário): uma linha por nota, itens expansíveis, totais conferidos com o resumo ----------
@@ -364,27 +379,28 @@ async function viewExtrato(d, adm, K, cfg) {
   X.itens.forEach(r => { const n = by[r.nota_id] ||= { nota_id: r.nota_id, created_at: r.created_at, handle: r.handle, nome: r.nome, cliente: r.cliente, status: r.status || "ativa", itens: [], qtd: 0, total: 0, pags: [], lucro: null }; n.itens.push(r); n.qtd += Number(r.qtd); n.total += Number(r.total); });
   (X.heads || []).forEach(r => { by[r.nota_id] ||= { nota_id: r.nota_id, created_at: r.created_at, handle: r.handle, nome: r.nome, cliente: r.cliente, status: r.status || "ativa", itens: [], qtd: 0, total: 0, pags: [], lucro: null }; }); /* nota só de frete */
   Object.entries(X.fre || {}).forEach(([k, v]) => by[k] && (by[k].frete = Number(v)));
+  Object.entries(X.cn || {}).forEach(([k, v]) => by[k] && (by[k].caixinho_natal = Number(v)));
   X.pags.forEach(g => by[g.nota_id] && by[g.nota_id].pags.push(g));
   if (adm) Object.entries(X.lucro || {}).forEach(([k, v]) => by[k] && (by[k].lucro = Number(v)));
   const L = Object.values(by).sort((a, b) => (new Date(a.created_at) - new Date(b.created_at)) || (a.nota_id - b.nota_id));
   const A = L.filter(n => n.status !== "cancelada"), C = L.filter(n => n.status === "cancelada");
   const sum = (a, f) => a.reduce((s, n) => s + Number(f(n) || 0), 0), c2 = v => Math.round(Number(v || 0) * 100);
-  const T = { n: cfg.linhas ? sum(A, n => n.itens.length) : A.filter(n => n.itens.length).length, it: sum(A, n => n.qtd), fat: sum(A, n => n.total), luc: sum(A, n => n.lucro), fr: sum(A, n => n.frete) }; /* Total = produtos (confere com o resumo); Frete à parte */
+  const T = { n: cfg.linhas ? sum(A, n => n.itens.length) : A.filter(n => n.itens.length).length, it: sum(A, n => n.qtd), fat: sum(A, n => n.total), luc: sum(A, n => n.lucro), fr: sum(A, n => n.frete), cx: sum(A, n => n.caixinho_natal) };
   const PF = {}; A.forEach(n => n.pags.forEach(g => { const k = cfg.pl(g.metodo); PF[k] ||= { n: 0, v: 0 }; PF[k].n++; PF[k].v += Number(g.valor); }));
   const dif = []; if (T.n !== K.n) dif.push(`vendas ${T.n} × ${K.n}`); if (T.it !== K.it) dif.push(`itens ${T.it} × ${K.it}`); if (c2(T.fat) !== c2(K.fat)) dif.push(`faturamento ${brl(T.fat)} × ${brl(K.fat)}`); if (adm && c2(T.luc) !== c2(K.luc)) dif.push(`lucro ${brl(T.luc)} × ${brl(K.luc)}`);
   const hm = t => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const nn = id => String(id).padStart(6, "0"), pg = n => n.pags.map(g => `${cfg.pl(g.metodo)} ${brl(g.valor)}`).join(" + ");
-  const cols = adm ? 11 : 10, dd = d.split("-").reverse().join("/");
+  const cols = adm ? 12 : 11, dd = d.split("-").reverse().join("/");
   const rows = L.map(n => { const cx = n.status === "cancelada";
-    return `<tr class="${cx ? "exc" : ""}"><td class="noprint"><button class="ext-t" data-n="${n.nota_id}" title="Ver itens" aria-expanded="false">▸</button></td><td>${nn(n.nota_id)}</td><td>${esc(hm(n.created_at))}</td><td>${esc(n.handle || "")}</td><td>${esc(n.cliente || "—")}</td><td>${esc(pg(n))}</td><td class="n">${n.qtd}</td><td class="n">${brl(n.total)}</td><td class="n">${n.frete ? brl(n.frete) : "—"}</td>${adm ? `<td class="n">${n.lucro == null ? "—" : brl(n.lucro)}</td>` : ""}<td>${cx ? '<b class="warn">CANCELADA</b><br><small class="muted">fora dos totais</small>' : "Ativa"}</td><td class="noprint"><button class="ext-o" data-n="${n.nota_id}">Abrir nota</button></td></tr>
+    return `<tr class="${cx ? "exc" : ""}"><td class="noprint"><button class="ext-t" data-n="${n.nota_id}" title="Ver itens" aria-expanded="false">▸</button></td><td>${nn(n.nota_id)}</td><td>${esc(hm(n.created_at))}</td><td>${esc(n.handle || "")}</td><td>${esc(n.cliente || "—")}</td><td>${esc(pg(n))}</td><td class="n">${n.qtd}</td><td class="n">${brl(n.total)}</td><td class="n">${n.frete ? brl(n.frete) : "—"}</td><td class="n">${n.caixinho_natal ? brl(n.caixinho_natal) : "—"}</td>${adm ? `<td class="n">${n.lucro == null ? "—" : brl(n.lucro)}</td>` : ""}<td>${cx ? '<b class="warn">CANCELADA</b><br><small class="muted">fora dos totais</small>' : "Ativa"}</td><td class="noprint"><button class="ext-o" data-n="${n.nota_id}">Abrir nota</button></td></tr>
     <tr class="exi" data-p="${n.nota_id}" hidden><td class="noprint"></td><td colspan="${cols - 2}"><table class="exit"><tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço un.</th><th class="n">Subtotal</th></tr>
-    ${n.itens.map(i => `<tr><td>${esc(i.sku ? i.sku + " · " : "")}${esc(i.marca)} ${esc(i.produto)} ${esc(i.tamanho || "")}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco_vendido)}</td><td class="n">${brl(i.total)}</td></tr>`).join("")}${n.frete ? `<tr><td><b>FRETE</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(n.frete)}</td></tr>` : ""}</table></td><td class="noprint"></td></tr>`; }).join("");
+    ${n.itens.map(i => `<tr><td>${esc(i.sku ? i.sku + " · " : "")}${esc(i.marca)} ${esc(i.produto)} ${esc(i.tamanho || "")}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco_vendido)}</td><td class="n">${brl(i.total)}</td></tr>`).join("")}${n.frete ? `<tr><td><b>FRETE</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(n.frete)}</td></tr>` : ""}${n.caixinho_natal ? `<tr><td><b>CAIXINHO DO NATAL</b></td><td class="n">—</td><td class="n">—</td><td class="n">${brl(n.caixinho_natal)}</td></tr>` : ""}</table></td><td class="noprint"></td></tr>`; }).join("");
   host.innerHTML = `<h2>Extrato de vendas — ${esc(dd)} <span class="noprint" style="float:right"><button class="btn ghost" id="exa" style="margin:0">Expandir itens</button> <button class="btn ghost" id="excsv" style="margin:0">CSV</button> <button class="btn" id="expr" style="margin:0">Imprimir / PDF (A4)</button></span></h2>
   <p class="muted">${L.length} nota(s)${C.length ? ` · ${C.length} cancelada(s) mostrada(s) mas fora dos totais` : ""}${cfg.linhas ? " · “Vendas” no resumo = linhas de item" : ""}</p>
-  <div style="overflow-x:auto"><table class="stk ext"><tr><th class="noprint"></th><th>Nº</th><th>Hora</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th class="n">Itens</th><th class="n">Total</th><th class="n">Frete</th>${adm ? '<th class="n">Lucro</th>' : ""}<th>Status</th><th class="noprint"></th></tr>
+  <div style="overflow-x:auto"><table class="stk ext"><tr><th class="noprint"></th><th>Nº</th><th>Hora</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th class="n">Itens</th><th class="n">Total</th><th class="n">Frete</th><th class="n">Caixinho</th>${adm ? '<th class="n">Lucro</th>' : ""}<th>Status</th><th class="noprint"></th></tr>
   ${rows || `<tr><td colspan="${cols + 1}" class="muted">Nenhuma nota nesta data.</td></tr>`}
-  ${Object.entries(PF).map(([k, v]) => `<tr class="sep"><th class="noprint"></th><th colspan="5">Total ${esc(k)} (${v.n} ${v.n === 1 ? "nota" : "notas"})</th><th></th><th class="n">${brl(v.v)}</th><th></th>${adm ? "<th></th>" : ""}<th></th><th class="noprint"></th></tr>`).join("")}
-  <tr class="tot"><th class="noprint"></th><th colspan="5">TOTAL (${A.length} nota(s) ativas${cfg.linhas ? `, ${T.n} linhas` : ""})</th><th class="n">${T.it}</th><th class="n">${brl(T.fat)}</th><th class="n">${brl(T.fr)}</th>${adm ? `<th class="n">${brl(T.luc)}</th>` : ""}<th></th><th class="noprint"></th></tr></table></div>${T.fr ? `<p class="muted">Frete (motoboy) do dia: <b>${brl(T.fr)}</b> — fora do Total de produtos e do lucro; os totais por forma de pagamento já incluem o frete.</p>` : ""}
+  ${Object.entries(PF).map(([k, v]) => `<tr class="sep"><th class="noprint"></th><th colspan="5">Total ${esc(k)} (${v.n} ${v.n === 1 ? "nota" : "notas"})</th><th></th><th class="n">${brl(v.v)}</th><th></th><th></th>${adm ? "<th></th>" : ""}<th></th><th class="noprint"></th></tr>`).join("")}
+  <tr class="tot"><th class="noprint"></th><th colspan="5">TOTAL (${A.length} nota(s) ativas${cfg.linhas ? `, ${T.n} linhas` : ""})</th><th class="n">${T.it}</th><th class="n">${brl(T.fat)}</th><th class="n">${brl(T.fr)}</th><th class="n">${brl(T.cx)}</th>${adm ? `<th class="n">${brl(T.luc)}</th>` : ""}<th></th><th class="noprint"></th></tr></table></div>${T.fr ? `<p class="muted">Frete (motoboy) do dia: <b>${brl(T.fr)}</b> — fora do Total de produtos e do lucro; os totais por forma de pagamento já incluem o frete.</p>` : ""}${T.cx ? `<p class="muted">Caixinho do Natal do dia: <b>${brl(T.cx)}</b> — fora do Total de produtos e do lucro; os totais por forma de pagamento já incluem o caixinho.</p>` : ""}
   ${K.on ? (dif.length ? `<p class="warn"><b>⚠ Não confere com o resumo:</b> ${esc(dif.join(" · "))}</p>` : `<p class="ok-r">✓ Confere com o resumo: ${T.n} vendas · ${T.it} itens · ${brl(T.fat)}${adm ? " · lucro " + brl(T.luc) : ""}</p>`) : ""}`;
   const tog = (id, on) => { const r = host.querySelector(`tr.exi[data-p="${id}"]`), b = host.querySelector(`.ext-t[data-n="${id}"]`); if (!r) return; r.hidden = on == null ? !r.hidden : !on; b.textContent = r.hidden ? "▸" : "▾"; b.setAttribute("aria-expanded", String(!r.hidden)); };
   host.querySelectorAll(".ext-t").forEach(b => b.onclick = () => tog(b.dataset.n));
@@ -392,10 +408,10 @@ async function viewExtrato(d, adm, K, cfg) {
   $("#exa").onclick = () => { const open = $("#exa").textContent.startsWith("Expandir"); L.forEach(n => tog(n.nota_id, open)); $("#exa").textContent = open ? "Recolher itens" : "Expandir itens"; };
   $("#expr").onclick = () => window.print();
   $("#excsv").onclick = () => { const q = v => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; }, m = v => v == null ? "" : Number(v).toFixed(2).replace(".", ",");
-    const H = ["Nº", "Data", "Hora", "Vendedor", "Cliente", "Pagamento", "Itens", "Total", "Frete", ...(adm ? ["Lucro"] : []), "Status", "Nos totais"];
-    const out = [["Extrato de vendas", dd], [], H, ...L.map(n => [nn(n.nota_id), dd, hm(n.created_at), n.handle || "", n.cliente || "", n.pags.map(g => `${cfg.pl(g.metodo)} ${m(g.valor)}`).join(" + "), n.qtd, m(n.total), m(n.frete || 0), ...(adm ? [m(n.lucro)] : []), n.status === "cancelada" ? "CANCELADA" : "Ativa", n.status === "cancelada" ? "não" : "sim"]), [],
+    const H = ["Nº", "Data", "Hora", "Vendedor", "Cliente", "Pagamento", "Itens", "Total", "Frete", "Caixinho", ...(adm ? ["Lucro"] : []), "Status", "Nos totais"];
+    const out = [["Extrato de vendas", dd], [], H, ...L.map(n => [nn(n.nota_id), dd, hm(n.created_at), n.handle || "", n.cliente || "", n.pags.map(g => `${cfg.pl(g.metodo)} ${m(g.valor)}`).join(" + "), n.qtd, m(n.total), m(n.frete || 0), m(n.caixinho_natal || 0), ...(adm ? [m(n.lucro)] : []), n.status === "cancelada" ? "CANCELADA" : "Ativa", n.status === "cancelada" ? "não" : "sim"]), [],
       ["Nº", "SKU", "Produto", "Qtd", "Preço un.", "Subtotal", "Status"], ...L.flatMap(n => n.itens.map(i => [nn(n.nota_id), i.sku || "", `${i.marca || ""} ${i.produto || ""} ${i.tamanho || ""}`.trim(), i.qtd, m(i.preco_vendido), m(i.total), n.status === "cancelada" ? "CANCELADA" : "Ativa"])), [],
-      ...Object.entries(PF).map(([k, v]) => ["Total " + k, v.n + " nota(s)", m(v.v)]), ["TOTAL (ativas)", A.length + " nota(s)", m(T.fat), "Itens", T.it, "Frete", m(T.fr), ...(adm ? ["Lucro", m(T.luc)] : [])], ...(C.length ? [["Canceladas (fora dos totais)", C.length + " nota(s)", m(sum(C, n => n.total))]] : [])];
+      ...Object.entries(PF).map(([k, v]) => ["Total " + k, v.n + " nota(s)", m(v.v)]), ["TOTAL (ativas)", A.length + " nota(s)", m(T.fat), "Itens", T.it, "Frete", m(T.fr), "Caixinho", m(T.cx), ...(adm ? ["Lucro", m(T.luc)] : [])], ...(C.length ? [["Canceladas (fora dos totais)", C.length + " nota(s)", m(sum(C, n => n.total))]] : [])];
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + out.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `extrato-vendas-${d}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 }
@@ -498,15 +514,18 @@ async function viewNota() {
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
   <h3>Itens da nota</h3><table id="it"></table>
-  <div class="grid"><div><label>Frete (motoboy) R$ — opcional</label><input id="fre" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div><div><p class="muted" style="margin-top:28px">Entra no total da nota. Sem estoque/custo. Nota só de frete é permitida.</p></div></div>
+  <div class="grid"><div><label>Frete (motoboy) R$ — opcional</label><input id="fre" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div><div id="cxbox"></div></div>
+  <p class="muted">Frete e Caixinho entram no total. Sem estoque/custo. Nota só de frete/caixinho é permitida.</p>
   <div class="grid"><div><label>Forma de pagamento</label><select id="fp">${PAY.map(x => `<option>${x}</option>`).join("")}</select></div>
   <div><label>Cliente (opcional)</label><input id="cl" maxlength="120"></div></div>
   <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
-  const draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + (freN() > 0 ? `<tr><td><b>Frete</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(freN())}</td><td></td></tr>` : "") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(totalN())}</th><th></th></tr>`;
+  if (caixinhoOn()) $("#cxbox").innerHTML = `<label>Caixinho do Natal R$ — opcional (até 24/12/2026)</label><input id="cxn" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">`;
+  const draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + (freN() > 0 ? `<tr><td><b>Frete</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(freN())}</td><td></td></tr>` : "") + (cxN() > 0 ? `<tr><td><b>Caixinho do Natal</b></td><td class="n">—</td><td class="n">—</td><td class="n">${brl(cxN())}</td><td></td></tr>` : "") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(totalN())}</th><th></th></tr>`;
     document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
   function freN() { const v = Math.round(+String(($("#fre") || {}).value || "0").replace(",", ".") * 100) / 100; return v > 0 ? v : 0; }
-  function totalN() { return Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + freN()) * 100) / 100; }
-  $("#fre").oninput = () => draw();
+  function cxN() { const v = Math.round(+String(($("#cxn") || {}).value || "0").replace(",", ".") * 100) / 100; return v > 0 ? v : 0; }
+  function totalN() { return Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + freN() + cxN()) * 100) / 100; }
+  $("#fre").oninput = () => draw(); if ($("#cxn")) $("#cxn").oninput = () => draw();
   const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = ""; }; /* sem aviso de preço mínimo (MB 05/11) */
   let hi = 0, M = [];
   const drawS = () => { const q = $("#bq").value.trim(); M = q ? P.filter(p => match(p, q)).sort((a, b) => (b.estoque > 0) - (a.estoque > 0)).slice(0, 12) : []; hi = Math.min(hi, Math.max(M.length - 1, 0));
@@ -528,22 +547,22 @@ async function viewNota() {
     if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
     items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
     $("#f").reset(); $("#sku").value = ""; $("#sel").innerHTML = ""; $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
-  $("#fin").onclick = async () => { const FR = freN(); if (+String($("#fre").value || "0").replace(",", ".") < 0) return toast("Frete inválido"); if (!items.length && !(FR > 0)) return toast("Adicione pelo menos 1 item (ou informe o Frete)"); if (items.some(x => !(+x.preco_vendido >= 0))) return toast("Há item com preço inválido — remova e adicione de novo");
-    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, totalN(), esc($("#fp").value), FR))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
+  $("#fin").onclick = async () => { const FR = freN(), CXV = cxN(); if (+String(($("#fre") || {}).value || "0").replace(",", ".") < 0) return toast("Frete inválido"); if (+String(($("#cxn") || {}).value || "0").replace(",", ".") < 0) return toast("Caixinho do Natal inválido"); if (!items.length && !(FR > 0) && !(CXV > 0)) return toast("Adicione pelo menos 1 item (ou informe Frete / Caixinho)"); if (items.some(x => !(+x.preco_vendido >= 0))) return toast("Há item com preço inválido — remova e adicione de novo");
+    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, totalN(), esc($("#fp").value), FR, CXV))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = totalN(), pagTxt = esc($("#fp").value);
-    try { const nid = await api.criarNota($("#fp").value, items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), $("#cl").value, FR);
+    try { const nid = await api.criarNota($("#fp").value, items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), $("#cl").value, FR, CXV);
       if (!nidOk(nid)) throw new Error("Servidor não confirmou o número da nota (retorno: " + JSON.stringify(nid) + ")");
-      const R = await api.nota(+nid).then(r => r && r.length ? r : api.fretes({ id: +nid })); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
+      const R = await api.nota(+nid).then(r => r && r.length ? r : api.fretes({ id: +nid }).then(F => F.length ? F : (api.caixinhos ? api.caixinhos({ id: +nid }) : []))); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
       items = []; await viewRecibo(+nid);
-      banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b>${FR > 0 ? ` (frete ${brl(FR)})` : ""} · Pagamento: <b>${pagTxt}</b>`);  printBtns();}
+      banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b>${FR > 0 ? ` (frete ${brl(FR)})` : ""}${CXV > 0 ? ` (caixinho ${brl(CXV)})` : ""} · Pagamento: <b>${pagTxt}</b>`);  printBtns();}
     catch (e) { console.error("Nota NÃO salva:", e); fb.disabled = false; fb.textContent = lbl;
-      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small><br><small>Os itens continuam no carrinho.</small>`); }
+      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small><br><small>Os itens continuam no carrinho.</small>`); if (CXV > 0 && /Caixinho do Natal depende/.test(e.message || "")) toast("Caixinho do Natal depende de atualização do banco — avise o admin"); }
     finally { notaSaving = false; } };
   draw(); $("#bq").focus();
 }
 async function viewRecibo(nid) {
-  const R = await api.nota(nid), F = (await api.fretes({ id: nid }).catch(() => []))[0]; if (!R.length && !F) return toast("Nota não encontrada");
-  const h = { ...(R[0] || F), frete: F ? F.frete : 0 }, tot = R.reduce((a, r) => a + Number(r.total), 0);
+  const R = await api.nota(nid), F = (await api.fretes({ id: nid }).catch(() => []))[0], Cx = api.caixinhos ? (await api.caixinhos({ id: nid }).catch(() => []))[0] : null; if (!R.length && !F && !Cx) return toast("Nota não encontrada");
+  const h = { ...(R[0] || F || Cx), frete: F ? F.frete : 0, caixinho_natal: Cx ? Cx.caixinho_natal : 0 }, tot = R.reduce((a, r) => a + Number(r.total), 0);
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
   ${reciboTxt("BAGDA PERFUMES", nid, h, R, tot, [h.forma_pagamento], false)}`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
