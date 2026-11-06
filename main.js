@@ -97,7 +97,7 @@
         '<a class="pvisual" href="perfumes/"><img src="perfumes/' + esc(p.photo) + '" alt="' + esc(full) + '" loading="' + LOAD + '" decoding="async"></a>' +
         '<p class="label mono">' + esc(p.brand) + ' · ' + esc(p.size) + '</p>' +
         '<h3>' + esc(p.name) + '</h3>' +
-        '<div class="prow"><span class="price">' + esc(p.soldOut ? 'Esgotado' : p.priceLabel) + '</span>' +
+        '<div class="prow"><span class="price">' + (p.soldOut ? 'Esgotado' : (p.priceFromLabel ? '<s>De ' + esc(p.priceFromLabel) + '</s> ' : '') + esc(p.priceLabel)) + '</span>' +
         '<a class="btn btn-sm btn-gold mono" target="_blank" rel="noopener" href="' + wa(C.perfumesProduct.replace('{produto}', full).replace('{preco}', p.priceLabel)) + '">Pedir</a></div>' +
         '</article>';
     }).join('');

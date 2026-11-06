@@ -12,6 +12,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/ferassa-jamra.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>Ferassa</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -24,6 +25,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/ferassa-nemer.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>70.00 BRL</g:sale_price>
   <g:brand>Ferassa</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -36,6 +38,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/ferassa-delilah.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>Ferassa</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -48,6 +51,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/ferassa-burkan.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>70.00 BRL</g:sale_price>
   <g:brand>Ferassa</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -60,6 +64,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-club-de-nuit-elite.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>280.00 BRL</g:price>
+  <g:sale_price>260.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -96,6 +101,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-club-de-nuit-intense-man.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>200.00 BRL</g:price>
+  <g:sale_price>155.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -108,6 +114,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-club-de-nuit-intense-woman.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>180.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -120,6 +127,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-club-de-nuit-malika.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>200.00 BRL</g:price>
+  <g:sale_price>170.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -168,6 +176,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-island-bliss.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>250.00 BRL</g:price>
+  <g:sale_price>225.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -180,6 +189,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-odyssey-go-mango.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>155.00 BRL</g:price>
+  <g:sale_price>125.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -192,6 +202,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/armaf-odyssey-spectra.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>115.00 BRL</g:sale_price>
   <g:brand>Armaf</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -204,6 +215,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-strength-in-amber.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -216,6 +228,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-wild-deep.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -228,6 +241,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-scudo-electrique.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -252,6 +266,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-black-morgan.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>70.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -264,6 +279,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-europa-very-red.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>90.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -276,6 +292,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-his-dynasty.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>80.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -288,6 +305,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-two-dare.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>70.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -300,6 +318,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-gossip-homme.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -312,6 +331,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-souls-intertwined-for-her.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>80.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -324,6 +344,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-crypto-gold.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -336,6 +357,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-before-midnight-for-her.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -348,6 +370,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-dominer.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -360,6 +383,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-prima-donna.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>90.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -372,6 +396,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-by-the-shore.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>95.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -384,6 +409,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-heartstrings.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>110.00 BRL</g:price>
+  <g:sale_price>105.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -396,6 +422,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-rose-bourbon.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>110.00 BRL</g:price>
+  <g:sale_price>100.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -467,7 +494,7 @@
   <g:link>https://bgdstores.com/perfumes/#p=mpf-fabulicious</g:link>
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-fabulicious.webp</g:image_link>
   <g:availability>in_stock</g:availability>
-  <g:price>100.00 BRL</g:price>
+  <g:price>105.00 BRL</g:price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -480,6 +507,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-leather-for-men.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>95.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -528,6 +556,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-aquatic-allure.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>110.00 BRL</g:price>
+  <g:sale_price>100.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -540,6 +569,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-rider-blue.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -552,6 +582,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ashaa-amethyst.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -564,6 +595,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-nyla.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -576,6 +608,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ashaa-blanc.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -588,6 +621,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ashaa-mauve.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -600,6 +634,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ashaa-neroli.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -612,6 +647,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ashaa-oud-noir.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>150.00 BRL</g:price>
+  <g:sale_price>140.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -624,6 +660,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ayaan.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>90.00 BRL</g:price>
+  <g:sale_price>75.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -636,6 +673,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-qissat-al-najah.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>220.00 BRL</g:price>
+  <g:sale_price>215.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -648,6 +686,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-la-di-da-for-her.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>230.00 BRL</g:price>
+  <g:sale_price>190.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -660,6 +699,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-hypnotic-amber.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>260.00 BRL</g:price>
+  <g:sale_price>255.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -672,6 +712,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-raees-luxury-edition.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>170.00 BRL</g:price>
+  <g:sale_price>160.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -684,6 +725,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-habib-azul.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>220.00 BRL</g:price>
+  <g:sale_price>215.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -696,6 +738,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-habiba-rosa.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>220.00 BRL</g:price>
+  <g:sale_price>205.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -708,6 +751,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-rihla.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>180.00 BRL</g:price>
+  <g:sale_price>165.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -720,6 +764,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-nisma.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>180.00 BRL</g:price>
+  <g:sale_price>160.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -732,6 +777,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-portrait.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>180.00 BRL</g:price>
+  <g:sale_price>160.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -744,6 +790,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-portrait-azure.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>180.00 BRL</g:price>
+  <g:sale_price>160.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -768,6 +815,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-cranberry-musk.webp</g:image_link>
   <g:availability>out_of_stock</g:availability>
   <g:price>130.00 BRL</g:price>
+  <g:sale_price>110.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -780,6 +828,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-raspberry-ripple.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>215.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -792,6 +841,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-black-currant-lolly.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>215.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -804,6 +854,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-ramad.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>170.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -828,6 +879,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-mahd-al-dhahab.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>190.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -840,6 +892,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-rumiel.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>195.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -852,6 +905,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-uhud.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>190.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -864,6 +918,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-bahiya-garnet.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>190.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -876,6 +931,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-kohl-luminous.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>240.00 BRL</g:price>
+  <g:sale_price>190.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -888,6 +944,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/arabiyat-prestige-noire.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>230.00 BRL</g:price>
+  <g:sale_price>200.00 BRL</g:sale_price>
   <g:brand>Arabiyat Prestige</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -900,6 +957,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/al-wataniah-atter-al-wesal-gold.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>160.00 BRL</g:price>
+  <g:sale_price>150.00 BRL</g:sale_price>
   <g:brand>Al Wataniah</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -912,6 +970,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/rayhaan-pacific-tropical-vibe.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>190.00 BRL</g:price>
+  <g:sale_price>170.00 BRL</g:sale_price>
   <g:brand>Rayhaan</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1031,7 +1090,8 @@
   <g:link>https://bgdstores.com/perfumes/#p=mpf-highway-parfum</g:link>
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-highway-parfum-v2.webp</g:image_link>
   <g:availability>in_stock</g:availability>
-  <g:price>99.99 BRL</g:price>
+  <g:price>100.00 BRL</g:price>
+  <g:sale_price>70.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1091,7 +1151,8 @@
   <g:link>https://bgdstores.com/perfumes/#p=mpf-murano-crystal</g:link>
   <g:image_link>https://bgdstores.com/perfumes/assets/img/mpf-murano-crystal.webp</g:image_link>
   <g:availability>in_stock</g:availability>
-  <g:price>99.99 BRL</g:price>
+  <g:price>100.00 BRL</g:price>
+  <g:sale_price>90.00 BRL</g:sale_price>
   <g:brand>MPF</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1116,6 +1177,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/paris-corner-eshal-vanilla.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>185.00 BRL</g:price>
+  <g:sale_price>155.00 BRL</g:sale_price>
   <g:brand>Paris Corner</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1128,6 +1190,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/paris-corner-dulzura.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>135.00 BRL</g:price>
+  <g:sale_price>115.00 BRL</g:sale_price>
   <g:brand>Paris Corner</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1140,6 +1203,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/paris-corner-december-vanilla.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>100.00 BRL</g:price>
+  <g:sale_price>85.00 BRL</g:sale_price>
   <g:brand>Paris Corner</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1152,6 +1216,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/paris-corner-azm.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>185.00 BRL</g:price>
+  <g:sale_price>145.00 BRL</g:sale_price>
   <g:brand>Paris Corner</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1164,6 +1229,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/paris-corner-marshmallow-blush.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>200.00 BRL</g:price>
+  <g:sale_price>170.00 BRL</g:sale_price>
   <g:brand>Paris Corner</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1176,6 +1242,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-azzure-aoud.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>175.00 BRL</g:price>
+  <g:sale_price>135.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1188,6 +1255,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-aether-extrait.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>195.00 BRL</g:price>
+  <g:sale_price>170.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1200,6 +1268,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-atlantis-extrait.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>245.00 BRL</g:price>
+  <g:sale_price>195.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1212,6 +1281,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-vulcan-feu.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>255.00 BRL</g:price>
+  <g:sale_price>215.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1224,6 +1294,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-royal-blend.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>190.00 BRL</g:price>
+  <g:sale_price>150.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1236,6 +1307,7 @@
   <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-spectre-wraith.webp</g:image_link>
   <g:availability>in_stock</g:availability>
   <g:price>185.00 BRL</g:price>
+  <g:sale_price>145.00 BRL</g:sale_price>
   <g:brand>French Avenue</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>479</g:google_product_category>
@@ -1725,6 +1797,20 @@
   <g:brand>Ninja</g:brand>
   <g:condition>new</g:condition>
   <g:google_product_category>Home &amp; Garden &gt; Kitchen &amp; Dining &gt; Kitchen Appliances</g:google_product_category>
+</item>
+
+<item>
+  <g:id>french-avenue-liquid-brun</g:id>
+  <g:title>Perfume French Avenue Liquid Brun 100 ml</g:title>
+  <g:description>Perfume French Avenue Liquid Brun 100 ml · Masculino. Original, na BAGDA PERFUMES (Mega Polo Brás, São Paulo). Retire na loja ou receba em todo o Brasil.</g:description>
+  <g:link>https://bgdstores.com/perfumes/#p=french-avenue-liquid-brun</g:link>
+  <g:image_link>https://bgdstores.com/perfumes/assets/img/french-avenue-liquid-brun.webp</g:image_link>
+  <g:availability>in_stock</g:availability>
+  <g:price>210.00 BRL</g:price>
+  <g:sale_price>195.00 BRL</g:sale_price>
+  <g:brand>French Avenue</g:brand>
+  <g:condition>new</g:condition>
+  <g:google_product_category>479</g:google_product_category>
 </item>
 </channel>
 </rss>
