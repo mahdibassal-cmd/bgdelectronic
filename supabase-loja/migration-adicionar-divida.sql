@@ -10,17 +10,37 @@
 -- Não é crédito da Caixa Geral (o cliente passa a dever, não a ter saldo).
 -- Não altera criar_nota, criar_nota_local, LARANJIHA, GETNET nem o ledger cxesp.
 --
--- Pré-requisitos: schema.sql, users.sql, security.sql, migration-clientes.sql
--- (cliente_id e método prazo), migration-caixa-geral.sql (obs_pagamento).
--- A coluna notas.frete é criada aqui se ainda não existir (a mesma de migration-frete.sql).
--- frete_dia, se existir ou for criada, não soma nota marcada DÍVIDA ANTERIOR,
--- para o resumo do dia não tratar a dívida como frete de motoboy.
+-- Pré-requisitos já presentes em produção (esta migration NÃO os cria):
+--   public.notas.frete (migration-frete.sql)
+--   public.notas.obs_pagamento (migration-caixa-geral.sql)
+--   public.notas.cliente_id e pay_method 'prazo' (migration-clientes.sql)
+--   public.cliente_saldo_calc(bigint), public.can(text), public.profiles
+-- Não cria frete_dia. Em produção essa função não existe; criá-la faria o
+-- Resumo do dia passar a mostrar "Frete (motoboy)" de todas as notas, não só
+-- desta dívida. O extrato e o relatório por forma deixam esta nota de fora
+-- pelo rótulo DÍVIDA ANTERIOR. Caixa, crédito e lucro de produto não mudam.
 -- =====================================================================
 
-alter table public.notas add column if not exists frete numeric(12,2) not null default 0;
 do $$ begin
-  if not exists (select 1 from pg_constraint where conname = 'notas_frete_check') then
-    alter table public.notas add constraint notas_frete_check check (frete >= 0);
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'notas' and column_name = 'frete') then
+    raise exception 'Parar: falta public.notas.frete. Não criar a coluna aqui.';
+  end if;
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'notas' and column_name = 'obs_pagamento') then
+    raise exception 'Parar: falta public.notas.obs_pagamento.';
+  end if;
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'notas' and column_name = 'cliente_id') then
+    raise exception 'Parar: falta public.notas.cliente_id.';
+  end if;
+  if not exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+                  where t.typname = 'pay_method' and e.enumlabel = 'prazo') then
+    raise exception 'Parar: pay_method sem prazo.';
+  end if;
+  if to_regprocedure('public.cliente_saldo_calc(bigint)') is null
+     or to_regprocedure('public.can(text)') is null then
+    raise exception 'Parar: falta cliente_saldo_calc ou can.';
   end if;
 end $$;
 
@@ -34,6 +54,7 @@ create table if not exists public.divida_legado_idem (
   constraint divida_legado_idem_chave_chk check (chave ~ '^[A-Za-z0-9._:-]{8,80}$')
 );
 alter table public.divida_legado_idem enable row level security;
+alter table public.divida_legado_idem force row level security;
 revoke all on table public.divida_legado_idem from public, anon, authenticated;
 
 create or replace function public.adicionar_divida(
@@ -90,26 +111,14 @@ end $$;
 revoke all on function public.adicionar_divida(bigint, numeric, text, text) from public, anon;
 grant execute on function public.adicionar_divida(bigint, numeric, text, text) to authenticated;
 
--- Resumo do dia: dívida anterior não entra no total de frete de motoboy.
-create or replace function public.frete_dia(p_data date default null)
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare r jsonb; d date := coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date);
-begin
-  if not (public.can('financas') or public.can('admin')) then
-    raise exception 'Sem permissão' using errcode = '42501';
-  end if;
-  select jsonb_build_object(
-           'data', d,
-           'frete', coalesce(sum(frete), 0),
-           'notas', count(*) filter (where frete > 0))
-    into r
-    from public.notas
-   where data = d and status = 'ativa'
-     and coalesce(obs_pagamento, '') not like 'DÍVIDA ANTERIOR%';
-  return r;
-end $$;
-revoke all on function public.frete_dia(date) from public, anon;
-grant execute on function public.frete_dia(date) to authenticated;
+-- Relatório por forma: a dívida anterior não entra como faturamento.
+create or replace view public.v_report_payment with (security_invoker = true) as
+select n.data, np.metodo as forma_pagamento, count(distinct n.id) as vendas, sum(np.valor) as faturamento
+from public.notas n join public.nota_pagamentos np on np.nota_id = n.id
+where n.status = 'ativa'
+  and coalesce(n.obs_pagamento, '') not like 'DÍVIDA ANTERIOR%'
+  and public.has_perm('admin')
+group by n.data, np.metodo;
 
 notify pgrst, 'reload schema';
 select 'adicionar divida ok' as status;

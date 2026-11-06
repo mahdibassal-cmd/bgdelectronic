@@ -16,11 +16,17 @@ grant execute on all functions in schema auth to anon, authenticated;
 insert into auth.users values ${Object.keys(ids).map(k => `('${U(k)}','${k}@loja.bgdstores.local')`).join(",")};`);
 const files = ["schema.sql", "users.sql", "security.sql", "migration-clientes.sql", "migration-caixa-resumo.sql",
   "fix-security-events-kinds.sql", "migration-caixa-geral.sql", "migration-receber-credito.sql", "migration-estornos.sql",
-  "migration-caixa-metodo-null.sql", "migration-receber-caixa-especial.sql", "migration-adicionar-divida.sql"];
+  "migration-caixa-metodo-null.sql", "migration-receber-caixa-especial.sql"];
 for (const f of files) {
   try { await db.exec(S(f)); console.log("ran " + f); }
   catch (e) { console.error("FAIL load " + f + ": " + e.message); process.exit(1); }
 }
+await db.exec("alter table public.notas add column if not exists frete numeric(12,2) not null default 0");
+try { await db.exec(S("migration-adicionar-divida.sql")); console.log("ran migration-adicionar-divida.sql"); }
+catch (e) { console.error("FAIL load migration-adicionar-divida.sql: " + e.message); process.exit(1); }
+ok(!/create or replace function public\.frete_dia/.test(S("migration-adicionar-divida.sql")), "migration does not create frete_dia");
+ok(!/add column if not exists frete/.test(S("migration-adicionar-divida.sql")), "migration does not create notas.frete");
+ok(/DÍVIDA ANTERIOR%/.test(S("migration-adicionar-divida.sql")) && /v_report_payment/.test(S("migration-adicionar-divida.sql")), "payment report excludes the legacy label");
 const as = k => db.exec(`reset role; select set_config('request.jwt.claims', '${JSON.stringify({ sub: U(k), aal: "aal1" })}', false); set role authenticated;`);
 const err = async q => { try { await db.query(q); return null; } catch (e) { return e.message; } };
 const one = async q => (await db.query(q)).rows[0];
@@ -93,9 +99,10 @@ const rec = await num(`select public.registrar_recebimento(${maria}::bigint, 30:
 const saldoPay = await ownerNum(`select public.cliente_saldo_calc(${maria})`);
 ok(Math.round((Number(saldo0) + 80.13 - 30) * 100) === Math.round(saldoPay * 100), "repayment reduces the same debt: " + saldoPay);
 ok(await ownerNum("select count(*) from public.caixa_movimentos") === mov0 + 1, "only the receipt entered the caixa");
-await as("pamela");
-const freteHoje = (await one("select public.frete_dia(null::date) j")).j;
-ok(Number(freteHoje.frete) === 0, "legacy debt is not counted as motoboy freight");
+await as("mike");
+const prazoFat = await num("select coalesce(sum(faturamento),0)::float8 from public.v_report_payment where forma_pagamento::text = 'prazo'");
+ok(prazoFat === 100, "daily payment report keeps the real prazo sale and excludes the debt: " + prazoFat);
+ok(await ownerNum("select count(*) from pg_proc where proname = 'frete_dia'") === 0, "frete_dia stays absent");
 
 await as("mike");
 await db.query(`select public.cancelar_nota(${r1.nota_id}, 'lancamento errado')`);
