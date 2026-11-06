@@ -1,4 +1,4 @@
-/* Manifest parity: public De/Por match sanitized v3. No cost figures. */
+/* Round-up draft parity. Reference price is proposed, not a verified past price. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,73 +17,68 @@ const json = JSON.parse(readFileSync(join(root, "data.json"), "utf8"));
 const man = JSON.parse(readFileSync(join(root, "bf-manifest-public.json"), "utf8"));
 const html = readFileSync(join(root, "index.html"), "utf8");
 const app = readFileSync(join(root, "assets/app.js"), "utf8");
+const css = readFileSync(join(root, "assets/bf.css"), "utf8");
 const feed = readFileSync(join(repo, "feeds/google-merchant.xml"), "utf8");
 const P = data.perfumes;
 const by = new Map(P.map(p => [p.id, p]));
 const rows = man.rows;
-const perfume = rows.filter(r => r.scope === "perfume");
-const known = perfume.filter(r => !r.unknown);
-const held = perfume.filter(r => r.unknown);
-const beauty = rows.filter(r => r.scope === "beauty");
+const known = rows.filter(r => r.scope === "perfume" && !r.unknown);
+const held = rows.filter(r => r.unknown);
 
-ok(rows.length === 113 && perfume.length === 104 && known.length === 88 && held.length === 16 && beauty.length === 9, "113 manifest rows: 88 priced, 16 held, 9 beauty");
-ok(!JSON.stringify(data).match(/"(cost|custo)"/i) && !JSON.stringify(man).match(/"(cost|custo)"/i), "no cost field in public catalog or sanitized manifest");
-ok(json.perfumes.every((p, i) => p.id === P[i].id && p.price === P[i].price && p.priceFrom === P[i].priceFrom && p.bf === P[i].bf && p.soldOut === P[i].soldOut), "data.json matches data.js");
+ok(rows.length === 104 && known.length === 88 && held.length === 16, "104 perfume rows, 88 priced, 16 held");
+ok(!JSON.stringify(data).match(/"(cost|custo|margin)"/i) && !JSON.stringify(man).match(/"(cost|custo|margin)"/i), "no cost or margin in public files");
+ok(json.perfumes.every((p, i) => p.id === P[i].id && p.price === P[i].price && p.priceFrom === P[i].priceFrom && !!p.proposed === !!P[i].proposed), "data.json matches data.js");
+ok(!P.some(p => /lattafa|celimax|fino/i.test(p.brand + " " + p.name)), "Lattafa excluded; Celimax and Fino not added");
 
-let knownMismatch = 0;
+let mismatch = 0;
 for (const r of known) {
   const p = by.get(r.id);
-  const off = Math.round((1 - r.por / r.de) * 100);
-  const priceOk = p && Math.abs(p.price - r.por) < 0.001 && p.priceFrom === r.de && p.bf === true && p.bfOff === off;
+  const priceOk = p && p.proposed && p.price === r.por && p.priceFrom === r.de && r.de === r.por * 2 && !p.bfOff;
   const payOk = p && !!p.waOnly === (r.previous == null || Math.abs(r.por - r.previous) > 0.001);
-  if (!priceOk || !payOk) { knownMismatch++; console.error("KNOWN", r.sku, r.name, p && p.price, p && p.priceFrom, "want", r.por, r.de); }
+  if (!priceOk || !payOk) { mismatch++; console.error("PRICED", r.sku, r.name, p && p.price, p && p.priceFrom); }
 }
-ok(knownMismatch === 0, "known-cost mismatch count after correction is " + knownMismatch);
+ok(mismatch === 0, "priced-row mismatch count is " + mismatch);
 
-let divergence = 0;
-const inStock = ["PERF-063", "PERF-013", "PERF-079"];
+const heldIds = ["PERF-020","PERF-084","PERF-085","PERF-087","PERF-088","PERF-089","PERF-090","PERF-063","PERF-068","PERF-006","PERF-007","PERF-011","PERF-012","PERF-013","PERF-079","PERF-092"];
+ok(held.map(r => r.sku).sort().join() === heldIds.slice().sort().join(), "held sku set is the 16 missing-cost bottles");
+let holdBad = 0;
 for (const r of held) {
   const p = by.get(r.id);
-  const same = p && !p.bf && p.priceFrom == null && Math.abs(p.price - r.hold) < 0.001 && Math.abs(p.price - r.manifestPor) > 0.001;
-  const stockOk = p && p.soldOut === (r.stock === "ESGOTADO") && (r.stock === "IN STOCK") === inStock.includes(r.sku);
-  if (!same || !stockOk || p.waOnly) { divergence++; console.error("HOLD", r.sku, p && p.price, p && p.soldOut, p && p.bf); }
+  const okHold = p && !p.proposed && p.priceFrom == null && Math.abs(p.price - r.hold) < 0.001 && Math.abs(r.filePor - r.hold) > 0.001 && !p.waOnly;
+  if (!okHold) { holdBad++; console.error("HOLD", r.sku, p && p.price, r.hold, r.filePor); }
 }
-ok(held.length === 16 && divergence === 0, "16 missing-cost rows stay at the published price and out of the sale; divergence vs half-price is " + held.length);
+ok(holdBad === 0, "16 held rows keep the published price and are excluded from the proposed reference");
 
-const jam = by.get("ferassa-jamra");
-const fab = by.get("mpf-fabulicious");
-const brun = by.get("french-avenue-liquid-brun");
-ok(jam.priceFrom === 95 && jam.price === 85 && jam.bfOff === 11 && jam.waOnly, "Jamra 95 to 85");
-ok(fab.priceFrom === 110 && fab.price === 105 && fab.bfOff === 5 && fab.waOnly && !fab.soldOut, "Fabulicious 110 to 105");
-ok(brun.priceFrom === 210 && brun.price === 195 && brun.bfOff === 7 && brun.waOnly, "Liquid Brun 210 to 195");
-ok(by.get("arabiyat-prestige-swar-venin").price === 230 && !by.get("arabiyat-prestige-swar-venin").bf && !by.get("arabiyat-prestige-swar-venin").soldOut, "Swar Venin stays 230 in stock");
-ok(by.get("armaf-magical-oud").price === 150 && !by.get("armaf-magical-oud").bf, "Magical Oud stays 150");
-ok(by.get("ibraheem-al-qurashi-cuban-tobacco").price === 150 && !by.get("ibraheem-al-qurashi-cuban-tobacco").bf, "Cuban Tobacco stays 150");
-ok(by.get("armaf-club-de-nuit-intense-fuego").soldOut && by.get("armaf-club-de-nuit-intense-fuego").price === 320 && !by.get("armaf-club-de-nuit-intense-fuego").bf, "Fuego held at 320 and marked sold out");
-ok(beauty.every(r => !P.some(p => p.name === r.name)), "beauty rows are not added to the perfume catalog");
+const fer = known.filter(r => r.sku.startsWith("FER-"));
+ok(fer.length === 4 && fer.every(r => r.de === 190 && r.por === 95 && by.get(r.id).price === 95 && by.get(r.id).priceFrom === 190), "all Ferassa 190/95");
+const manRow = known.find(r => r.sku === "PERF-008");
+ok(manRow.de === 330 && manRow.por === 165 && by.get(manRow.id).priceFrom === 330 && by.get(manRow.id).price === 165, "Club de Nuit Intense Man 330/165");
+const brun = known.find(r => r.sku === "PERF-150");
+ok(brun.de === 400 && brun.por === 200 && by.get(brun.id).priceFrom === 400 && by.get(brun.id).price === 200, "Liquid Brun 400/200");
+ok(by.get("arabiyat-prestige-swar-venin").price === 230 && !by.get("arabiyat-prestige-swar-venin").proposed, "Swar Venin held at 230");
+ok(by.get("armaf-magical-oud").price === 150 && !by.get("armaf-magical-oud").proposed, "Magical Oud held at 150");
+ok(by.get("ibraheem-al-qurashi-cuban-tobacco").price === 150 && !by.get("ibraheem-al-qurashi-cuban-tobacco").proposed, "Cuban Tobacco held at 150");
+
+ok(/referência proposta/i.test(html) && /não é um preço anterior comprovado/i.test(html) && !/Desconto real|De riscado/i.test(html), "preview calls the higher price a proposed reference");
+ok(!/-50%|50%\s*OFF/.test(html + app) && !app.includes("'-'+p.bfOff"), "no blanket or percent-off claim");
+ok(/if\(p\.waOnly\) return ""/.test(app), "Getnet only when the charged amount is unchanged");
 
 function ld(id) {
-  const m = html.match(new RegExp('"sku":"' + id + '"[\\s\\S]*?"price":"([0-9.]+)"[\\s\\S]*?"availability":"([^"]+)"'));
-  return m && { price: m[1], avail: m[2] };
+  const m = html.match(new RegExp('"sku":"' + id + '"[\\s\\S]*?"price":"([0-9.]+)"'));
+  return m && m[1];
 }
-ok(ld("ferassa-jamra").price === "85.00" && ld("mpf-fabulicious").price === "105.00" && ld("french-avenue-liquid-brun").price === "195.00", "JSON-LD charges Por");
-ok(ld("arabiyat-prestige-swar-venin").price === "230.00" && ld("arabiyat-prestige-swar-venin").avail.endsWith("InStock"), "JSON-LD keeps Swar Venin at 230");
-ok(ld("armaf-club-de-nuit-intense-fuego").price === "320.00" && ld("armaf-club-de-nuit-intense-fuego").avail.endsWith("OutOfStock"), "JSON-LD marks Fuego sold out at 320");
+ok(ld("ferassa-jamra") === "95.00" && ld("armaf-club-de-nuit-intense-man") === "165.00" && ld("french-avenue-liquid-brun") === "200.00", "JSON-LD price is Por, the amount charged");
+ok(!html.includes("highPrice"), "JSON-LD does not publish the reference as a past price");
 
 function item(id) {
   const m = feed.match(new RegExp("<g:id>" + id + "</g:id>[\\s\\S]*?</item>"));
   return m && m[0];
 }
-const jamFeed = item("ferassa-jamra");
-ok(jamFeed.includes("<g:price>95.00 BRL</g:price>") && jamFeed.includes("<g:sale_price>85.00 BRL</g:sale_price>"), "merchant De 95 Por 85");
-const fabFeed = item("mpf-fabulicious");
-ok(fabFeed.includes("<g:price>110.00 BRL</g:price>") && fabFeed.includes("<g:sale_price>105.00 BRL</g:sale_price>"), "merchant Fabulicious 110 to 105");
-const fuego = item("armaf-club-de-nuit-intense-fuego");
-ok(fuego.includes("<g:price>320.00 BRL</g:price>") && !fuego.includes("sale_price") && fuego.includes("out_of_stock"), "merchant leaves Fuego at 320 without a sale price");
-const same = item("mpf-rouge-lights");
-ok(same.includes("<g:price>105.00 BRL</g:price>") && same.includes("<g:sale_price>100.00 BRL</g:sale_price>"), "merchant shows De even when Por equals the old shelf price");
-ok(/if\(p\.waOnly\) return ""/.test(app) && !/if\(p\.bf\|\|p\.waOnly\)/.test(app), "Getnet stays only when the charged amount did not change");
-ok(!/Distribuidor oficial/i.test(html) && !/50%\s*OFF/.test(html), "no blanket discount or new distributor claim");
+ok(item("ferassa-jamra").includes("<g:price>95.00 BRL</g:price>") && !item("ferassa-jamra").includes("sale_price"), "feed charges Jamra 95 and does not claim a sale from 190");
+ok(item("armaf-club-de-nuit-intense-man").includes("<g:price>165.00 BRL</g:price>") && !item("armaf-club-de-nuit-intense-man").includes("sale_price"), "feed charges Intense Man 165");
+ok(item("french-avenue-liquid-brun").includes("<g:price>200.00 BRL</g:price>") && !feed.includes("<g:sale_price>"), "feed has no sale_price while the reference is unvalidated");
+ok(item("arabiyat-prestige-swar-venin").includes("<g:price>230.00 BRL</g:price>"), "feed keeps Swar Venin at 230");
+ok(css.includes(".ref-lab") && !css.includes("text-decoration:line-through"), "reference label is not a strikethrough previous price");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
-console.log("manifest parity ok; known mismatches 0; intentional holds 16");
+console.log("round-up parity ok; priced mismatches 0; held exceptions 16");

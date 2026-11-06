@@ -1,5 +1,5 @@
 {
- "note": "Sanitized Black Friday v3 prices for the public catalog. Internal figures that are not a selling price are omitted.",
+ "note": "Sanitized round-up prices for the draft. Cost and margin are omitted. Reference prices are proposed, not verified past prices. v3 pricing is superseded.",
  "rows": [
   {
    "sku": "FER-001",
@@ -7,8 +7,8 @@
    "id": "ferassa-jamra",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 85,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -18,8 +18,8 @@
    "id": "ferassa-nemer",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 70,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -29,8 +29,8 @@
    "id": "ferassa-delilah",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 85,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -40,8 +40,8 @@
    "id": "ferassa-burkan",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 70,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -51,8 +51,8 @@
    "id": "mpf-strength-in-amber",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 100,
    "soldOut": false
   },
@@ -62,8 +62,8 @@
    "id": "mpf-wild-deep",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 100,
    "soldOut": false
   },
@@ -73,8 +73,8 @@
    "id": "mpf-scudo-electrique",
    "scope": "perfume",
    "unknown": false,
-   "de": 90,
-   "por": 85,
+   "de": 180,
+   "por": 90,
    "previous": 100,
    "soldOut": false
   },
@@ -84,12 +84,11 @@
    "id": "mpf-wicked",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-021",
@@ -97,8 +96,8 @@
    "id": "mpf-black-morgan",
    "scope": "perfume",
    "unknown": false,
-   "de": 75,
-   "por": 70,
+   "de": 150,
+   "por": 75,
    "previous": 100,
    "soldOut": false
   },
@@ -108,8 +107,8 @@
    "id": "mpf-europa-very-red",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 90,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -119,8 +118,8 @@
    "id": "mpf-his-dynasty",
    "scope": "perfume",
    "unknown": false,
-   "de": 85,
-   "por": 80,
+   "de": 170,
+   "por": 85,
    "previous": 100,
    "soldOut": false
   },
@@ -130,8 +129,8 @@
    "id": "mpf-two-dare",
    "scope": "perfume",
    "unknown": false,
-   "de": 75,
-   "por": 70,
+   "de": 150,
+   "por": 75,
    "previous": 100,
    "soldOut": false
   },
@@ -141,8 +140,8 @@
    "id": "mpf-gossip-homme",
    "scope": "perfume",
    "unknown": false,
-   "de": 90,
-   "por": 85,
+   "de": 180,
+   "por": 90,
    "previous": 100,
    "soldOut": false
   },
@@ -152,8 +151,8 @@
    "id": "mpf-souls-intertwined-for-her",
    "scope": "perfume",
    "unknown": false,
-   "de": 85,
-   "por": 80,
+   "de": 170,
+   "por": 85,
    "previous": 100,
    "soldOut": false
   },
@@ -163,8 +162,8 @@
    "id": "mpf-crypto-gold",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 100,
    "soldOut": false
   },
@@ -174,8 +173,8 @@
    "id": "mpf-before-midnight-for-her",
    "scope": "perfume",
    "unknown": false,
-   "de": 90,
-   "por": 85,
+   "de": 180,
+   "por": 90,
    "previous": 100,
    "soldOut": false
   },
@@ -185,8 +184,8 @@
    "id": "mpf-dominer",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 100,
    "soldOut": false
   },
@@ -196,8 +195,8 @@
    "id": "mpf-prima-donna",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 90,
+   "de": 190,
+   "por": 95,
    "previous": 100,
    "soldOut": false
   },
@@ -207,8 +206,8 @@
    "id": "mpf-by-the-shore",
    "scope": "perfume",
    "unknown": false,
-   "de": 100,
-   "por": 95,
+   "de": 200,
+   "por": 100,
    "previous": 100,
    "soldOut": false
   },
@@ -218,8 +217,8 @@
    "id": "mpf-heartstrings",
    "scope": "perfume",
    "unknown": false,
-   "de": 110,
-   "por": 105,
+   "de": 220,
+   "por": 110,
    "previous": 110,
    "soldOut": false
   },
@@ -229,8 +228,8 @@
    "id": "mpf-rose-bourbon",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 110,
    "soldOut": false
   },
@@ -240,8 +239,8 @@
    "id": "mpf-rouge-lights",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -251,8 +250,8 @@
    "id": "mpf-oud-memoir",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -262,8 +261,8 @@
    "id": "mpf-roseate-glow",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -273,8 +272,8 @@
    "id": "mpf-fizzy-cherry",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -284,8 +283,8 @@
    "id": "mpf-just-peach",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -295,8 +294,8 @@
    "id": "mpf-fabulicious",
    "scope": "perfume",
    "unknown": false,
-   "de": 110,
-   "por": 105,
+   "de": 220,
+   "por": 110,
    "previous": 100,
    "soldOut": false
   },
@@ -306,8 +305,8 @@
    "id": "mpf-leather-for-men",
    "scope": "perfume",
    "unknown": false,
-   "de": 100,
-   "por": 95,
+   "de": 200,
+   "por": 100,
    "previous": 100,
    "soldOut": false
   },
@@ -317,8 +316,8 @@
    "id": "mpf-orchid-noir",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -328,8 +327,8 @@
    "id": "mpf-just-oud-wood",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -339,8 +338,8 @@
    "id": "mpf-ombre",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -350,8 +349,8 @@
    "id": "mpf-aquatic-allure",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 110,
    "soldOut": false
   },
@@ -361,8 +360,8 @@
    "id": "mpf-rider-blue",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 100,
    "soldOut": false
   },
@@ -372,12 +371,11 @@
    "id": "mpf-poudre",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-085",
@@ -385,12 +383,11 @@
    "id": "mpf-dark-scudo",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-086",
@@ -398,8 +395,8 @@
    "id": "mpf-highway-parfum",
    "scope": "perfume",
    "unknown": false,
-   "de": 75,
-   "por": 70,
+   "de": 150,
+   "por": 75,
    "previous": 99.99,
    "soldOut": false
   },
@@ -409,12 +406,11 @@
    "id": "mpf-vanilla-tobacco",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-088",
@@ -422,12 +418,11 @@
    "id": "mpf-wicked-elixir",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-089",
@@ -435,12 +430,11 @@
    "id": "mpf-wicked-legend",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-090",
@@ -448,12 +442,11 @@
    "id": "mpf-wicked-noir",
    "scope": "perfume",
    "unknown": true,
-   "de": 100,
-   "manifestPor": 50,
+   "fileDe": 100,
+   "filePor": 50,
    "hold": 99.99,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-091",
@@ -461,8 +454,8 @@
    "id": "mpf-murano-crystal",
    "scope": "perfume",
    "unknown": false,
-   "de": 95,
-   "por": 90,
+   "de": 190,
+   "por": 95,
    "previous": 99.99,
    "soldOut": false
   },
@@ -472,8 +465,8 @@
    "id": "al-wataniah-atter-al-wesal-gold",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 160,
    "soldOut": false
   },
@@ -483,8 +476,8 @@
    "id": "arabiyat-prestige-ashaa-amethyst",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 150,
    "soldOut": false
   },
@@ -494,8 +487,8 @@
    "id": "arabiyat-prestige-nyla",
    "scope": "perfume",
    "unknown": false,
-   "de": 90,
-   "por": 85,
+   "de": 180,
+   "por": 90,
    "previous": 150,
    "soldOut": false
   },
@@ -505,8 +498,8 @@
    "id": "arabiyat-prestige-ashaa-blanc",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 150,
    "soldOut": false
   },
@@ -516,8 +509,8 @@
    "id": "arabiyat-prestige-ashaa-mauve",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 150,
    "soldOut": false
   },
@@ -527,8 +520,8 @@
    "id": "arabiyat-prestige-ashaa-neroli",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 150,
    "soldOut": false
   },
@@ -538,8 +531,8 @@
    "id": "arabiyat-prestige-ashaa-oud-noir",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 150,
    "soldOut": false
   },
@@ -549,8 +542,8 @@
    "id": "arabiyat-prestige-ayaan",
    "scope": "perfume",
    "unknown": false,
-   "de": 80,
-   "por": 75,
+   "de": 160,
+   "por": 80,
    "previous": 90,
    "soldOut": false
   },
@@ -560,8 +553,8 @@
    "id": "arabiyat-prestige-qissat-al-najah",
    "scope": "perfume",
    "unknown": false,
-   "de": 220,
-   "por": 215,
+   "de": 440,
+   "por": 220,
    "previous": 220,
    "soldOut": false
   },
@@ -571,8 +564,8 @@
    "id": "arabiyat-prestige-la-di-da-for-her",
    "scope": "perfume",
    "unknown": false,
-   "de": 195,
-   "por": 190,
+   "de": 390,
+   "por": 195,
    "previous": 230,
    "soldOut": false
   },
@@ -582,8 +575,8 @@
    "id": "arabiyat-prestige-hypnotic-amber",
    "scope": "perfume",
    "unknown": false,
-   "de": 260,
-   "por": 255,
+   "de": 520,
+   "por": 260,
    "previous": 260,
    "soldOut": false
   },
@@ -593,8 +586,8 @@
    "id": "arabiyat-prestige-raees-luxury-edition",
    "scope": "perfume",
    "unknown": false,
-   "de": 165,
-   "por": 160,
+   "de": 330,
+   "por": 165,
    "previous": 170,
    "soldOut": false
   },
@@ -604,8 +597,8 @@
    "id": "arabiyat-prestige-habib-azul",
    "scope": "perfume",
    "unknown": false,
-   "de": 220,
-   "por": 215,
+   "de": 440,
+   "por": 220,
    "previous": 220,
    "soldOut": false
   },
@@ -615,8 +608,8 @@
    "id": "arabiyat-prestige-habiba-rosa",
    "scope": "perfume",
    "unknown": false,
-   "de": 210,
-   "por": 205,
+   "de": 420,
+   "por": 210,
    "previous": 220,
    "soldOut": false
   },
@@ -626,8 +619,8 @@
    "id": "arabiyat-prestige-rihla",
    "scope": "perfume",
    "unknown": false,
-   "de": 170,
-   "por": 165,
+   "de": 340,
+   "por": 170,
    "previous": 180,
    "soldOut": false
   },
@@ -637,8 +630,8 @@
    "id": "arabiyat-prestige-nisma",
    "scope": "perfume",
    "unknown": false,
-   "de": 165,
-   "por": 160,
+   "de": 330,
+   "por": 165,
    "previous": 180,
    "soldOut": false
   },
@@ -648,8 +641,8 @@
    "id": "arabiyat-prestige-portrait",
    "scope": "perfume",
    "unknown": false,
-   "de": 165,
-   "por": 160,
+   "de": 330,
+   "por": 165,
    "previous": 180,
    "soldOut": false
   },
@@ -659,8 +652,8 @@
    "id": "arabiyat-prestige-portrait-azure",
    "scope": "perfume",
    "unknown": false,
-   "de": 165,
-   "por": 160,
+   "de": 330,
+   "por": 165,
    "previous": 180,
    "soldOut": false
   },
@@ -670,12 +663,11 @@
    "id": "arabiyat-prestige-swar-venin",
    "scope": "perfume",
    "unknown": true,
-   "de": 230,
-   "manifestPor": 115,
+   "fileDe": 230,
+   "filePor": 115,
    "hold": 230,
    "soldOut": false,
-   "stock": "IN STOCK",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-064",
@@ -683,8 +675,8 @@
    "id": "arabiyat-prestige-cranberry-musk",
    "scope": "perfume",
    "unknown": false,
-   "de": 115,
-   "por": 110,
+   "de": 230,
+   "por": 115,
    "previous": 130,
    "soldOut": true
   },
@@ -694,8 +686,8 @@
    "id": "arabiyat-prestige-raspberry-ripple",
    "scope": "perfume",
    "unknown": false,
-   "de": 220,
-   "por": 215,
+   "de": 440,
+   "por": 220,
    "previous": 240,
    "soldOut": false
   },
@@ -705,8 +697,8 @@
    "id": "arabiyat-prestige-black-currant-lolly",
    "scope": "perfume",
    "unknown": false,
-   "de": 220,
-   "por": 215,
+   "de": 440,
+   "por": 220,
    "previous": 240,
    "soldOut": false
   },
@@ -716,8 +708,8 @@
    "id": "arabiyat-prestige-ramad",
    "scope": "perfume",
    "unknown": false,
-   "de": 175,
-   "por": 170,
+   "de": 350,
+   "por": 175,
    "previous": 240,
    "soldOut": false
   },
@@ -727,12 +719,11 @@
    "id": "arabiyat-prestige-marwa",
    "scope": "perfume",
    "unknown": true,
-   "de": 240,
-   "manifestPor": 120,
+   "fileDe": 240,
+   "filePor": 120,
    "hold": 240,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-069",
@@ -740,8 +731,8 @@
    "id": "arabiyat-prestige-mahd-al-dhahab",
    "scope": "perfume",
    "unknown": false,
-   "de": 195,
-   "por": 190,
+   "de": 390,
+   "por": 195,
    "previous": 240,
    "soldOut": false
   },
@@ -751,8 +742,8 @@
    "id": "arabiyat-prestige-rumiel",
    "scope": "perfume",
    "unknown": false,
-   "de": 200,
-   "por": 195,
+   "de": 400,
+   "por": 200,
    "previous": 240,
    "soldOut": false
   },
@@ -762,8 +753,8 @@
    "id": "arabiyat-prestige-uhud",
    "scope": "perfume",
    "unknown": false,
-   "de": 195,
-   "por": 190,
+   "de": 390,
+   "por": 195,
    "previous": 240,
    "soldOut": false
   },
@@ -773,8 +764,8 @@
    "id": "arabiyat-prestige-bahiya-garnet",
    "scope": "perfume",
    "unknown": false,
-   "de": 195,
-   "por": 190,
+   "de": 390,
+   "por": 195,
    "previous": 240,
    "soldOut": false
   },
@@ -784,8 +775,8 @@
    "id": "arabiyat-prestige-kohl-luminous",
    "scope": "perfume",
    "unknown": false,
-   "de": 195,
-   "por": 190,
+   "de": 390,
+   "por": 195,
    "previous": 240,
    "soldOut": false
   },
@@ -795,8 +786,8 @@
    "id": "arabiyat-prestige-noire",
    "scope": "perfume",
    "unknown": false,
-   "de": 205,
-   "por": 200,
+   "de": 410,
+   "por": 205,
    "previous": 230,
    "soldOut": false
   },
@@ -806,8 +797,8 @@
    "id": "armaf-club-de-nuit-elite",
    "scope": "perfume",
    "unknown": false,
-   "de": 265,
-   "por": 260,
+   "de": 530,
+   "por": 265,
    "previous": 280,
    "soldOut": false
   },
@@ -817,12 +808,11 @@
    "id": "armaf-club-de-nuit-intense-fuego",
    "scope": "perfume",
    "unknown": true,
-   "de": 320,
-   "manifestPor": 160,
+   "fileDe": 320,
+   "filePor": 160,
    "hold": 320,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-007",
@@ -830,12 +820,11 @@
    "id": "armaf-club-de-nuit-bling",
    "scope": "perfume",
    "unknown": true,
-   "de": 210,
-   "manifestPor": 105,
+   "fileDe": 210,
+   "filePor": 105,
    "hold": 210,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-008",
@@ -843,8 +832,8 @@
    "id": "armaf-club-de-nuit-intense-man",
    "scope": "perfume",
    "unknown": false,
-   "de": 160,
-   "por": 155,
+   "de": 330,
+   "por": 165,
    "previous": 200,
    "soldOut": false
   },
@@ -854,8 +843,8 @@
    "id": "armaf-club-de-nuit-intense-woman",
    "scope": "perfume",
    "unknown": false,
-   "de": 145,
-   "por": 140,
+   "de": 290,
+   "por": 145,
    "previous": 180,
    "soldOut": false
   },
@@ -865,8 +854,8 @@
    "id": "armaf-club-de-nuit-malika",
    "scope": "perfume",
    "unknown": false,
-   "de": 175,
-   "por": 170,
+   "de": 350,
+   "por": 175,
    "previous": 200,
    "soldOut": false
   },
@@ -876,12 +865,11 @@
    "id": "armaf-tag-uomo-nero",
    "scope": "perfume",
    "unknown": true,
-   "de": 180,
-   "manifestPor": 90,
+   "fileDe": 180,
+   "filePor": 90,
    "hold": 180,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-012",
@@ -889,12 +877,11 @@
    "id": "armaf-le-parfait-pour-homme",
    "scope": "perfume",
    "unknown": true,
-   "de": 150,
-   "manifestPor": 75,
+   "fileDe": 150,
+   "filePor": 75,
    "hold": 150,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-013",
@@ -902,12 +889,11 @@
    "id": "armaf-magical-oud",
    "scope": "perfume",
    "unknown": true,
-   "de": 150,
-   "manifestPor": 75,
+   "fileDe": 150,
+   "filePor": 75,
    "hold": 150,
    "soldOut": false,
-   "stock": "IN STOCK",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-014",
@@ -915,8 +901,8 @@
    "id": "armaf-island-bliss",
    "scope": "perfume",
    "unknown": false,
-   "de": 230,
-   "por": 225,
+   "de": 460,
+   "por": 230,
    "previous": 250,
    "soldOut": false
   },
@@ -926,8 +912,8 @@
    "id": "armaf-odyssey-go-mango",
    "scope": "perfume",
    "unknown": false,
-   "de": 130,
-   "por": 125,
+   "de": 260,
+   "por": 130,
    "previous": 155,
    "soldOut": false
   },
@@ -937,8 +923,8 @@
    "id": "armaf-odyssey-spectra",
    "scope": "perfume",
    "unknown": false,
-   "de": 120,
-   "por": 115,
+   "de": 240,
+   "por": 120,
    "previous": 150,
    "soldOut": false
   },
@@ -948,8 +934,8 @@
    "id": "rayhaan-pacific-tropical-vibe",
    "scope": "perfume",
    "unknown": false,
-   "de": 175,
-   "por": 170,
+   "de": 350,
+   "por": 175,
    "previous": 190,
    "soldOut": false
   },
@@ -959,8 +945,8 @@
    "id": "ibraheem-al-qurashi-arabian-tobacco",
    "scope": "perfume",
    "unknown": false,
-   "de": 205,
-   "por": 200,
+   "de": 410,
+   "por": 205,
    "previous": 200,
    "soldOut": false
   },
@@ -970,8 +956,8 @@
    "id": "ibraheem-al-qurashi-spanish-tobacco",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 150,
    "soldOut": false
   },
@@ -981,12 +967,11 @@
    "id": "ibraheem-al-qurashi-cuban-tobacco",
    "scope": "perfume",
    "unknown": true,
-   "de": 150,
-   "manifestPor": 75,
+   "fileDe": 150,
+   "filePor": 75,
    "hold": 150,
    "soldOut": false,
-   "stock": "IN STOCK",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-080",
@@ -994,8 +979,8 @@
    "id": "ibraheem-al-qurashi-dominic-tobacco",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 150,
    "soldOut": false
   },
@@ -1005,8 +990,8 @@
    "id": "ibraheem-al-qurashi-jamaican-tobacco",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 150,
    "soldOut": false
   },
@@ -1016,8 +1001,8 @@
    "id": "ibraheem-al-qurashi-mexican-tobacco",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 150,
    "soldOut": false
   },
@@ -1027,8 +1012,8 @@
    "id": "ibraheem-al-qurashi-balas-rose",
    "scope": "perfume",
    "unknown": false,
-   "de": 105,
-   "por": 100,
+   "de": 210,
+   "por": 105,
    "previous": 100,
    "soldOut": false
   },
@@ -1038,12 +1023,11 @@
    "id": "paris-corner-khair-pistachio",
    "scope": "perfume",
    "unknown": true,
-   "de": 85,
-   "manifestPor": 42.5,
+   "fileDe": 85,
+   "filePor": 42.5,
    "hold": 85,
    "soldOut": true,
-   "stock": "ESGOTADO",
-   "divergence": "held at published price; manifest half not applied"
+   "divergence": "held at published price; file half-price not applied"
   },
   {
    "sku": "PERF-093",
@@ -1051,8 +1035,8 @@
    "id": "paris-corner-eshal-vanilla",
    "scope": "perfume",
    "unknown": false,
-   "de": 160,
-   "por": 155,
+   "de": 320,
+   "por": 160,
    "previous": 185,
    "soldOut": false
   },
@@ -1062,8 +1046,8 @@
    "id": "paris-corner-dulzura",
    "scope": "perfume",
    "unknown": false,
-   "de": 120,
-   "por": 115,
+   "de": 240,
+   "por": 120,
    "previous": 135,
    "soldOut": false
   },
@@ -1073,8 +1057,8 @@
    "id": "paris-corner-december-vanilla",
    "scope": "perfume",
    "unknown": false,
-   "de": 90,
-   "por": 85,
+   "de": 180,
+   "por": 90,
    "previous": 100,
    "soldOut": false
   },
@@ -1084,8 +1068,8 @@
    "id": "paris-corner-azm",
    "scope": "perfume",
    "unknown": false,
-   "de": 150,
-   "por": 145,
+   "de": 300,
+   "por": 150,
    "previous": 185,
    "soldOut": false
   },
@@ -1095,8 +1079,8 @@
    "id": "paris-corner-marshmallow-blush",
    "scope": "perfume",
    "unknown": false,
-   "de": 175,
-   "por": 170,
+   "de": 350,
+   "por": 175,
    "previous": 200,
    "soldOut": false
   },
@@ -1106,8 +1090,8 @@
    "id": "french-avenue-azzure-aoud",
    "scope": "perfume",
    "unknown": false,
-   "de": 140,
-   "por": 135,
+   "de": 280,
+   "por": 140,
    "previous": 175,
    "soldOut": false
   },
@@ -1117,8 +1101,8 @@
    "id": "french-avenue-aether-extrait",
    "scope": "perfume",
    "unknown": false,
-   "de": 175,
-   "por": 170,
+   "de": 350,
+   "por": 175,
    "previous": 195,
    "soldOut": false
   },
@@ -1128,8 +1112,8 @@
    "id": "french-avenue-atlantis-extrait",
    "scope": "perfume",
    "unknown": false,
-   "de": 200,
-   "por": 195,
+   "de": 400,
+   "por": 200,
    "previous": 245,
    "soldOut": false
   },
@@ -1139,8 +1123,8 @@
    "id": "french-avenue-vulcan-feu",
    "scope": "perfume",
    "unknown": false,
-   "de": 220,
-   "por": 215,
+   "de": 440,
+   "por": 220,
    "previous": 255,
    "soldOut": false
   },
@@ -1150,8 +1134,8 @@
    "id": "french-avenue-royal-blend",
    "scope": "perfume",
    "unknown": false,
-   "de": 155,
-   "por": 150,
+   "de": 310,
+   "por": 155,
    "previous": 190,
    "soldOut": false
   },
@@ -1161,73 +1145,10 @@
    "id": "french-avenue-spectre-wraith",
    "scope": "perfume",
    "unknown": false,
-   "de": 150,
-   "por": 145,
+   "de": 300,
+   "por": 150,
    "previous": 185,
    "soldOut": false
-  },
-  {
-   "sku": "PERF-109",
-   "name": "Fino Hair Oil",
-   "scope": "beauty",
-   "de": null,
-   "por": 99.99
-  },
-  {
-   "sku": "PERF-110",
-   "name": "Fino Airy Smooth",
-   "scope": "beauty",
-   "de": null,
-   "por": 99.99
-  },
-  {
-   "sku": "PERF-106",
-   "name": "Celimax Retinal Shot",
-   "scope": "beauty",
-   "de": null,
-   "por": 89.99
-  },
-  {
-   "sku": "PERF-107",
-   "name": "Celimax Retinol Shot Serum",
-   "scope": "beauty",
-   "de": null,
-   "por": 89.99
-  },
-  {
-   "sku": "PERF-104",
-   "name": "Celimax Dual Barrier Cream",
-   "scope": "beauty",
-   "de": null,
-   "por": 89.99
-  },
-  {
-   "sku": "HSC-006",
-   "name": "Celimax Pore + Dark Spot Serum",
-   "scope": "beauty",
-   "de": null,
-   "por": 99.99
-  },
-  {
-   "sku": "PERF-108",
-   "name": "Celimax Noni Ampoule",
-   "scope": "beauty",
-   "de": null,
-   "por": 89.99
-  },
-  {
-   "sku": "HSC-008",
-   "name": "Celimax Cica BHA Toner Pad",
-   "scope": "beauty",
-   "de": null,
-   "por": 89.99
-  },
-  {
-   "sku": "PERF-105",
-   "name": "Celimax Pore + Dark Spot Serum Mask",
-   "scope": "beauty",
-   "de": null,
-   "por": 29.99
   },
   {
    "sku": "PERF-150",
@@ -1235,8 +1156,8 @@
    "id": "french-avenue-liquid-brun",
    "scope": "perfume",
    "unknown": false,
-   "de": 210,
-   "por": 195,
+   "de": 400,
+   "por": 200,
    "previous": null,
    "soldOut": false
   }
