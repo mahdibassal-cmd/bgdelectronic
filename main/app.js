@@ -457,7 +457,7 @@ if (!MOCK && !CONFIGURED) {
       const d = IM.find(i => [i.imei1, i.imei2].some(v => v && (v === a || v === b))); if (d) throw new Error(`IMEI já cadastrado na compra ${cnum(PU.find(p => p.id === d.purchase_id).compra_id)} (unidade ${d.slot})`); if (recb(pu) >= pu.qtd) throw new Error(`Item já completo (${pu.qtd} de ${pu.qtd})`);
       let sl = 1; while (IM.some(i => i.purchase_id === pid && i.slot === sl)) sl++; IM.push({ purchase_id: pid, slot: sl, imei1: a, imei2: b }); return { purchase_id: pid, slot: sl, recebidos: recb(pu), qtd: pu.qtd, status: recb(pu) >= pu.qtd ? "completo" : "pendente" }; },
     async itemReceber(pid, q) { if (!["admin", "estoque"].includes(role)) throw new Error("Sem permissão"); const pu = PU.find(p => p.id === pid), ni = IM.filter(i => i.purchase_id === pid).length; if (!(q >= 0) || q + ni > pu.qtd) throw new Error(`Quantidade inválida (comprado ${pu.qtd}, já com IMEI ${ni})`); pu.rsi = q; return { purchase_id: pid, recebidos: recb(pu), qtd: pu.qtd }; },
-    async purchases() { return PU; }, async addPurchase(p) { if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); const ci = p.compra_lote && (PU.find(x => x.compra_lote === p.compra_lote) || {}).compra_id || ++CNO; PU.unshift({ id: id++, data: today(), ...p, compra_id: ci, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
+    async purchases() { return PU; }, async addPurchase(p) { if (role !== "admin") throw new Error("Só admin registra compra"); if (p.custo_unit == null || p.custo_unit === "" || Number.isNaN(Number(p.custo_unit)) || Number(p.custo_unit) < 0) throw new Error("Informe o custo unitário"); if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); const ci = p.compra_lote && (PU.find(x => x.compra_lote === p.compra_lote) || {}).compra_id || ++CNO; PU.unshift({ id: id++, data: today(), ...p, compra_id: ci, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
     async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
   };
   Object.assign(api, BGDUsers.mockApi(qs, U, meU.id));
@@ -684,7 +684,9 @@ const combo = (inp, ul, itens, onPick) => { let hi = 0, M = [];
   return { pick: () => M.length && pick(hi), open: draw }; };
 async function viewCompras(o = {}) {
   const root = o.root || app, emb = !!o.root, again = x => o.onSaved ? o.onSaved(x) : viewCompras(o);
-  const adm = me.role === "admin", [P, PU, K, FT] = await Promise.all([(api.productsFull ? api.productsFull() : api.products()).catch(() => api.products()), api.purchases(), adm ? api.costs().catch(() => []) : [], api.fornecedores ? api.fornecedores().catch(() => []) : []]);
+  const adm = me.role === "admin";
+  if (!adm) { root.innerHTML = `<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2><p class="muted">Somente admin registra a compra e informa o custo unitário.</p></div>`; return; }
+  const [P, PU, K, FT] = await Promise.all([(api.productsFull ? api.productsFull() : api.products()).catch(() => api.products()), api.purchases(), api.costs().catch(() => []), api.fornecedores ? api.fornecedores().catch(() => []) : []]);
   const cm = Object.fromEntries((K || []).map(k => [k.sku, k.custo])), V = Object.fromEntries(P.map(p => [p.sku, variante(p)])), PS = Object.fromEntries(P.map(p => [p.sku, p]));
   const hay = p => `${p.sku} ${p.marca} ${p.produto} ${V[p.sku].raw} ${V[p.sku].gb.join(" ")}`, nome = p => `${p.marca} ${p.produto}${V[p.sku].raw ? " — " + V[p.sku].raw : ""}`;
   const line = p => { const v = V[p.sku], tags = [v.cor && `🎨 ${v.cor}`, v.gb.length && `💾 ${v.gb.join(" / ")}`].filter(Boolean).join(" · ");
@@ -705,11 +707,11 @@ async function viewCompras(o = {}) {
   const dest = () => emb ? "esp" : ($("#dst") || {}).value || "loja", sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; }; if ($("#dst")) $("#dst").onchange = sb0; sb0();
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
-  const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
-  const tot = () => { const ok = L.filter(l => l.sku); $("#gt").textContent = brl(ok.reduce((a, l) => a + (+l.qtd || 0) * (num(l.custo) || 0), 0)); $("#gq").textContent = `${ok.length} item(ns) · ${ok.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
-    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * (num(l.custo) || 0)); }); };
+  const custoOf = v => { let s = String(v ?? "").trim().replace(/\s/g, "").replace(/^R\$/i, ""); if (s === "") return null; if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); if (!/^\d+(\.\d+)?$/.test(s)) return NaN; return Math.round(Number(s) * 100) / 100; };
+  const tot = () => { const ok = L.filter(l => l.sku); $("#gt").textContent = brl(ok.reduce((a, l) => a + (+l.qtd || 0) * (custoOf(l.custo) || 0), 0)); $("#gq").textContent = `${ok.length} item(ns) · ${ok.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
+    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * (custoOf(l.custo) || 0)); }); };
   const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div></div>
-    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>Custo un. (R$)</label><input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}"></div>
+    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>Custo un. (R$)</label><input class="lc" type="text" inputmode="decimal" autocomplete="off" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : "0,00"}"></div>
     <div><label>Total</label><div class="lt n" data-i="${i}"></div></div><div><button type="button" class="btn ghost rm" title="Remover linha" ${L.length < 2 ? "disabled" : ""}>✕</button></div></div>`; }).join("");
     document.querySelectorAll("#lns .cl").forEach(r => { const i = +r.dataset.i, l = L[i], pq = r.querySelector(".pq");
       combo(pq, r.querySelector(".sug"), q => (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: line(p) + (L.some((x, j) => j !== i && x.sku === p.sku) ? '<small class="warn">já está em outra linha</small>' : "") })),
@@ -722,10 +724,10 @@ async function viewCompras(o = {}) {
   $("#add").onclick = () => { L.push({ sku: "", qtd: 1, custo: "" }); drawL(true); };
   drawL();
   $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" ), w = $("#pw");
-    for (const [i, l] of it.entries()) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`; if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
+    for (const [i, l] of it.entries()) { const n = L.indexOf(l) + 1, c = custoOf(l.custo); if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`; if (c == null) return w.textContent = `Linha ${n}: informe o custo unitário`; if (Number.isNaN(c)) return w.textContent = `Linha ${n}: custo inválido`; }
     if (!it.length) return w.textContent = "Adicione pelo menos um item";
     const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#cdt").value || today(), ob = $("#ob").value.trim() || null;
-    const itens = it.map(l => ({ sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) })), total = itens.reduce((a, x) => a + x.qtd * x.custo_unit, 0);
+    const itens = it.map(l => ({ sku: l.sku, qtd: +l.qtd, custo_unit: custoOf(l.custo) })), total = itens.reduce((a, x) => a + x.qtd * x.custo_unit, 0);
     busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
     if (fx.length >= 2 && api.salvarFornecedor && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {});
     if (dest() === "esp") { const mot = ["Compra", fx, dt !== today() ? dt : "", ob].filter(Boolean).join(" · ").slice(0, 200);
