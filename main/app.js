@@ -1007,7 +1007,7 @@ async function viewDevolucao() {
     <table class="stk"><tr><th>SKU</th><th>Produto</th><th class="n">Vendido</th><th class="n">Preço da nota</th><th class="n">Já em proposta</th><th class="n">Disponível</th><th class="n">Devolver</th></tr>${rows || `<tr><td colspan="7" class="muted">Sem itens.</td></tr>`}</table>
     <p>Mercadoria desta seleção, no preço original: <b id="sel">R$ 0,00</b>. Estoque, caixa, crédito e dívida <b>não mudam</b> ao guardar. Acerto: <b>pendente</b>.</p>
     ${props ? `<h3>Propostas abertas</h3><ul>${props}</ul>` : ""}
-    <form id="fp"><label>Motivo</label><input id="bm" maxlength="300" required placeholder="Ex.: cliente devolveu 1 unidade lacrada"><button class="btn" id="bg" ${info.aceita ? "" : "disabled"}>Guardar proposta</button> <button class="btn gold" id="bc" type="button" disabled title="O acerto financeiro ainda não tem regra">Confirmar acerto</button></form>
+    <form id="fp"><label>Motivo</label><input id="bm" maxlength="300" required placeholder="Ex.: cliente devolveu 1 unidade lacrada"><button class="btn" id="bg" ${info.aceita ? "" : "disabled"}>Guardar proposta</button> <button class="btn gold" id="bc" type="button" disabled aria-disabled="true" title="O acerto financeiro ainda não tem regra" style="opacity:.4;cursor:not-allowed">Confirmar acerto</button></form>
     <h3>Decisões pendentes</h3><ol>${(info.perguntas || []).map(q => `<li>${esc(q)}</li>`).join("")}</ol>` : ""}</div>`;
     const soma = () => { let t = 0; document.querySelectorAll(".dq").forEach(el => { const q = Math.max(0, Math.floor(+el.value || 0)); t += q * Number(el.dataset.p || 0); }); const s = $("#sel"); if (s) s.textContent = brl(t); };
     document.querySelectorAll(".dq").forEach(el => el.oninput = soma);
