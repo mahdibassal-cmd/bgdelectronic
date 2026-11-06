@@ -82,5 +82,25 @@ ok(!blob.includes("77.77") && !/"custo"/.test(blob) && !/cxesp|caixa_especial/i.
 ok(ext.historico_sem_vinculo.includes("sem cliente vinculado"), "unlinked history is labeled, not searched");
 ok(ext.recebimentos.length === 1 && Number(ext.recebimentos[0].valor) === 30 && ext.recebimentos[0].caixa_id == null && ext.recebimentos[0].mov_id == null, "receipt is listed without caixa movement ids");
 
+await db.exec("reset role");
+const sec = await db.query(`select n.nspname, p.proname, p.prosecdef, coalesce(array_to_string(p.proconfig, ','), '') cfg
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where (n.nspname, p.proname) in (('public','cliente_extrato'), ('private','cliente_extrato_ler'))
+ order by 1`);
+const pub = sec.rows.find(r => r.nspname === "public"), priv = sec.rows.find(r => r.nspname === "private");
+ok(pub && pub.prosecdef === false && pub.cfg.includes("search_path="), "public wrapper is invoker with empty search_path: " + JSON.stringify(pub));
+ok(priv && priv.prosecdef === true && priv.cfg.includes("search_path="), "private reader is definer with empty search_path: " + JSON.stringify(priv));
+ok(await ownerNum("select has_function_privilege('anon', 'public.cliente_extrato(bigint)', 'execute')::int") === 0, "anon cannot execute the wrapper");
+ok(await ownerNum("select has_function_privilege('anon', 'private.cliente_extrato_ler(bigint)', 'execute')::int") === 0, "anon cannot execute the private reader");
+ok(await ownerNum("select has_schema_privilege('anon', 'private', 'usage')::int") === 0, "anon has no usage on schema private");
+const pubsrc = (await one("select pg_get_functiondef('public.cliente_extrato(bigint)'::regprocedure) d")).d;
+ok(!/from public\.notas|product_costs|sale_costs|caixa_especial/.test(pubsrc), "wrapper does not read notes, cost, or cxesp");
+await as("kaio");
+e = await err(`select private.cliente_extrato_ler(${maria})`);
+ok(e && /Sem permissão/.test(e) && !/77\.77/.test(e), "direct private call still denies vendedor before any payload: " + e);
+await as("pamela");
+const via = (await one(`select public.cliente_extrato(${maria}) j`)).j;
+ok(Number(via.saldo) === saldo && !JSON.stringify(via).includes("77.77"), "financeiro still receives the statement through the public wrapper");
+
 if (fails) { console.error(fails + " failed"); process.exit(1); }
 console.log(passes + " passed");

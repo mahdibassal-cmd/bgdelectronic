@@ -2,12 +2,11 @@
 -- migration-cliente-extrato.sql — Loja /main. NÃO executar em produção
 -- sem autorização direta do MB.
 --
--- Extrato do cliente para quem tem financas (financeiro e admin).
--- A RLS de notas exige vendas, então o financeiro não lê a nota direto.
--- Esta função, no padrão de notas_lancar_financas, devolve só o extrato
--- do cliente_id pedido. Não busca nota pelo nome digitado.
--- Não devolve custo, caixa especial, nem movimento de caixa.
--- Não grava nada.
+-- A leitura privilegiada fica em private.cliente_extrato_ler (security
+-- definer, search_path ''). O schema private não entra na API.
+-- public.cliente_extrato é security invoker: confere financas e só então
+-- delega. A função privada repete a trava antes de qualquer leitura.
+-- Não substitui criar_nota nem criar_nota_local. Não grava nada.
 -- Pré-requisito já presente: public.notas.frete. Esta migration não cria a coluna.
 -- =====================================================================
 
@@ -24,7 +23,12 @@ do $$ begin
   end if;
 end $$;
 
-create or replace function public.cliente_extrato(p_cliente bigint)
+create schema if not exists private;
+revoke all on schema private from public;
+revoke all on schema private from anon;
+grant usage on schema private to authenticated;
+
+create or replace function private.cliente_extrato_ler(p_cliente bigint)
 returns jsonb
 language plpgsql
 stable
@@ -147,6 +151,29 @@ begin
     'notas', v_notas,
     'recebimentos', v_recs,
     'creditos', v_creds);
+end $$;
+
+revoke all on function private.cliente_extrato_ler(bigint) from public, anon;
+grant execute on function private.cliente_extrato_ler(bigint) to authenticated;
+
+-- Troca um rascunho anterior que era security definer em public, se chegou a ser criado.
+drop function if exists public.cliente_extrato(bigint);
+
+create or replace function public.cliente_extrato(p_cliente bigint)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = ''
+as $$
+begin
+  if not public.can('financas') then
+    raise exception 'Sem permissão (financeiro/admin)' using errcode = '42501';
+  end if;
+  if p_cliente is null or p_cliente <= 0 then
+    raise exception 'Cliente não encontrado' using errcode = 'P0001';
+  end if;
+  return private.cliente_extrato_ler(p_cliente);
 end $$;
 
 revoke all on function public.cliente_extrato(bigint) from public, anon;
