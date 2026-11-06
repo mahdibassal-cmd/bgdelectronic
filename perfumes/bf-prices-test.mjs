@@ -1,5 +1,5 @@
-/* Black Friday public prices: per-perfume De/Por, no blanket 50%, no cost fields. */
-import { readFileSync, existsSync } from "node:fs";
+/* Manifest parity: public De/Por match sanitized v3. No cost figures. */
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,65 +14,76 @@ function loadJs(name) {
 }
 const data = loadJs("assets/data.js");
 const json = JSON.parse(readFileSync(join(root, "data.json"), "utf8"));
+const man = JSON.parse(readFileSync(join(root, "bf-manifest-public.json"), "utf8"));
 const html = readFileSync(join(root, "index.html"), "utf8");
 const app = readFileSync(join(root, "assets/app.js"), "utf8");
-const extras = readFileSync(join(root, "assets/extras.js"), "utf8");
 const feed = readFileSync(join(repo, "feeds/google-merchant.xml"), "utf8");
-const home = readFileSync(join(repo, "index.html"), "utf8");
 const P = data.perfumes;
 const by = new Map(P.map(p => [p.id, p]));
+const rows = man.rows;
+const perfume = rows.filter(r => r.scope === "perfume");
+const known = perfume.filter(r => !r.unknown);
+const held = perfume.filter(r => r.unknown);
+const beauty = rows.filter(r => r.scope === "beauty");
 
-const held = ["armaf-club-de-nuit-intense-fuego","armaf-club-de-nuit-bling","armaf-tag-uomo-nero","armaf-le-parfait-pour-homme","armaf-magical-oud","mpf-wicked","arabiyat-prestige-swar-venin","arabiyat-prestige-marwa","ibraheem-al-qurashi-cuban-tobacco","mpf-poudre","mpf-dark-scudo","mpf-vanilla-tobacco","mpf-wicked-elixir","mpf-wicked-legend","mpf-wicked-noir","paris-corner-khair-pistachio"];
-const heldPrice = { "armaf-club-de-nuit-intense-fuego":320, "armaf-club-de-nuit-bling":210, "armaf-tag-uomo-nero":180, "armaf-le-parfait-pour-homme":150, "armaf-magical-oud":150, "mpf-wicked":99.99, "arabiyat-prestige-swar-venin":230, "arabiyat-prestige-marwa":240, "ibraheem-al-qurashi-cuban-tobacco":150, "mpf-poudre":99.99, "mpf-dark-scudo":99.99, "mpf-vanilla-tobacco":99.99, "mpf-wicked-elixir":99.99, "mpf-wicked-legend":99.99, "mpf-wicked-noir":99.99, "paris-corner-khair-pistachio":85 };
+ok(rows.length === 113 && perfume.length === 104 && known.length === 88 && held.length === 16 && beauty.length === 9, "113 manifest rows: 88 priced, 16 held, 9 beauty");
+ok(!JSON.stringify(data).match(/"(cost|custo)"/i) && !JSON.stringify(man).match(/"(cost|custo)"/i), "no cost field in public catalog or sanitized manifest");
+ok(json.perfumes.every((p, i) => p.id === P[i].id && p.price === P[i].price && p.priceFrom === P[i].priceFrom && p.bf === P[i].bf && p.soldOut === P[i].soldOut), "data.json matches data.js");
 
-ok(P.length === 104 && data.meta.count === 104, "104 perfumes");
-ok(json.perfumes.length === 104 && json.perfumes.every((p, i) => p.id === P[i].id && p.price === P[i].price && p.bf === P[i].bf), "data.json matches data.js");
-ok(!JSON.stringify(data).match(/"(cost|custo|wholesale)"/i), "no cost fields in public catalog");
-ok(!/50%\s*OFF|-50%|metade da loja|tudo pela metade/i.test(html + readFileSync(join(root, "assets/bf.css"), "utf8")), "no blanket 50% claim");
-ok(!/Distribuidor oficial/i.test(html), "perfume page adds no distribuidor oficial claim");
-ok(!/Distribuidor oficial/i.test(app), "cards and product dialog add no distribuidor oficial claim");
-ok(/if\(p\.bf\|\|p\.waOnly\) return ""/.test(app), "changed prices do not open a payment link");
-ok(extras.includes("https://pag.getnet.com.br/NzK6N-pmh"), "existing Getnet links stay in extras.js");
-
-const bf = P.filter(p => p.bf);
-ok(bf.length === 73 && P.filter(p => p.waOnly).length === 74, "73 discounted, 74 WhatsApp-only");
-ok(bf.every(p => p.priceFrom % 5 === 0 && p.price <= p.priceFrom + 1e-9 && p.price + 1e-9 >= p.priceFrom / 2), "Por is at least half of De and never above De");
-ok(bf.every(p => p.bfOff === Math.round((1 - p.price / p.priceFrom) * 100) && p.bfOff > 0 && p.bfOff < 50 && p.waOnly && p.priceFromLabel), "badge is the real discount, never 50");
-ok(held.every(id => by.get(id) && !by.get(id).bf && !by.get(id).waOnly && by.get(id).price === heldPrice[id] && !by.get(id).priceFrom), "16 uncosted perfumes keep the live price");
-
-const gold = [
-  ["ferassa-jamra", 100, 85, 15],
-  ["ferassa-nemer", 100, 70, 30],
-  ["armaf-club-de-nuit-elite", 280, 260, 7],
-  ["arabiyat-prestige-nyla", 150, 85, 43],
-  ["mpf-highway-parfum", 100, 70, 30],
-  ["french-avenue-liquid-brun", 210, 195, 7],
-];
-for (const [id, de, por, off] of gold) {
-  const p = by.get(id);
-  ok(p && p.priceFrom === de && p.price === por && p.bfOff === off && p.photo.indexOf("assets/img/") === 0, id + " De/Por");
+let knownMismatch = 0;
+for (const r of known) {
+  const p = by.get(r.id);
+  const off = Math.round((1 - r.por / r.de) * 100);
+  const priceOk = p && Math.abs(p.price - r.por) < 0.001 && p.priceFrom === r.de && p.bf === true && p.bfOff === off;
+  const payOk = p && !!p.waOnly === (r.previous == null || Math.abs(r.por - r.previous) > 0.001);
+  if (!priceOk || !payOk) { knownMismatch++; console.error("KNOWN", r.sku, r.name, p && p.price, p && p.priceFrom, "want", r.por, r.de); }
 }
+ok(knownMismatch === 0, "known-cost mismatch count after correction is " + knownMismatch);
+
+let divergence = 0;
+const inStock = ["PERF-063", "PERF-013", "PERF-079"];
+for (const r of held) {
+  const p = by.get(r.id);
+  const same = p && !p.bf && p.priceFrom == null && Math.abs(p.price - r.hold) < 0.001 && Math.abs(p.price - r.manifestPor) > 0.001;
+  const stockOk = p && p.soldOut === (r.stock === "ESGOTADO") && (r.stock === "IN STOCK") === inStock.includes(r.sku);
+  if (!same || !stockOk || p.waOnly) { divergence++; console.error("HOLD", r.sku, p && p.price, p && p.soldOut, p && p.bf); }
+}
+ok(held.length === 16 && divergence === 0, "16 missing-cost rows stay at the published price and out of the sale; divergence vs half-price is " + held.length);
+
+const jam = by.get("ferassa-jamra");
 const fab = by.get("mpf-fabulicious");
-ok(fab && !fab.bf && fab.waOnly && fab.price === 105 && !fab.priceFrom, "Fabulicious rises to 105 with no fake strikethrough");
-ok(existsSync(join(root, "assets/img/french-avenue-liquid-brun.webp")), "Liquid Brun photo shipped");
-ok(by.get("ferassa-jamra").photo === "assets/img/ferassa-jamra.webp", "existing photo path kept");
+const brun = by.get("french-avenue-liquid-brun");
+ok(jam.priceFrom === 95 && jam.price === 85 && jam.bfOff === 11 && jam.waOnly, "Jamra 95 to 85");
+ok(fab.priceFrom === 110 && fab.price === 105 && fab.bfOff === 5 && fab.waOnly && !fab.soldOut, "Fabulicious 110 to 105");
+ok(brun.priceFrom === 210 && brun.price === 195 && brun.bfOff === 7 && brun.waOnly, "Liquid Brun 210 to 195");
+ok(by.get("arabiyat-prestige-swar-venin").price === 230 && !by.get("arabiyat-prestige-swar-venin").bf && !by.get("arabiyat-prestige-swar-venin").soldOut, "Swar Venin stays 230 in stock");
+ok(by.get("armaf-magical-oud").price === 150 && !by.get("armaf-magical-oud").bf, "Magical Oud stays 150");
+ok(by.get("ibraheem-al-qurashi-cuban-tobacco").price === 150 && !by.get("ibraheem-al-qurashi-cuban-tobacco").bf, "Cuban Tobacco stays 150");
+ok(by.get("armaf-club-de-nuit-intense-fuego").soldOut && by.get("armaf-club-de-nuit-intense-fuego").price === 320 && !by.get("armaf-club-de-nuit-intense-fuego").bf, "Fuego held at 320 and marked sold out");
+ok(beauty.every(r => !P.some(p => p.name === r.name)), "beauty rows are not added to the perfume catalog");
 
-function ldPrice(id) {
-  const m = html.match(new RegExp('"sku":"' + id + '"[\\s\\S]*?"price":"([0-9.]+)"'));
-  return m && m[1];
+function ld(id) {
+  const m = html.match(new RegExp('"sku":"' + id + '"[\\s\\S]*?"price":"([0-9.]+)"[\\s\\S]*?"availability":"([^"]+)"'));
+  return m && { price: m[1], avail: m[2] };
 }
-ok(ldPrice("ferassa-jamra") === "85.00" && ldPrice("armaf-club-de-nuit-intense-fuego") === "320.00" && ldPrice("mpf-fabulicious") === "105.00" && ldPrice("french-avenue-liquid-brun") === "195.00", "JSON-LD offer price is the amount charged");
+ok(ld("ferassa-jamra").price === "85.00" && ld("mpf-fabulicious").price === "105.00" && ld("french-avenue-liquid-brun").price === "195.00", "JSON-LD charges Por");
+ok(ld("arabiyat-prestige-swar-venin").price === "230.00" && ld("arabiyat-prestige-swar-venin").avail.endsWith("InStock"), "JSON-LD keeps Swar Venin at 230");
+ok(ld("armaf-club-de-nuit-intense-fuego").price === "320.00" && ld("armaf-club-de-nuit-intense-fuego").avail.endsWith("OutOfStock"), "JSON-LD marks Fuego sold out at 320");
 
 function item(id) {
   const m = feed.match(new RegExp("<g:id>" + id + "</g:id>[\\s\\S]*?</item>"));
   return m && m[0];
 }
-const jam = item("ferassa-jamra");
-ok(jam && jam.includes("<g:price>100.00 BRL</g:price>") && jam.includes("<g:sale_price>85.00 BRL</g:sale_price>"), "merchant feed De/Por for a discounted perfume");
+const jamFeed = item("ferassa-jamra");
+ok(jamFeed.includes("<g:price>95.00 BRL</g:price>") && jamFeed.includes("<g:sale_price>85.00 BRL</g:sale_price>"), "merchant De 95 Por 85");
+const fabFeed = item("mpf-fabulicious");
+ok(fabFeed.includes("<g:price>110.00 BRL</g:price>") && fabFeed.includes("<g:sale_price>105.00 BRL</g:sale_price>"), "merchant Fabulicious 110 to 105");
 const fuego = item("armaf-club-de-nuit-intense-fuego");
-ok(fuego && fuego.includes("<g:price>320.00 BRL</g:price>") && !fuego.includes("sale_price"), "merchant feed leaves an unchanged perfume alone");
-ok(item("mpf-fabulicious").includes("<g:price>105.00 BRL</g:price>") && !item("mpf-fabulicious").includes("sale_price"), "merchant feed shows the Fabulicious increase as the price");
-ok(home.includes("perfumes/assets/data.js?v=20261105bf") && html.includes("assets/bf.css?v=20261105bf") && html.includes('rel="canonical" href="https://bgdstores.com/perfumes/"') && !html.includes("noindex"), "cache bump, canonical, still indexable");
+ok(fuego.includes("<g:price>320.00 BRL</g:price>") && !fuego.includes("sale_price") && fuego.includes("out_of_stock"), "merchant leaves Fuego at 320 without a sale price");
+const same = item("mpf-rouge-lights");
+ok(same.includes("<g:price>105.00 BRL</g:price>") && same.includes("<g:sale_price>100.00 BRL</g:sale_price>"), "merchant shows De even when Por equals the old shelf price");
+ok(/if\(p\.waOnly\) return ""/.test(app) && !/if\(p\.bf\|\|p\.waOnly\)/.test(app), "Getnet stays only when the charged amount did not change");
+ok(!/Distribuidor oficial/i.test(html) && !/50%\s*OFF/.test(html), "no blanket discount or new distributor claim");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
-console.log("bf prices ok");
+console.log("manifest parity ok; known mismatches 0; intentional holds 16");

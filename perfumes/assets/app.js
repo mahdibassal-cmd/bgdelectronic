@@ -16,7 +16,7 @@ var ICON={
 var DATA=window.BAGDA_DATA, P=[], META={};
 var X=window.BAGDA_EXTRAS||{}; X.installments=X.installments||{max:12,noInterest:false}; X.products=X.products||{}; X.decants=X.decants||[]; X.bestSellers=X.bestSellers||[]; X.lowStockAt=X.lowStockAt||3;
 function ext(p){ return X.products[p.id]||{}; }
-function payLink(p){ if(p.bf||p.waOnly) return ""; var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
+function payLink(p){ if(p.waOnly) return ""; var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
 function lowStock(p){ var st=ext(p).stock; if(st==null) st=p.stock; return !p.soldOut&&typeof st==="number"&&st>0&&st<=X.lowStockAt; }
 function instText(p,long){ var n=X.installments.max||12; if(X.installments.noInterest) return (long?'ou ':'')+n+'x de '+money(p.price/n)+' sem juros'; return long?'ou em até '+n+'x no cartão':'em até '+n+'x no cartão'; }
 var OFFB='';
