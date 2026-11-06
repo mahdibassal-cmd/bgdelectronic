@@ -16,12 +16,10 @@ const amb = await err(`select public.criar_nota('PIX'::public.pay_method, '[]'::
 ok(amb && /not unique|não é única|is not unique/i.test(amb), "3 args hit both overloads: " + amb);
 const named = (await db.query(`select public.criar_nota(p_forma => 'PIX'::public.pay_method, p_items => '[{"sku":"S","qtd":1,"preco_vendido":10}]'::jsonb, p_cliente => null, p_frete => 0, p_caxinha_natal => 0) f`)).rows[0].f;
 ok(named === "frete+caxinha", "naming both fees selects the full function: " + named);
-const sql = fs.readFileSync(new URL("../fix-criar-nota-overload.sql", import.meta.url), "utf8");
-const code = sql.replace(/--.*$/gm, "");
-ok(!/cascade/i.test(code), "executable SQL has no CASCADE");
-ok(/drop function if exists public\.criar_nota\(public\.pay_method, jsonb, text\);/.test(code), "drops only the 3-arg signature");
-ok(!/criar_nota_local/.test(code), "executable SQL does not touch criar_nota_local");
-await db.exec("drop function if exists public.criar_nota(public.pay_method, jsonb, text)");
+const catalog = fs.readFileSync(new URL("../catalog-criar-nota-readonly.sql", import.meta.url), "utf8");
+const code = catalog.replace(/--.*$/gm, "");
+ok(!/drop function|create or replace|cascade/i.test(code), "catalog file does not drop or replace functions");
+await db.exec("drop function public.criar_nota(public.pay_method, jsonb, text)");
 const after = (await db.query(`select public.criar_nota('PIX'::public.pay_method, '[{"sku":"S","qtd":1,"preco_vendido":10}]'::jsonb, null) f`)).rows[0].f;
 ok(after === "frete+caxinha", "after dropping the short signature, defaults still save a zero-fee note");
 const ui = fs.readFileSync(new URL("../../../kiosk/app.js", import.meta.url), "utf8");
