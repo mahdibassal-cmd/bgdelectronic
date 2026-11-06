@@ -131,10 +131,10 @@ if (!MOCK) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
-    async criarNota(forma, items, cliente, frete, caxinha) { const a = { p_forma: forma, p_items: items, p_cliente: cliente || null }, f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caxinha || 0) * 100) / 100;
-      if (!(f > 0) && !(c > 0)) return ok(await sb.rpc("criar_nota", a)); /* sem fee: chamada antiga */
-      const extra = { ...a, p_frete: f, ...(c > 0 ? { p_caxinha_natal: c } : {}) };
-      const r = await sb.rpc("criar_nota", extra); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+    async criarNota(forma, items, cliente, frete, caxinha) { const f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caxinha || 0) * 100) / 100;
+      /* Sempre nomeia p_frete e p_caxinha_natal, mesmo 0. A assinatura curta (sem esses dois) ainda existe no banco e o PostgREST não escolhe entre ela e a função com default. */
+      const a = { p_forma: forma, p_items: items, p_cliente: cliente || null, p_frete: f, p_caxinha_natal: c };
+      const r = await sb.rpc("criar_nota", a); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
       if (r.error && c > 0 && /PGRST202|42883|p_caxinha/.test(em)) throw new Error("Caxinha d Natal depende de atualização do banco — avise o admin.");
       if (r.error && f > 0 && /PGRST202|42883|p_frete/.test(em)) throw new Error("Frete depende de atualização do banco — avise o admin.");
       return ok(r); },
