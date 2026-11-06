@@ -26,8 +26,8 @@ ok(groups.map(g => g.heading).join("|") === "Notas|Financeiro|Compras e estoque|
 ok(groups.every(g => g.labelledby && html.includes(`id="${g.labelledby}"`)), "aria-labelledby targets exist");
 
 const expected = {
-  notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["lancar", "financas", "Notas a lançar"]],
-  financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["clientes", "financas", "Clientes"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
+  notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["lancar", "financas", "Notas a lançar"], ["clientes", "financas", "Clientes"]],
+  financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
   compras: [["compras", "admin", "Compras"], ["imei", "financas|estoque", "Compras & IMEI"], ["estoque", "vendas|estoque", "Estoque"], ["produtos", "admin", "Produtos"], ["depesp", "admin|estoque", "Depósito Especial"]],
   sistema: [["usuarios", "admin", "Usuários"], ["seguranca", "", "Segurança"], ["", "", "Sair"]],
 };
@@ -54,8 +54,8 @@ function visible(role) {
 }
 const labels = role => visible(role).flatMap(g => g.buttons);
 const expectRole = {
-  admin: ["Nova nota", "Notas", "Notas a lançar", "Caixa", "Caixa Geral", "Caixa Especial", "Clientes", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Usuários", "Segurança", "Sair"],
-  financeiro: ["Notas a lançar", "Caixa", "Caixa Geral", "Clientes", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Segurança", "Sair"],
+  admin: ["Nova nota", "Notas", "Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Caixa Especial", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Usuários", "Segurança", "Sair"],
+  financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Segurança", "Sair"],
   vendedor: ["Nova nota", "Notas", "Estoque", "Segurança", "Sair"],
   estoque: ["Compras & IMEI", "Estoque", "Depósito Especial", "Segurança", "Sair"],
 };
@@ -65,11 +65,20 @@ for (const [role, want] of Object.entries(expectRole)) {
 ok(visible("vendedor").every(g => g.heading !== "Financeiro"), "vendedor hides empty Financeiro");
 ok(visible("estoque").every(g => g.heading !== "Notas" && g.heading !== "Financeiro"), "estoque hides empty Notas and Financeiro");
 ok(visible("financeiro").some(g => g.heading === "Notas") && visible("financeiro").some(g => g.heading === "Financeiro"), "financeiro keeps Notas and Financeiro");
+const finNotas = visible("financeiro").find(g => g.heading === "Notas");
+const cli = groups.find(g => g.g === "notas").buttons.find(b => b.v === "clientes");
+ok(cli && cli.p === "financas" && cli.label === "Clientes", "Clientes stays data-v clientes and data-p financas inside Notas");
+ok(!groups.find(g => g.g === "financas").buttons.some(b => b.v === "clientes"), "Clientes is not in Financeiro");
+ok(finNotas && finNotas.buttons.includes("Clientes") && !finNotas.buttons.includes("Nova nota") && !finNotas.buttons.includes("Notas"), "financeiro sees Clientes in Notas without the vendas buttons");
+ok(!/<div class="navg"[^>]*\sdata-p=/.test(html), "no group-level permission gate");
+ok(js.includes('clientes: "financas"'), "clientes route still requires financas");
+const onlyCli = groups.find(g => g.g === "notas").buttons.map(b => ({ hidden: b.v !== "clientes" }));
+ok(onlyCli.length > 0 && !onlyCli.every(b => b.hidden), "Notas group stays visible when only Clientes is allowed");
 ok(labels("financeiro").includes("Sair") && !labels("financeiro").includes("Usuários"), "Sair not newly admin-only");
 ok(/nav \.navg[\s\S]*g\.hidden = bs\.length > 0 && bs\.every\(b => b\.hidden\)/.test(js), "app hides empty groups");
 ok(/function navMark\(/.test(js) && /aria-current/.test(js) && /navMark\(v\)/.test(js) && /navMark\("imei"\)/.test(js), "active page mark kept");
 ok(css.includes(".ngh") && css.includes("@media(max-width:720px)") && css.includes("nav button.on") && /@media print[\s\S]*nav,button,header\{display:none!important\}/.test(css), "compact, responsive, active, print hide");
-ok(html.includes("loja.css?v=20261105n") && html.includes("app.js?v=20261105n"), "cache version bumped");
+ok(html.includes("loja.css?v=20261105n") && html.includes("app.js?v=20261106e"), "script cache unchanged by the menu move");
 ok(!html.includes("data-v=\"comprovante\""), "no invented comprovante button");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
