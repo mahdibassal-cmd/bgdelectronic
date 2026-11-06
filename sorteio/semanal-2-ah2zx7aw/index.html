@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Sorteio Semanal #2 | BAGDA PERFUMES</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#111;color:#f6f6f6}
+main{max-width:680px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:32px;margin:8px 0}
+button{font-size:28px;font-weight:800;letter-spacing:.08em;width:100%;padding:18px;border:0;border-radius:12px;background:#e6c36a;color:#111}
+button:disabled{opacity:.45}
+#who{font-size:40px;line-height:1.15;min-height:1.2em;margin:12px 0 4px}
+#won-prize{min-height:1.3em;margin:0 0 12px}
+ol,ul{padding-left:18px}
+li{margin:6px 0}
+.fine{opacity:.85}
+</style>
+</head>
+<body>
+<main>
+<p>BAGDA PERFUMES</p>
+<h1>Sorteio Semanal #2</h1>
+<p>Resultado ao vivo: sexta-feira, 06/11/2026, às 16:30 (horário de Brasília).</p>
+<p><b id="count">73</b> participantes confirmados · <b id="sum">908</b> participações confirmadas</p>
+<p class="fine">Cada comentário confirmado vale 1 participação. Esta lista não significa que todos os comentários mais recentes já foram apurados.</p>
+<h2>Prêmios</h2>
+<ol id="prizes"></ol>
+<p id="who">Carregando a lista…</p>
+<p id="won-prize"></p>
+<p id="next"></p>
+<button type="button" id="btn" disabled>SORTEAR</button>
+<p id="save" class="fine"></p>
+<p id="alert"></p>
+<ol id="winners"></ol>
+<h2>Participantes confirmados</h2>
+<ul id="list"></ul>
+</main>
+<script type="module">
+import { cryptoRandomBelow, drawNext, eligiblePool, restoreState, serializeState } from './draw.js';
+
+const KEY = 'bagda-sorteio-semanal-2-20261106';
+const btn = document.getElementById('btn');
+const alertEl = document.getElementById('alert');
+let winners = [];
+let participants = [];
+let prizes = [];
+let busy = false;
+
+function render() {
+  const prizeList = document.getElementById('prizes');
+  prizeList.replaceChildren();
+  prizes.forEach((prize, i) => {
+    const li = document.createElement('li');
+    li.textContent = prize;
+    prizeList.appendChild(li);
+  });
+  const won = document.getElementById('winners');
+  won.replaceChildren();
+  for (const w of winners) {
+    const li = document.createElement('li');
+    li.textContent = w.place + 'º — ' + w.handle + ' — ' + w.prize;
+    won.appendChild(li);
+  }
+  const last = winners[winners.length - 1];
+  document.getElementById('who').textContent = last ? (last.place + 'º ' + last.handle) : 'Toque em SORTEAR';
+  document.getElementById('won-prize').textContent = last ? last.prize : '';
+  const next = document.getElementById('next');
+  if (winners.length >= 3) {
+    next.textContent = 'Os 3 ganhadores estão definidos.';
+    btn.textContent = 'Sorteio concluído';
+    btn.disabled = true;
+  } else {
+    next.textContent = 'Próximo toque: ' + (winners.length + 1) + 'º prêmio';
+    btn.textContent = 'SORTEAR';
+  }
+}
+
+function block(message) {
+  btn.disabled = true;
+  alertEl.textContent = message;
+  document.getElementById('who').textContent = 'Sorteio bloqueado';
+}
+
+btn.addEventListener('click', () => {
+  if (busy || winners.length >= 3) return;
+  busy = true;
+  btn.disabled = true;
+  let next;
+  try {
+    next = drawNext({ winners }, participants, cryptoRandomBelow, prizes);
+  } catch (e) {
+    busy = false;
+    btn.disabled = false;
+    alertEl.textContent = 'Não foi possível sortear. Nenhum nome novo foi gravado.';
+    return;
+  }
+  if (next.winners.length !== winners.length + 1) {
+    busy = false;
+    render();
+    return;
+  }
+  winners = next.winners;
+  try {
+    localStorage.setItem(KEY, serializeState(winners));
+    document.getElementById('save').textContent = 'Gravado neste navegador. Recarregar não sorteia de novo.';
+  } catch (e) {
+    document.getElementById('save').textContent = 'Não consegui gravar neste navegador. Não recarregue a página.';
+  }
+  busy = false;
+  render();
+});
+
+try {
+  const pool = await (await fetch('./pool.json', { cache: 'no-store' })).json();
+  const people = eligiblePool(pool.participants, []);
+  const sum = people.reduce((s, p) => s + p.entries, 0);
+  prizes = Array.isArray(pool.prizes) ? pool.prizes : [];
+  if (pool.participants.length !== 73 || people.length !== 73 || sum !== 908 || prizes.length !== 3) {
+    block('A lista desta página não confere. Nenhum nome foi sorteado.');
+  } else {
+    participants = pool.participants;
+    document.getElementById('count').textContent = '73';
+    document.getElementById('sum').textContent = '908';
+    const list = document.getElementById('list');
+    for (const p of people) {
+      const li = document.createElement('li');
+      li.textContent = '@' + p.handle + ' · ' + p.entries + (p.entries > 1 ? ' participações' : ' participação');
+      list.appendChild(li);
+    }
+    let raw = null;
+    let broken = false;
+    try {
+      const text = localStorage.getItem(KEY);
+      raw = text ? JSON.parse(text) : null;
+    } catch (e) {
+      broken = true;
+    }
+    const restored = broken ? { ok: false, winners: [] } : restoreState(raw, participants, prizes);
+    if (!restored.ok) {
+      block('Há um sorteio salvo neste navegador que não pôde ser lido. Nenhum nome novo foi sorteado.');
+    } else {
+      winners = restored.winners;
+      render();
+      if (winners.length < 3) btn.disabled = false;
+      if (winners.length) document.getElementById('save').textContent = 'Sorteio já gravado neste navegador. Recarregar não sorteia de novo.';
+    }
+  }
+} catch (e) {
+  block('Não foi possível carregar a lista. Nenhum nome foi sorteado.');
+}
+</script>
+</body>
+</html>
