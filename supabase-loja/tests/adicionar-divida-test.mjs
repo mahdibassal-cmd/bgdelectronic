@@ -37,6 +37,11 @@ const sql = S("migration-adicionar-divida.sql");
 ok(/Adicionar dívida/.test(ui) && /isAdm \?/.test(ui) && ui.includes("migration-adicionar-divida.sql"), "UI form is admin-only and names the SQL file");
 ok(!/create or replace function public\.criar_nota/.test(sql), "migration does not replace criar_nota");
 ok(!/insert into public\.(caixa_especial_mov|cliente_creditos|caixa_movimentos)/.test(sql), "migration does not insert cash, credit, or cxesp");
+const fix = S("fix-adicionar-divida-sem-teto.sql");
+const fixBody = fix.slice(fix.indexOf("as $$"), fix.indexOf("end $$"));
+ok(!/999999\.99/.test(fixBody), "fix body does not install a replacement ceiling");
+ok(!/^\s*alter table/im.test(fix) && !/drop schema/i.test(fix) && !/create or replace view/i.test(fix) && !/create or replace function public\.criar_nota/i.test(fix), "fix does not rewrite schema, views, or note functions");
+ok(/atttypmod/.test(fix) && /numeric\(12,2\)/.test(fix), "fix keeps the existing numeric(12,2) representability check");
 
 await db.exec("reset role; insert into public.products(sku,marca,produto,preco_venda,estoque) values ('APL-001','Apple','AirPods 4',1000,50)");
 const est0 = await ownerNum("select estoque from public.products where sku = 'APL-001'");
@@ -66,6 +71,15 @@ const mov0 = await ownerNum("select count(*) from public.caixa_movimentos");
 const cred0 = await ownerNum("select count(*) from public.cliente_creditos");
 const esp0 = await ownerNum("select count(*) from public.caixa_especial_mov");
 const saldo0 = await num(`select public.cliente_saldo_calc(${maria})`);
+e = await err(`select public.adicionar_divida(${maria}, 1592870, 'sistema antiga', 'chave-antes-teto')`);
+ok(e && /Valor inválido/.test(e), "before the fix, 1592870 still hits the old cap: " + e);
+ok(await ownerNum("select count(*) from public.divida_legado_idem") === 0, "the rejected 1592870 wrote nothing");
+await db.exec("reset role; do $$ begin if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if; end $$;");
+await db.exec(fix);
+await as("mike");
+ok(await ownerNum("select has_function_privilege('anon', 'public.adicionar_divida(bigint, numeric, text, text)', 'execute')::int") === 0, "anon still cannot execute");
+ok(await ownerNum("select has_function_privilege('authenticated', 'public.adicionar_divida(bigint, numeric, text, text)', 'execute')::int") === 1, "authenticated keeps execute");
+ok(await ownerNum("select has_function_privilege('service_role', 'public.adicionar_divida(bigint, numeric, text, text)', 'execute')::int") === 1, "service_role keeps execute");
 const r1 = (await one(`select public.adicionar_divida(${maria}, 80.126, 'frete da moto', 'chave-maria-80') j`)).j;
 ok(r1.idempotente === false && Number(r1.valor) === 80.13 && Number(r1.frete) === 80.13 && r1.rotulo === "DÍVIDA ANTERIOR", "admin adds 80.13 of legacy debt: " + JSON.stringify(r1));
 ok(Math.round((Number(r1.saldo) - Number(saldo0)) * 100) === 8013, "open balance grew by exactly 80.13");
@@ -91,6 +105,14 @@ e = await err(`select public.adicionar_divida(${inativo}, 15, null, 'chave-inati
 ok(e && /Cliente inativo/.test(e), "inactive client rejected: " + e);
 e = await err(`select public.adicionar_divida(${maria}, 0, null, 'chave-zero-01')`);
 ok(e && /Valor inválido/.test(e), "zero rejected");
+e = await err(`select public.adicionar_divida(${maria}, -5, null, 'chave-negativa')`);
+ok(e && /Valor inválido/.test(e), "negative rejected");
+e = await err(`select public.adicionar_divida(${maria}, 'NaN'::numeric, null, 'chave-nan-001')`);
+ok(e && /Valor inválido/.test(e), "NaN rejected: " + e);
+e = await err(`select public.adicionar_divida(${maria}, null, null, 'chave-null-01')`);
+ok(e && /Valor inválido/.test(e), "null rejected");
+e = await err(`select public.adicionar_divida(${maria}, 'Infinity'::numeric, null, 'chave-inf-001')`);
+ok(e && /numeric|invalid|inválid/i.test(e), "Infinity is not a numeric amount: " + e);
 e = await err(`select public.adicionar_divida(99999, 10, null, 'chave-ausente')`);
 ok(e && /Cliente não encontrado/.test(e), "unknown client rejected");
 
@@ -111,6 +133,52 @@ ok(Math.round((Number(saldo0) - 30) * 100) === Math.round(saldoCancel * 100), "c
 ok(await ownerNum("select estoque from public.products where sku = 'APL-001'") === estAfterSale, "cancel did not change stock");
 await db.exec("reset role");
 ok((await db.query(`select status from public.notas where id = ${r1.nota_id}`)).rows[0].status === "cancelada", "note cancelled");
+
+await as("mike");
+const big = (await one(`select public.adicionar_divida(${maria}, 1592870, 'sistema antiga', 'chave-1592870') j`)).j;
+ok(big.idempotente === false && Number(big.valor) === 1592870 && Number(big.frete) === 1592870, "1592870 is stored: " + JSON.stringify(big));
+const stored = (await db.query(`select frete::float8 frete, total::float8 total from public.notas where id = ${big.nota_id}`)).rows[0];
+ok(stored.frete === 1592870 && stored.total === 1592870, "note columns hold 1592870 without a schema change");
+const bigAgain = (await one(`select public.adicionar_divida(${maria}, 1592870.004, 'sistema antiga', 'chave-1592870') j`)).j;
+ok(bigAgain.idempotente === true && Number(bigAgain.nota_id) === Number(big.nota_id), "same key and same cents do not create another note");
+e = await err(`select public.adicionar_divida(${maria}, 1592870.01, null, 'chave-1592870')`);
+ok(e && /Chave já usada/.test(e), "same key with another amount is still rejected");
+const rounded = (await one(`select public.adicionar_divida(${maria}, 1592870.005, null, 'chave-round-01') j`)).j;
+ok(Number(rounded.valor) === 1592870.01, "half-cent rounds away from zero to 1592870.01: " + rounded.valor);
+const top = (await one(`select public.adicionar_divida(${maria}, 9999999999.99, null, 'chave-tipo-max') j`)).j;
+ok(Number(top.valor) === 9999999999.99, "existing numeric(12,2) maximum is representable: " + top.valor);
+e = await err(`select public.adicionar_divida(${maria}, 10000000000, null, 'chave-tipo-over')`);
+ok(e && /Valor inválido/.test(e), "one real above numeric(12,2) is rejected: " + e);
+e = await err(`select public.adicionar_divida(${maria}, 9999999999.995, null, 'chave-tipo-round')`);
+ok(e && /Valor inválido/.test(e), "rounding past numeric(12,2) is rejected: " + e);
+const notesBeforeDeny = await ownerNum("select count(*) from public.notas");
+await as("pamela");
+e = await err(`select public.adicionar_divida(${maria}, 1592870, null, 'chave-fin-grande')`);
+ok(e && /Somente admin/.test(e), "financeiro still denied above the old cap");
+await db.exec("reset role; set role anon");
+e = await err(`select public.adicionar_divida(${maria}, 1592870, null, 'chave-anon-grande')`);
+ok(!!e, "anon still denied above the old cap: " + e);
+await as("mike");
+ok(await ownerNum("select count(*) from public.notas") === notesBeforeDeny, "unauthorized large calls created no note");
+await db.exec("reset role");
+await db.exec(S("rollback-adicionar-divida-sem-teto.sql"));
+await as("mike");
+e = await err(`select public.adicionar_divida(${maria}, 1000000, null, 'chave-rollback1')`);
+ok(e && /Valor inválido/.test(e), "rollback restores the commercial cap: " + e);
+await db.exec("reset role");
+await db.exec(fix);
+await as("mike");
+const restored = (await one(`select public.adicionar_divida(${maria}, 1000000, null, 'chave-rollback1') j`)).j;
+ok(Number(restored.valor) === 1000000 && restored.idempotente === false, "reapplying the fix accepts 1000000");
+
+const parseValorDivida = new Function(ui.match(/function parseValorDivida\(input\) \{[\s\S]*?\n\}/)[0] + "\nreturn parseValorDivida;")();
+const parsed = Object.fromEntries([["1592870", 1592870], ["1.592.870,00", 1592870], ["1592870,50", 1592870.5], ["999.999,99", 999999.99], ["9.999.999.999,99", 9999999999.99]].map(([raw, want]) => [raw, parseValorDivida(raw).value === want]));
+ok(Object.values(parsed).every(Boolean), "locale amounts parse: " + JSON.stringify(parsed));
+for (const bad of ["1.592.870", "0", "-1", "NaN", "Infinity", "1e5", "abc", "", "80,126", "10.000.000.000,00", "9999999999,995"]) {
+  ok(parseValorDivida(bad).error === "Valor inválido", "parser rejects " + bad);
+}
+ok(!/999999\.99/.test(ui), "the screen no longer carries the commercial cap");
+ok(ui.includes("numeric(12,2)") && ui.includes("Não há teto comercial"), "the screen explains the existing column type");
 
 if (fails) { console.error(fails + " failed"); process.exit(1); }
 console.log(passes + " passed");
