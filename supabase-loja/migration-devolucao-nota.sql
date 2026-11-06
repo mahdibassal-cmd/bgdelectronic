@@ -66,6 +66,14 @@ alter table public.devolucao_proposta_item enable row level security;
 alter table public.devolucao_proposta_item force row level security;
 revoke all on table public.devolucao_proposta, public.devolucao_proposta_item from public, anon, authenticated;
 
+alter table public.devolucao_proposta add column if not exists cliente_id bigint references public.clientes(id);
+alter table public.devolucao_proposta add column if not exists credito_id bigint references public.cliente_creditos(id);
+alter table public.devolucao_proposta add column if not exists modo text;
+alter table public.devolucao_proposta drop constraint if exists devolucao_proposta_status_check;
+alter table public.devolucao_proposta add constraint devolucao_proposta_status_check check (status in ('proposta', 'retirada', 'confirmada'));
+alter table public.devolucao_proposta drop constraint if exists devolucao_proposta_modo_chk;
+alter table public.devolucao_proposta add constraint devolucao_proposta_modo_chk check (modo is null or modo = 'credito_loja');
+
 create or replace function public._devolucao_admin() returns void
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -130,7 +138,7 @@ begin
       select i.sale_id, sum(i.qtd) qtd
         from public.devolucao_proposta_item i
         join public.devolucao_proposta d on d.id = i.proposta_id
-       where d.nota_id = p_nota and d.status = 'proposta'
+       where d.nota_id = p_nota and d.status in ('proposta', 'confirmada')
        group by i.sale_id
     ) u on u.sale_id = s.id
    where s.nota_id = p_nota;
@@ -158,7 +166,8 @@ begin
     'mercadoria_disponivel', coalesce((select sum((x->>'qtd_disponivel')::int * (x->>'preco_vendido')::numeric) from jsonb_array_elements(v_itens) x), 0),
     'confirmacao_habilitada', false, 'estoque_aplicado', false, 'caixa_aplicado', false,
     'credito_aplicado', false, 'divida_aplicada', false, 'acerto', 'pendente',
-    'caminho_existente', 'Cancelar nota anula a nota inteira, devolve todo o estoque e estorna o caixa lançado. Não serve para quantidade parcial e não fica preservada como venda ativa.',
+    'caminho_existente', 'Cancelar nota anula a nota inteira, devolve todo o estoque e estorna o caixa lançado. Não serve para quantidade parcial.',
+    'modo_credito_loja', 'Devolução paga: a mercadoria volta ao estoque e o cliente cadastrado recebe crédito da loja. O dinheiro não sai de nenhum caixa, nem do HX, nem da Caixa Especial. Não cria recebimento nem estorno.',
     'perguntas', public._devolucao_perguntas());
 end $$;
 
@@ -222,7 +231,7 @@ begin
     select s.qtd - coalesce((
              select sum(i.qtd) from public.devolucao_proposta_item i
                join public.devolucao_proposta d on d.id = i.proposta_id
-              where i.sale_id = s.id and d.status = 'proposta'), 0)
+              where i.sale_id = s.id and d.status in ('proposta', 'confirmada')), 0)
       into v_left
       from public.sales s where s.id = v_sale.id;
     if v_need > v_left then
@@ -274,14 +283,220 @@ begin
     using errcode = 'P0001';
 end $$;
 
+-- Modo escolhido: mercadoria volta ao estoque e vira crédito da loja.
+-- Não tira dinheiro de caixa nenhum (HX ou outro), não mexe na Caixa Especial
+-- e não cria recebimento nem estorno.
+create or replace function public.confirmar_devolucao_credito_loja(
+  p_nota bigint, p_itens jsonb, p_motivo text, p_chave text, p_cliente bigint)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_chave text := trim(coalesce(p_chave, ''));
+  v_motivo text := trim(coalesce(p_motivo, ''));
+  n record; it jsonb; v_sale record; v_need int; v_left int; v_merc numeric := 0;
+  v_pedido jsonb; v_idem record; v_id bigint; v_seen bigint[] := '{}';
+  v_recebido numeric := 0; v_ja numeric := 0; v_ativo boolean; v_cred bigint;
+  v_cx0 bigint; v_esp0 bigint; v_rec0 bigint;
+begin
+  perform public._devolucao_admin();
+  if v_chave !~ '^[A-Za-z0-9._:-]{8,80}$' then
+    raise exception 'Informe a chave da devolução' using errcode = 'P0001';
+  end if;
+  if length(v_motivo) < 3 or length(v_motivo) > 300 then
+    raise exception 'Informe o motivo' using errcode = 'P0001';
+  end if;
+  if p_cliente is null or p_cliente <= 0 then
+    raise exception 'Escolha o cliente cadastrado' using errcode = 'P0001';
+  end if;
+  if jsonb_typeof(p_itens) is distinct from 'array' or jsonb_array_length(p_itens) = 0 then
+    raise exception 'Informe a quantidade' using errcode = 'P0001';
+  end if;
+  perform pg_advisory_xact_lock(87234022, hashtext(coalesce(p_nota, 0)::text));
+  perform pg_advisory_xact_lock(87234023, hashtext(v_chave));
+  select coalesce(jsonb_agg(jsonb_build_object('sale_id', (x->>'sale_id')::bigint, 'qtd', (x->>'qtd')::int)
+                            order by (x->>'sale_id')::bigint), '[]'::jsonb)
+    into v_pedido from jsonb_array_elements(p_itens) x where coalesce((x->>'qtd')::int, 0) > 0;
+  if v_pedido = '[]'::jsonb then raise exception 'Informe a quantidade' using errcode = 'P0001'; end if;
+  select * into v_idem from public.devolucao_proposta where chave = v_chave;
+  if found then
+    if v_idem.modo is distinct from 'credito_loja' or v_idem.user_id is distinct from auth.uid()
+       or v_idem.nota_id is distinct from p_nota or v_idem.cliente_id is distinct from p_cliente
+       or v_idem.motivo is distinct from v_motivo or v_idem.pedido is distinct from v_pedido then
+      raise exception 'Chave já usada em outra devolução' using errcode = 'P0001';
+    end if;
+    return jsonb_build_object(
+      'proposta_id', v_idem.id, 'nota_id', p_nota, 'cliente_id', v_idem.cliente_id,
+      'credito_id', v_idem.credito_id, 'mercadoria', v_idem.mercadoria, 'idempotente', true,
+      'modo', 'credito_loja', 'estoque_aplicado', false, 'caixa_alterado', false, 'cxesp_alterado', false);
+  end if;
+  select id, status, cliente_id, coalesce(obs_pagamento, '') as obs into n
+    from public.notas where id = p_nota for update;
+  if n.id is null then raise exception 'Nota não encontrada' using errcode = 'P0001'; end if;
+  if n.status = 'cancelada' then raise exception 'Nota cancelada' using errcode = 'P0001'; end if;
+  if n.obs like 'DÍVIDA ANTERIOR%' or not exists (select 1 from public.sales s where s.nota_id = p_nota) then
+    raise exception 'Nota sem mercadoria' using errcode = 'P0001';
+  end if;
+  if n.cliente_id is not null and n.cliente_id is distinct from p_cliente then
+    raise exception 'Cliente diferente do vinculado à nota' using errcode = 'P0001';
+  end if;
+  select ativo into v_ativo from public.clientes where id = p_cliente for update;
+  if v_ativo is null then raise exception 'Cliente não encontrado' using errcode = 'P0001'; end if;
+  if not v_ativo then raise exception 'Cliente inativo' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.nota_pagamentos np where np.nota_id = p_nota
+              and np.metodo::text not in ('dinheiro', 'pix', 'cartao', 'transferencia', 'prazo')) then
+    raise exception 'Forma de pagamento sem regra de devolução' using errcode = 'P0001';
+  end if;
+  select coalesce(sum(np.valor), 0) into v_recebido from public.nota_pagamentos np
+   where np.nota_id = p_nota and np.metodo::text in ('dinheiro', 'pix', 'cartao', 'transferencia');
+  if to_regclass('public.recebimento_notas') is not null then
+    v_recebido := v_recebido + coalesce((select sum(rn.valor) from public.recebimento_notas rn where rn.nota_id = p_nota), 0);
+  end if;
+  select coalesce(sum(d.mercadoria), 0) into v_ja from public.devolucao_proposta d
+   where d.nota_id = p_nota and d.status = 'confirmada' and d.modo = 'credito_loja';
+  for it in select * from jsonb_array_elements(p_itens) loop
+    if (it->>'sale_id') is null or (it->>'qtd') !~ '^[0-9]+$' then
+      raise exception 'Item inválido' using errcode = 'P0001';
+    end if;
+    v_need := (it->>'qtd')::int;
+    if v_need = 0 then continue; end if;
+    if (it->>'sale_id')::bigint = any (v_seen) then
+      raise exception 'Item repetido na devolução' using errcode = 'P0001';
+    end if;
+    v_seen := v_seen || (it->>'sale_id')::bigint;
+    select s.id, s.sku, s.qtd, s.preco_vendido into v_sale
+      from public.sales s where s.id = (it->>'sale_id')::bigint and s.nota_id = p_nota for update;
+    if v_sale.id is null then raise exception 'Item não é desta nota' using errcode = 'P0001'; end if;
+    select s.qtd - coalesce((select sum(i.qtd) from public.devolucao_proposta_item i
+             join public.devolucao_proposta d on d.id = i.proposta_id
+            where i.sale_id = s.id and d.status = 'confirmada'), 0)
+      into v_left from public.sales s where s.id = v_sale.id;
+    if v_need > v_left then
+      raise exception 'Quantidade maior que a vendida (%): pedido %, disponível %', v_sale.sku, v_need, v_left
+        using errcode = 'P0001';
+    end if;
+    v_merc := v_merc + round(v_need * v_sale.preco_vendido, 2);
+  end loop;
+  if v_merc <= 0 then raise exception 'Informe a quantidade' using errcode = 'P0001'; end if;
+  if v_merc > v_recebido - v_ja then
+    raise exception 'Valor não recebido — crédito da loja não cobre quantia em aberto' using errcode = 'P0001';
+  end if;
+  select count(*) into v_cx0 from public.caixa_movimentos;
+  select count(*) into v_rec0 from public.cliente_recebimentos;
+  if to_regclass('public.caixa_especial_mov') is not null then
+    execute 'select count(*) from public.caixa_especial_mov' into v_esp0;
+  end if;
+  for it in select * from jsonb_array_elements(p_itens) loop
+    v_need := coalesce((it->>'qtd')::int, 0);
+    if v_need = 0 then continue; end if;
+    update public.products p set estoque = p.estoque + v_need, updated_at = now()
+      from public.sales s
+     where s.id = (it->>'sale_id')::bigint and s.nota_id = p_nota and p.sku = s.sku;
+  end loop;
+  insert into public.cliente_creditos(cliente_id, tipo, valor, obs, nota_id)
+  values (p_cliente, 'entrada', v_merc,
+          left('Devolução mercadoria nota ' || lpad(p_nota::text, 6, '0') || ' — crédito da loja', 300),
+          p_nota)
+  returning id into v_cred;
+  insert into public.devolucao_proposta(chave, nota_id, user_id, motivo, status, mercadoria, pedido, cliente_id, credito_id, modo)
+  values (v_chave, p_nota, auth.uid(), v_motivo, 'confirmada', v_merc, v_pedido, p_cliente, v_cred, 'credito_loja')
+  returning id into v_id;
+  for it in select * from jsonb_array_elements(p_itens) loop
+    v_need := coalesce((it->>'qtd')::int, 0);
+    if v_need = 0 then continue; end if;
+    insert into public.devolucao_proposta_item(proposta_id, sale_id, sku, qtd, preco_vendido)
+    select v_id, s.id, s.sku, v_need, s.preco_vendido
+      from public.sales s where s.id = (it->>'sale_id')::bigint and s.nota_id = p_nota;
+  end loop;
+  if (select count(*) from public.caixa_movimentos) <> v_cx0
+     or (select count(*) from public.cliente_recebimentos) <> v_rec0 then
+    raise exception 'Devolução não pode mexer em caixa ou recebimento' using errcode = 'P0001';
+  end if;
+  if v_esp0 is not null and (select count(*) from public.caixa_especial_mov) <> v_esp0 then
+    raise exception 'Devolução não pode mexer na Caixa Especial' using errcode = 'P0001';
+  end if;
+  return jsonb_build_object(
+    'proposta_id', v_id, 'nota_id', p_nota, 'cliente_id', p_cliente, 'credito_id', v_cred,
+    'mercadoria', v_merc, 'idempotente', false, 'modo', 'credito_loja',
+    'estoque_aplicado', true, 'caixa_alterado', false, 'cxesp_alterado', false, 'recebimento_criado', false);
+end $$;
+
+create or replace function public.cancelar_nota_financas(p_nota bigint, p_motivo text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare n record; r record; v_nn text := lpad(p_nota::text, 6, '0'); v_est numeric := 0; v_rec numeric; v_cxesp bigint;
+begin
+  if not public.can('financas') then raise exception 'Sem permissão (financeiro/admin)' using errcode = '42501'; end if;
+  if length(trim(coalesce(p_motivo, ''))) < 3 then raise exception 'Informe o motivo' using errcode = 'P0001'; end if;
+  select * into n from public.notas where id = p_nota for update;
+  if not found then raise exception 'Nota não encontrada' using errcode = 'P0001'; end if;
+  if n.status = 'cancelada' then raise exception 'Nota já cancelada' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.devolucao_proposta d where d.nota_id = p_nota and d.status = 'confirmada') then
+    raise exception 'Nota tem devolução em crédito da loja — cancelar devolveria o estoque outra vez e tiraria dinheiro do caixa'
+      using errcode = 'P0001';
+  end if;
+  select coalesce(sum(valor), 0) into v_rec from public.recebimento_notas where nota_id = p_nota;
+  if v_rec > 0 then
+    raise exception 'Nota % tem recebimento de R$ % em Contas a receber — estorne o recebimento antes de cancelar', v_nn,
+      replace(to_char(v_rec, 'FM999999990.00'), '.', ',') using errcode = 'P0001'; end if;
+  update public.products p set estoque = p.estoque + s.qtd, updated_at = now()
+    from (select sku, sum(qtd) qtd from public.sales where nota_id = p_nota group by sku) s where p.sku = s.sku;
+  for r in select caixa_id, forma, sum(case when tipo = 'venda' then valor when tipo = 'estorno' then -valor else 0 end) liq
+             from public.caixa_movimentos where nota_id = p_nota group by caixa_id, forma loop
+    if r.liq > 0 then
+      insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id, forma)
+      values (r.caixa_id, 'estorno', r.liq, left('Cancelamento nota ' || v_nn || ': ' || trim(p_motivo), 300), p_nota, auth.uid(), r.forma);
+      v_est := v_est + r.liq;
+    end if;
+  end loop;
+  v_cxesp := public._cxesp_estornar_nota(p_nota, left('Cancelamento nota ' || v_nn || ': ' || trim(p_motivo), 300));
+  update public.notas set status = 'cancelada', cancelada_em = now(), cancelada_por = auth.uid(), motivo_cancel = left(trim(p_motivo), 300),
+         caixa_lancada_id = null, lancada_em = null, lancada_por = null, prazo_lancada_em = null, prazo_lancada_por = null,
+         cxesp_lancada_em = null, cxesp_lancada_por = null, cxesp_mov_id = null
+   where id = p_nota;
+  perform public.fin_log('nota_cancelada_financas', jsonb_build_object('nota_id', p_nota, 'motivo', trim(p_motivo), 'total', n.total,
+    'estornado_caixa', v_est, 'cxesp_saida', v_cxesp, 'caixa_antes', n.caixa_lancada_id, 'cliente_id', n.cliente_id));
+  return jsonb_build_object('nota_id', p_nota, 'estornado_caixa', v_est, 'cxesp_saida', v_cxesp, 'cancelada', true);
+end $$;
+
+create or replace function public.cancelar_nota(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare n record; r record;
+begin
+  if not public.can('admin') then raise exception 'Só admin cancela nota' using errcode = '42501'; end if;
+  if length(trim(coalesce(p_motivo, ''))) < 3 then raise exception 'Informe o motivo' using errcode = 'P0001'; end if;
+  select * into n from public.notas where id = p_id for update;
+  if not found then raise exception 'Nota não encontrada' using errcode = 'P0001'; end if;
+  if n.status = 'cancelada' then raise exception 'Nota já cancelada' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.devolucao_proposta d where d.nota_id = p_id and d.status = 'confirmada') then
+    raise exception 'Nota tem devolução em crédito da loja — cancelar devolveria o estoque outra vez e tiraria dinheiro do caixa'
+      using errcode = 'P0001';
+  end if;
+  update public.products p set estoque = p.estoque + s.qtd, updated_at = now()
+    from (select sku, sum(qtd) qtd from public.sales where nota_id = p_id group by sku) s where p.sku = s.sku;
+  for r in select caixa_id, sum(case when tipo = 'venda' then valor when tipo = 'estorno' then -valor else 0 end) liq
+             from public.caixa_movimentos where nota_id = p_id group by caixa_id loop
+    if r.liq > 0 then
+      insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, nota_id, user_id)
+      values (r.caixa_id, 'estorno', r.liq, left('Cancelamento nota ' || lpad(p_id::text, 6, '0') || ': ' || trim(p_motivo), 300), p_id, auth.uid());
+    end if;
+  end loop;
+  perform public._cxesp_estornar_nota(p_id, left('Cancelamento nota ' || lpad(p_id::text, 6, '0') || ': ' || trim(p_motivo), 300));
+  update public.notas set status = 'cancelada', cancelada_em = now(), cancelada_por = auth.uid(), motivo_cancel = trim(p_motivo),
+         cxesp_lancada_em = null, cxesp_lancada_por = null, cxesp_mov_id = null
+   where id = p_id;
+end $$;
+
+revoke all on function public.cancelar_nota_financas(bigint, text), public.cancelar_nota(bigint, text) from public, anon;
+grant execute on function public.cancelar_nota_financas(bigint, text), public.cancelar_nota(bigint, text) to authenticated;
+
 revoke all on function public.consultar_devolucao_nota(bigint),
   public.propor_devolucao_nota(bigint, jsonb, text, text),
   public.retirar_proposta_devolucao(bigint, text),
-  public.confirmar_devolucao_nota(bigint) from public, anon;
+  public.confirmar_devolucao_nota(bigint),
+  public.confirmar_devolucao_credito_loja(bigint, jsonb, text, text, bigint) from public, anon;
 grant execute on function public.consultar_devolucao_nota(bigint),
   public.propor_devolucao_nota(bigint, jsonb, text, text),
   public.retirar_proposta_devolucao(bigint, text),
-  public.confirmar_devolucao_nota(bigint) to authenticated;
+  public.confirmar_devolucao_nota(bigint),
+  public.confirmar_devolucao_credito_loja(bigint, jsonb, text, text, bigint) to authenticated;
 
 notify pgrst, 'reload schema';
 select 'devolucao nota proposta ok' as status;
