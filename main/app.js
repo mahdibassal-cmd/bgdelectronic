@@ -152,6 +152,15 @@ if (!MOCK && !CONFIGURED) {
     async productsFull() { return allRows(() => sb.from("products").select("*").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
+    async custoSalvar(sku, custo) {
+      const n = Number(custo);
+      if (!/^[A-Z0-9-]{3,20}$/.test(String(sku || "")) || !Number.isFinite(n) || n < 0) throw new Error("Custo inválido");
+      ok(await sb.from("product_costs").upsert({ sku, custo: n }, { onConflict: "sku" }).select("sku,custo"));
+      const again = ok(await sb.from("product_costs").select("sku,custo").eq("sku", sku));
+      const row = (again || []).find(r => r.sku === sku);
+      if (!row || !globalThis.BAGDA_CUSTO.sameCents(row.custo, n)) throw new Error("O custo não foi confirmado. O valor na tela não foi trocado.");
+      return { sku: row.sku, custo: Number(row.custo) };
+    },
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
@@ -327,7 +336,19 @@ if (!MOCK && !CONFIGURED) {
     async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@loja.bgdstores.local", detail: {} }]; },
     async dumpTable(t) { return ({ clientes: CL, fornecedores: FO, contas_pagar: CP, conta_pagamentos: CPG, cliente_recebimentos: RC, products: P, notas: N, nota_pagamentos: PG, caixas: CX, caixa_movimentos: MV, caixa_sessoes: SE, purchases: PU })[t] || []; },
     async profile() { return meU; },
-    async products() { await ready; return role === "financeiro" ? [] : P; }, async productsFull() { await ready; return role === "financeiro" ? [] : P; }, async costs() { return role === "admin" ? Object.entries(K).map(([sku, custo]) => ({ sku, custo })) : []; },
+    async products() { await ready; return role === "financeiro" ? [] : P; }, async productsFull() { await ready; return role === "financeiro" ? [] : P; }, async costs() { if (role !== "admin") throw new Error("Sem permissão"); return Object.entries(K).map(([sku, custo]) => ({ sku, custo })); },
+    async custoSalvar(sku, custo) {
+      if (role !== "admin") throw new Error("Sem permissão");
+      if (qs.has("failcusto")) throw new Error("Falha simulada ao salvar o custo");
+      const n = Number(custo);
+      if (!/^[A-Z0-9-]{3,20}$/.test(String(sku || "")) || !Number.isFinite(n) || n < 0) throw new Error("Custo inválido");
+      const p = P.find(x => x.sku === sku);
+      if (!p) throw new Error("Produto não encontrado");
+      const est = p.estoque, preco = p.preco_venda;
+      K[sku] = Math.round(n * 100) / 100;
+      if (p.estoque !== est || p.preco_venda !== preco) throw new Error("Estoque ou preço não podem mudar com o custo");
+      return { sku, custo: K[sku] };
+    },
     async estoqueVendedor() { await ready; return role === "financeiro" ? [] : P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
     async repSeller(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...i, ...N.find(n => n.nota_id === i.nota_id), total: i.total })), "handle", (g, r) => { g.itens += r.qtd; g.faturamento += r.total; g.custo += r.qtd * r.custo; g._n = (g._n || new Set()).add(r.nota_id); g.vendas = g._n.size; }); },
     async repPay(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(PG.filter(g => ids.includes(g.nota_id)), "metodo", (g, r) => { g.vendas++; g.faturamento += r.valor; }).map(g => ({ ...g, forma_pagamento: g.metodo })); },
@@ -618,12 +639,35 @@ async function viewEstoque() {
   const base = adm ? await api.products() : await api.estoqueVendedor();
   const fix = MOCK && qs.has("estfix") && EC ? EC.previewFixtures() : [];
   const P = stockSort(fix.length ? base.concat(fix) : base);
-  let cat = "", sub = "";
+  let cat = "", sub = "", cm = {}, custoErr = "";
+  if (adm) { try { cm = Object.fromEntries((await api.costs()).map(k => [k.sku, Number(k.custo)])); } catch (e) { custoErr = e.message || "Não foi possível ler os custos."; } }
   app.innerHTML = `<div class="card"><h2>Estoque${adm ? "" : " (consulta)"} <button class="btn noprint" id="pe" style="float:right;margin:0">Imprimir / PDF</button></h2>
-  ${EC ? `<div id="est-nav" class="est-nav noprint"></div>` : ""}${fix.length ? `<p class="muted noprint">Pré-visualização com itens FIXTURE — não é o estoque real.</p>` : ""}<input id="b" class="noprint" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…" autofocus>
+  ${EC ? `<div id="est-nav" class="est-nav noprint"></div>` : ""}${fix.length ? `<p class="muted noprint">Pré-visualização com itens FIXTURE — não é o estoque real.</p>` : ""}${custoErr ? `<p class="warn">${esc(custoErr)}</p>` : ""}<input id="b" class="noprint" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…" autofocus>
   ${EC ? `<p id="est-sum" class="muted est-sum"></p>` : ""}<div class="stk-wrap"><table id="t" class="stk"></table></div></div>`;
   const ult = p => Number(p.estoque) === 1 ? ` <span class="ult">Última peça</span>` : "";
-  const row = adm ? p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${ult(p)}</td><td class="n">${brl(p.preco_venda)}</td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>` : p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}${ult(p)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
+  const cols = adm ? 6 : 5;
+  const rowAdm = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${ult(p)}</td><td class="n">${brl(p.preco_venda)}</td><td class="n">${cm[p.sku] != null ? brl(cm[p.sku]) : "—"} <button type="button" class="btn ghost ecst noprint" data-sku="${esc(p.sku)}" style="margin:0;padding:4px 8px">Editar custo</button></td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>`;
+  const rowSeller = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}${ult(p)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
+  const row = adm ? rowAdm : rowSeller;
+  const editarCusto = sku => {
+    const p = P.find(x => x.sku === sku); if (!adm || !p) return;
+    const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px";
+    o.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-labelledby="custo-title" style="max-width:440px;margin:0"><h2 id="custo-title">Editar custo</h2><p><b>${esc(p.sku)}</b> · ${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</p><p>Custo atual: <b>${cm[p.sku] != null ? brl(cm[p.sku]) : "sem custo cadastrado"}</b></p><p class="muted">Altera só o custo unitário atual deste SKU. Não muda o preço de venda, o estoque, nem compras e notas já lançadas.</p><label for="custo-in">Novo custo (R$)</label><input id="custo-in" inputmode="decimal" autocomplete="off" value="${cm[p.sku] != null ? esc(String(cm[p.sku])) : ""}"><p class="warn" id="custo-w" style="min-height:1em"></p><button type="button" class="btn ghost" id="custo-x">Cancelar</button> <button type="button" class="btn" id="custo-ok">Salvar custo</button></div>`;
+    const close = () => { o.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = e => { if (e.key === "Escape") close(); };
+    document.body.append(o); document.addEventListener("keydown", onKey); const inp = o.querySelector("#custo-in"); inp.focus(); inp.select();
+    o.querySelector("#custo-x").onclick = close;
+    o.querySelector("#custo-ok").onclick = async () => {
+      const parsed = globalThis.BAGDA_CUSTO.parseCusto(inp.value); const w = o.querySelector("#custo-w"), b = o.querySelector("#custo-ok");
+      if (parsed.error) { w.textContent = parsed.error; inp.focus(); return; }
+      b.disabled = true;
+      try {
+        const saved = await api.custoSalvar(p.sku, parsed.value);
+        if (!saved || saved.sku !== p.sku || !globalThis.BAGDA_CUSTO.sameCents(saved.custo, parsed.value)) throw new Error("O custo não foi confirmado. O valor na tela não foi trocado.");
+        cm[p.sku] = Number(saved.custo); close(); toast("Custo atualizado ✓"); draw();
+      } catch (e) { b.disabled = false; w.textContent = e.message || "Não foi possível salvar o custo."; }
+    };
+  };
   const draw = focusSel => {
     const q = $("#b").value;
     const matched = EC ? P.filter(p => EC.matchProduct(p, q)) : P.filter(p => match(p, q));
@@ -631,19 +675,20 @@ async function viewEstoque() {
     const L = EC ? EC.filterList(matched, { cat, sub, q: "" }) : matched;
     if ($("#est-sum") && EC) $("#est-sum").textContent = EC.summaryText(EC.countsOf(L), EC.countsOf(matched), EC.countsOf(P));
     const sec = EC ? EC.saleSections(L) : { priority: L.filter(p => Number(p.estoque) === 1), available: L.filter(p => Number(p.estoque) > 1), missing: L.filter(p => !(Number(p.estoque) > 0)) };
-    const sep = (cls, title) => `<tr class="sep${cls ? " " + cls : ""}"><th colspan="5">${title}</th></tr>`;
-    const head = adm ? `<tr><th>SKU</th><th>Produto</th><th class="n">Preço</th><th class="n">Estoque</th><th class="n">Mín.</th></tr>` : `<tr><th>SKU</th><th>Marca</th><th>Produto</th><th>Tamanho</th><th class="n">Estoque</th></tr>`;
+    const sep = (cls, title) => `<tr class="sep${cls ? " " + cls : ""}"><th colspan="${cols}">${title}</th></tr>`;
+    const head = adm ? `<tr><th>SKU</th><th>Produto</th><th class="n">Preço</th><th class="n">Custo</th><th class="n">Estoque</th><th class="n">Mín.</th></tr>` : `<tr><th>SKU</th><th>Marca</th><th>Produto</th><th>Tamanho</th><th class="n">Estoque</th></tr>`;
     let body = head;
-    if (!L.length) body += `<tr><td colspan="5" class="muted">${q ? "Nada encontrado." : cat ? "Nada nesta categoria." : "Nada encontrado."}</td></tr>`;
+    if (!L.length) body += `<tr><td colspan="${cols}" class="muted">${q ? "Nada encontrado." : cat ? "Nada nesta categoria." : "Nada encontrado."}</td></tr>`;
     else {
       const availN = sec.priority.length + sec.available.length;
       body += sep("", `Produtos disponíveis (${availN})`);
-      if (!availN) body += `<tr><td colspan="5" class="muted">Nenhum produto disponível neste filtro.</td></tr>`;
+      if (!availN) body += `<tr><td colspan="${cols}" class="muted">Nenhum produto disponível neste filtro.</td></tr>`;
       if (sec.priority.length) body += sep("pri", `Prioridade de venda · última peça (${sec.priority.length})`) + sec.priority.map(row).join("");
       body += sec.available.map(row).join("");
       if (sec.missing.length) body += sep("", `Sem estoque (${sec.missing.length})`) + sec.missing.map(row).join("");
     }
     $("#t").innerHTML = body;
+    if (adm) $("#t").querySelectorAll(".ecst").forEach(b => b.onclick = () => editarCusto(b.dataset.sku));
     if (focusSel && $("#est-nav")) { const el = $("#est-nav").querySelector(focusSel); if (el) el.focus({ preventScroll: true }); }
   };
   if ($("#est-nav")) {

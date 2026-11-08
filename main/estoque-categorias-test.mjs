@@ -234,12 +234,15 @@ const app = read("app.js");
 const view = app.slice(app.indexOf("async function viewEstoque"), app.indexOf("async function viewRelatorio"));
 ok(view.includes("await api.products()") && view.includes("await api.estoqueVendedor()") && view.includes("stockSort("), "admin and seller stock sources unchanged");
 ok(view.includes("REPOR") && view.includes("Sem estoque") && view.includes("Produtos disponíveis") && view.includes("Prioridade de venda") && view.includes("Última peça") && view.includes('placeholder="Buscar produto, marca ou SKU…"') && view.includes("Imprimir / PDF"), "stock table, priority label, search, and print stay");
-ok(view.includes('me.role === "admin"') && view.includes("preco_venda") && !view.includes("custo") && !view.includes("product_costs"), "sale price stays admin-only and cost is absent");
+ok(view.includes('me.role === "admin"') && view.includes("preco_venda") && view.includes("const rowSeller") && view.includes("const rowAdm"), "admin and seller rows stay separate");
+const sellerPart = view.slice(view.indexOf("const rowSeller"), view.indexOf("const row ="));
+ok(!sellerPart.includes("Editar custo") && !sellerPart.includes("product_costs") && !sellerPart.includes("preco_venda"), "seller row has no price and no cost control");
+ok(view.includes("if (adm)") && view.includes("await api.costs()") && view.includes("Editar custo") && view.includes("api.custoSalvar"), "cost read and edit stay inside the admin branch");
 ok(view.includes('qs.has("estfix")') && view.includes("MOCK &&"), "synthetic preview is mock-only");
 ok(app.includes('estoque: "vendas|estoque"') && app.includes('vendedor: ["vendas"]') && app.includes('estoque: ["estoque"]'), "route and role permissions unchanged");
 
 const htmlMain = read("index.html");
-ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("app.js?v=20261108c"), "classifier loads before the app");
+ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("custo-valor.js") && htmlMain.indexOf("custo-valor.js") < htmlMain.indexOf("app.js?v=20261108d"), "classifier and cost parser load before the app");
 const kioskJs = readFileSync(join(dir, "../kiosk/app.js"), "utf8");
 const kioskHtml = readFileSync(join(dir, "../kiosk/index.html"), "utf8");
 ok(!kioskJs.includes("BAGDA_ESTOQUE_CATS") && !kioskJs.includes("est-nav") && !kioskHtml.includes("estoque-categorias"), "kiosk estoque is untouched");
