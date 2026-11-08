@@ -621,18 +621,29 @@ async function viewEstoque() {
   let cat = "", sub = "";
   app.innerHTML = `<div class="card"><h2>Estoque${adm ? "" : " (consulta)"} <button class="btn noprint" id="pe" style="float:right;margin:0">Imprimir / PDF</button></h2>
   ${EC ? `<div id="est-nav" class="est-nav noprint"></div>` : ""}${fix.length ? `<p class="muted noprint">Pré-visualização com itens FIXTURE — não é o estoque real.</p>` : ""}<input id="b" class="noprint" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…" autofocus>
-  ${EC ? `<p id="est-sum" class="muted est-sum noprint"></p>` : ""}<div class="stk-wrap"><table id="t" class="stk"></table></div></div>`;
-  const row = adm ? p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</td><td class="n">${brl(p.preco_venda)}</td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>` : p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
+  ${EC ? `<p id="est-sum" class="muted est-sum"></p>` : ""}<div class="stk-wrap"><table id="t" class="stk"></table></div></div>`;
+  const ult = p => Number(p.estoque) === 1 ? ` <span class="ult">Última peça</span>` : "";
+  const row = adm ? p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${ult(p)}</td><td class="n">${brl(p.preco_venda)}</td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>` : p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}${ult(p)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
   const draw = focusSel => {
     const q = $("#b").value;
     const matched = EC ? P.filter(p => EC.matchProduct(p, q)) : P.filter(p => match(p, q));
     if (EC) $("#est-nav").innerHTML = EC.navHtml(matched, { cat, sub });
     const L = EC ? EC.filterList(matched, { cat, sub, q: "" }) : matched;
-    const shownU = L.reduce((a, p) => a + (Number(p.estoque) || 0), 0), totalU = P.reduce((a, p) => a + (Number(p.estoque) || 0), 0);
-    if ($("#est-sum")) $("#est-sum").textContent = EC.summaryText(P.length, totalU, matched.length, L.length, shownU);
-    const com = L.filter(p => +p.estoque > 0), sem = L.filter(p => !(+p.estoque > 0));
-    $("#t").innerHTML = (adm ? `<tr><th>SKU</th><th>Produto</th><th class="n">Preço</th><th class="n">Estoque</th><th class="n">Mín.</th></tr>` : `<tr><th>SKU</th><th>Marca</th><th>Produto</th><th>Tamanho</th><th class="n">Estoque</th></tr>`) + com.map(row).join("") +
-      (sem.length ? `<tr class="sep"><th colspan="5">Sem estoque (${sem.length})</th></tr>` + sem.map(row).join("") : "") + (L.length ? "" : `<tr><td colspan="5" class="muted">${q ? "Nada encontrado." : cat ? "Nada nesta categoria." : "Nada encontrado."}</td></tr>`);
+    if ($("#est-sum") && EC) $("#est-sum").textContent = EC.summaryText(EC.countsOf(L), EC.countsOf(matched), EC.countsOf(P));
+    const sec = EC ? EC.saleSections(L) : { priority: L.filter(p => Number(p.estoque) === 1), available: L.filter(p => Number(p.estoque) > 1), missing: L.filter(p => !(Number(p.estoque) > 0)) };
+    const sep = (cls, title) => `<tr class="sep${cls ? " " + cls : ""}"><th colspan="5">${title}</th></tr>`;
+    const head = adm ? `<tr><th>SKU</th><th>Produto</th><th class="n">Preço</th><th class="n">Estoque</th><th class="n">Mín.</th></tr>` : `<tr><th>SKU</th><th>Marca</th><th>Produto</th><th>Tamanho</th><th class="n">Estoque</th></tr>`;
+    let body = head;
+    if (!L.length) body += `<tr><td colspan="5" class="muted">${q ? "Nada encontrado." : cat ? "Nada nesta categoria." : "Nada encontrado."}</td></tr>`;
+    else {
+      const availN = sec.priority.length + sec.available.length;
+      body += sep("", `Produtos disponíveis (${availN})`);
+      if (!availN) body += `<tr><td colspan="5" class="muted">Nenhum produto disponível neste filtro.</td></tr>`;
+      if (sec.priority.length) body += sep("pri", `Prioridade de venda · última peça (${sec.priority.length})`) + sec.priority.map(row).join("");
+      body += sec.available.map(row).join("");
+      if (sec.missing.length) body += sep("", `Sem estoque (${sec.missing.length})`) + sec.missing.map(row).join("");
+    }
+    $("#t").innerHTML = body;
     if (focusSel && $("#est-nav")) { const el = $("#est-nav").querySelector(focusSel); if (el) el.focus({ preventScroll: true }); }
   };
   if ($("#est-nav")) {
