@@ -609,14 +609,37 @@ async function viewMfaChallenge() {
 }
 async function viewEstoque() {
   const adm = me.role === "admin";
-  const P = stockSort(adm ? await api.products() : await api.estoqueVendedor());
-  app.innerHTML = `<div class="card"><h2>Estoque${adm ? "" : " (consulta)"} <button class="btn noprint" id="pe" style="float:right;margin:0">Imprimir / PDF</button></h2><input id="b" class="noprint" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…" autofocus>
-  <table id="t" class="stk"></table></div>`;
+  const EC = globalThis.BAGDA_ESTOQUE_CATS;
+  const base = adm ? await api.products() : await api.estoqueVendedor();
+  const fix = MOCK && qs.has("estfix") && EC ? EC.previewFixtures() : [];
+  const P = stockSort(fix.length ? base.concat(fix) : base);
+  let cat = "", sub = "";
+  app.innerHTML = `<div class="card"><h2>Estoque${adm ? "" : " (consulta)"} <button class="btn noprint" id="pe" style="float:right;margin:0">Imprimir / PDF</button></h2>
+  ${EC ? `<div id="est-nav" class="est-nav noprint"></div>` : ""}${fix.length ? `<p class="muted noprint">Pré-visualização com itens FIXTURE — não é o estoque real.</p>` : ""}<input id="b" class="noprint" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…" autofocus>
+  ${EC ? `<p id="est-sum" class="muted est-sum noprint"></p>` : ""}<div class="stk-wrap"><table id="t" class="stk"></table></div></div>`;
   const row = adm ? p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</td><td class="n">${brl(p.preco_venda)}</td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>` : p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
-  const draw = () => { const L = P.filter(p => match(p, $("#b").value)), com = L.filter(p => +p.estoque > 0), sem = L.filter(p => !(+p.estoque > 0));
+  const draw = focusSel => {
+    const q = $("#b").value;
+    const matched = EC ? P.filter(p => EC.matchProduct(p, q)) : P.filter(p => match(p, q));
+    if (EC) $("#est-nav").innerHTML = EC.navHtml(matched, { cat, sub });
+    const L = EC ? EC.filterList(matched, { cat, sub, q: "" }) : matched;
+    const shownU = L.reduce((a, p) => a + (Number(p.estoque) || 0), 0), totalU = P.reduce((a, p) => a + (Number(p.estoque) || 0), 0);
+    if ($("#est-sum")) $("#est-sum").textContent = EC.summaryText(P.length, totalU, matched.length, L.length, shownU);
+    const com = L.filter(p => +p.estoque > 0), sem = L.filter(p => !(+p.estoque > 0));
     $("#t").innerHTML = (adm ? `<tr><th>SKU</th><th>Produto</th><th class="n">Preço</th><th class="n">Estoque</th><th class="n">Mín.</th></tr>` : `<tr><th>SKU</th><th>Marca</th><th>Produto</th><th>Tamanho</th><th class="n">Estoque</th></tr>`) + com.map(row).join("") +
-      (sem.length ? `<tr class="sep"><th colspan="5">Sem estoque (${sem.length})</th></tr>` + sem.map(row).join("") : "") + (L.length ? "" : '<tr><td colspan="5" class="muted">Nada encontrado.</td></tr>'); };
-  $("#b").oninput = draw; $("#pe").onclick = () => window.print(); draw(); $("#b").focus();
+      (sem.length ? `<tr class="sep"><th colspan="5">Sem estoque (${sem.length})</th></tr>` + sem.map(row).join("") : "") + (L.length ? "" : `<tr><td colspan="5" class="muted">${q ? "Nada encontrado." : cat ? "Nada nesta categoria." : "Nada encontrado."}</td></tr>`);
+    if (focusSel && $("#est-nav")) { const el = $("#est-nav").querySelector(focusSel); if (el) el.focus({ preventScroll: true }); }
+  };
+  if ($("#est-nav")) {
+    $("#est-nav").onclick = e => {
+      const b = e.target.closest("button.est-chip"); if (!b) return;
+      if (b.hasAttribute("data-cat")) { cat = b.dataset.cat || ""; sub = ""; }
+      else sub = b.dataset.sub || "";
+      draw(b.hasAttribute("data-cat") ? `button[data-cat="${CSS.escape(cat)}"]` : `button[data-sub="${CSS.escape(sub)}"]`);
+    };
+    $("#est-nav").onkeydown = e => EC.onToolbarKey(e);
+  }
+  $("#b").oninput = () => draw(); $("#pe").onclick = () => window.print(); draw(); $("#b").focus();
 }
 async function viewRelatorio(d = today()) {
   const adm = me.role === "admin";
