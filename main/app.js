@@ -40,7 +40,7 @@ const nidOk = n => Number.isInteger(+n) && +n > 0 && n !== null && n !== "";
 let notaSaving = false;
 const confirmNota = (items, total, pag, frete = 0, caxinha = 0) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
   o.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;color:#111;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.35)"><h2 style="margin:0 0 12px">Confirmar nota</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}${caxinha > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Caxinha d Natal</b></td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(caxinha)}</td></tr>` : ""}</table>
+  <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}${x.origem && globalThis.BAGDA_VENDA_ORIGEM ? " · " + esc(globalThis.BAGDA_VENDA_ORIGEM.origemLabel(x.origem)) : ""}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}${caxinha > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Caxinha d Natal</b></td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(caxinha)}</td></tr>` : ""}</table>
   <p style="font-size:1.4em;margin:14px 0 6px"><b>TOTAL: ${brl(total)}</b></p><p style="font-size:1.1em;margin:0 0 18px">Pagamento: <b>${pag}</b></p>
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
@@ -220,6 +220,7 @@ if (!MOCK && !CONFIGURED) {
     async depEspEntrada(sku, q, c, m) { return ok(await sb.rpc("dep_esp_entrada", { p_sku: sku, p_qtd: q, p_custo: c, p_motivo: m })); },
     async depEspAjuste(sku, q, m) { return ok(await sb.rpc("dep_esp_ajuste", { p_sku: sku, p_nova: q, p_motivo: m })); },
     async depEspTransf(sku, q, d, m) { return ok(await sb.rpc("dep_esp_transferir", { p_sku: sku, p_qtd: q, p_direcao: d, p_motivo: m })); },
+    async vendaOrigemPronta() { const r = await sb.from("v_nota_itens").select("estoque_origem").limit(1); return !r.error; },
     async receberCredito(cli, v, data, obs) { return ok(await sb.rpc("registrar_recebimento_com_credito", { p_cliente: cli, p_valor: v, p_data: data || null, p_obs: obs || null })); },
     async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento_credito", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
     async receberCxesp(cli, v, forma, data, obs, chave) { return ok(await sb.rpc("registrar_recebimento_cxesp", { p_cliente: cli, p_valor: v, p_forma: forma, p_data: data || null, p_obs: obs || null, p_chave: chave })); },
@@ -279,6 +280,7 @@ if (!MOCK && !CONFIGURED) {
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }];
   const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
+  if (qs.has("origemfix")) { P.push({ sku: "FX-ORG-1", marca: "Apple", produto: "iPhone 18 Pro Max FIXTURE", tamanho: "Preto", preco_venda: 9999, estoque: 2, estoque_minimo: 2, ativo: true, notas: null, fornecedor: null }); DE.push({ sku: "FX-ORG-1", qtd: 5, custo: 7000 }); K["FX-ORG-1"] = 6000; }
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
@@ -287,12 +289,20 @@ if (!MOCK && !CONFIGURED) {
     if (clienteId) cliente = (CL.find(c => c.id === clienteId) || {}).nome || cliente;
     const tot = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + frete + caxinha, pt = pags.reduce((a, x) => a + Number(x.valor), 0);
     if (Math.round(tot * 100) !== Math.round(pt * 100)) throw new Error(`Pagamentos (${pt.toFixed(2)}) diferentes do total (${tot.toFixed(2)})`);
-    for (const it of items) { const p = P.find(x => x.sku === it.sku); if (!p || p.estoque < it.qtd) throw new Error(`Estoque insuficiente ou produto inativo (${it.sku})`); }
+    const need = {};
+    for (const it of items) { const origem = it.origem === "especial" ? "especial" : "principal"; const p = P.find(x => x.sku === it.sku); if (!p || p.ativo === false) throw new Error(`Estoque insuficiente ou produto inativo (${it.sku})`); if (origem === "especial" && !["admin", "estoque"].includes(meU.role)) throw new Error("Sem permissão para vender do Depósito Especial"); need[origem + "\0" + it.sku] = (need[origem + "\0" + it.sku] || 0) + it.qtd; }
+    for (const [key, qtd] of Object.entries(need)) { const origem = key.slice(0, key.indexOf("\0")), sku = key.slice(key.indexOf("\0") + 1), p = P.find(x => x.sku === sku);
+      if (origem === "especial") { const d = DE.find(x => x.sku === sku); if (!d || d.qtd < qtd) throw new Error(`Depósito Especial sem estoque suficiente (${sku})`); }
+      else if (p.estoque < qtd) throw new Error(`Estoque insuficiente ou produto inativo (${sku})`); }
     const nid = id++, ts = at || new Date().toISOString();
-    for (const it of items) { const p = P.find(x => x.sku === it.sku); p.estoque -= it.qtd; IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo: K[p.sku] }); }
+    for (const it of items) { const origem = it.origem === "especial" ? "especial" : "principal"; const p = P.find(x => x.sku === it.sku); let custo = K[p.sku];
+      if (origem === "especial") { const d = DE.find(x => x.sku === it.sku); const antes = d.qtd; d.qtd -= it.qtd; custo = d.custo; DEM.unshift({ id: id++, sku: it.sku, tipo: "venda", qtd: -it.qtd, qtd_antes: antes, qtd_depois: d.qtd, custo_unit: d.custo, motivo: "Venda nota " + nid, created_at: ts }); }
+      else p.estoque -= it.qtd;
+      IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo, origem }); }
     N.push({ frete, caxinha_natal: caxinha, local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
     for (const g of pags) PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); /* pendente: o financeiro lança no caixa */
     return nid; };
+  const devolverItem = i => { if (i.origem === "especial") { let d = DE.find(x => x.sku === i.sku); if (!d) DE.push(d = { sku: i.sku, qtd: 0, custo: i.custo || 0 }); d.qtd += i.qtd; } else { const p = P.find(x => x.sku === i.sku); if (p) p.estoque += i.qtd; } };
   const ready = Promise.resolve().then(() => {
     const kaio = U.find(u => u.handle === "@kaio") || meU, bia = U.find(u => u.handle === "@bianca");
     const H = h => new Date(Date.now() - h * 36e5).toISOString();
@@ -383,6 +393,7 @@ if (!MOCK && !CONFIGURED) {
     async depEspLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function dep_esp_entrada_lote (demo)"); for (const x of itens) await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, h.motivo); return { itens: itens.length }; },
     async depEspEntrada(sku, q, c, m) { if (qs.has("failsku") && sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); if (meU.role !== "admin") throw new Error("Somente admin"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: 0 }); const a = d.qtd; d.custo = Math.round((d.qtd * d.custo + q * c) / (d.qtd + q) * 100) / 100; d.qtd += q; DEM.unshift({ id: id++, sku, tipo: "entrada", qtd: q, qtd_antes: a, qtd_depois: d.qtd, custo_unit: c, motivo: m || "Entrada", created_at: new Date().toISOString() }); return d; },
     async depEspAjuste(sku, q, m) { if (!["admin", "estoque"].includes(meU.role)) throw new Error("Sem permissão"); if (!m || m.length < 3) throw new Error("Informe o motivo"); const d = DE.find(x => x.sku === sku); if (!d) throw new Error("Produto não está no Depósito Especial"); if (!(q >= 0)) throw new Error("Quantidade inválida"); DEM.unshift({ id: id++, sku, tipo: "ajuste", qtd: q - d.qtd, qtd_antes: d.qtd, qtd_depois: q, custo_unit: d.custo, motivo: m, created_at: new Date().toISOString() }); d.qtd = q; return d; },
+    async vendaOrigemPronta() { return !qs.has("semorigem"); },
     async depEspTransf(sku, q, dir, m) { if (!["admin", "estoque"].includes(meU.role)) throw new Error("Sem permissão"); if (!(q > 0)) throw new Error("Quantidade deve ser maior que zero"); const p = P.find(x => x.sku === sku); let d = DE.find(x => x.sku === sku); if (!d) DE.push(d = { sku, qtd: 0, custo: K[sku] || 0 }); const a = d.qtd;
       if (dir === "para_loja") { if (d.qtd < q) throw new Error(`Depósito Especial só tem ${d.qtd} un.`); d.qtd -= q; p.estoque += q; } else { if (p.estoque < q) throw new Error(`Loja só tem ${p.estoque} un.`); p.estoque -= q; d.qtd += q; }
       DEM.unshift({ id: id++, sku, tipo: dir, qtd: dir === "para_loja" ? -q : q, qtd_antes: a, qtd_depois: d.qtd, custo_unit: d.custo, motivo: m || (dir === "para_loja" ? "Transferência para a loja" : "Transferência da loja"), created_at: new Date().toISOString() }); return d; },
@@ -429,7 +440,7 @@ if (!MOCK && !CONFIGURED) {
       Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, `Nota ${nn} transferida para ${nm}`, nid, meU); }); P2.forEach(g => mov(cx, "venda", g.valor, "Nota " + nn, nid, meU)); n.caixa_lancada_id = cx; return { mudou: true }; },
     async lancarNotaCxesp(nid) { if (meU.role !== "admin") throw new Error("Somente admin"); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada não pode ser lançada"); const P2 = PG.filter(g => g.nota_id === nid && !["prazo", "credito"].includes(g.metodo)); if (!P2.length) throw new Error("Nota sem valor para caixa (Paga Depois / Caixa Geral)"); if (n.cxesp_mov && !CXE.some(x => x.estorno_de === n.cxesp_mov)) return { mudou: false, destino: "cxesp", valor: P2.reduce((a, g) => a + g.valor, 0) }; const liq = {}; MV.filter(m => m.nota_id === nid).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0)); Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, "Nota transferida para CAIXA SPECIAL", nid, meU); }); const valor = P2.reduce((a, g) => a + Number(g.valor), 0), mid = id++; CXE.push({ id: mid, tipo: "entrada", valor, motivo: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, created_at: new Date().toISOString() }); n.cxesp_mov = mid; n.caixa_lancada_id = null; return { mudou: true, destino: "cxesp", valor, cxesp_id: mid }; },
     async cancelarNotaFin(nid, m) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status === "cancelada") throw new Error("Nota já cancelada"); if (AL.some(x => x.nota_id === nid)) throw new Error(`Nota ${String(nid).padStart(6, "0")} tem recebimento em Contas a receber — estorne o recebimento antes de cancelar`);
-      IT.filter(i => i.nota_id === nid).forEach(i => { const p = P.find(x => x.sku === i.sku); if (p) p.estoque += i.qtd; }); const liq = {}; MV.filter(x => x.nota_id === nid).forEach(x => liq[x.caixa_id] = (liq[x.caixa_id] || 0) + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0));
+      IT.filter(i => i.nota_id === nid).forEach(devolverItem); const liq = {}; MV.filter(x => x.nota_id === nid).forEach(x => liq[x.caixa_id] = (liq[x.caixa_id] || 0) + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0));
       Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, `Cancelamento nota ${String(nid).padStart(6, "0")}: ${m}`, nid, meU); }); if (n.cxesp_mov && !CXE.some(x => x.estorno_de === n.cxesp_mov)) { const ent = CXE.find(x => x.id === n.cxesp_mov); if (ent) CXE.push({ id: id++, tipo: "saida", valor: ent.valor, motivo: `Cancelamento nota ${String(nid).padStart(6, "0")}`, estorno_de: ent.id, nota_id: nid, created_at: new Date().toISOString() }); } Object.assign(n, { status: "cancelada", caixa_lancada_id: null, prazo_lancada_em: null, cxesp_mov: null }); SE.push({ kind: "nota_cancelada_financas", detail: { nota_id: nid, motivo: m } }); return { cancelada: true }; },
     async corrigirPag(nid, pags, cli, m) { needFin(); const n = N.find(x => x.nota_id === nid); if (n.caixa_lancada_id || n.cxesp_mov || MV.some(x => x.nota_id === nid)) throw new Error("Nota já lançada em caixa — não dá para corrigir; cancele e refaça"); if (AL.some(x => x.nota_id === nid)) throw new Error("Nota tem recebimento em Contas a receber — estorne antes");
       if (PG.some(g => g.nota_id === nid && g.metodo === "credito")) throw new Error("Nota paga com crédito da Caixa Geral — cancele e refaça"); const c = cli || n.cliente_id; if (pags.some(g => g.metodo === "prazo") && !c) throw new Error("Paga Depois exige cliente cadastrado");
@@ -442,12 +453,12 @@ if (!MOCK && !CONFIGURED) {
     async creditoMov(cid) { needFin(); return CR.filter(k => !cid || k.cliente_id === cid).map(k => ({ ...k, cliente: CL.find(c => c.id === k.cliente_id).nome, nota_status: k.nota_id ? (N.find(n => n.nota_id === k.nota_id) || {}).status : null, estornado: CR.some(x => x.estorno_de === k.id) })).reverse(); },
     async lancarCredito(cid, tipo, v, obs) { needFin(); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (tipo === "uso" && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); CR.push({ id: id++, cliente_id: cid, tipo, valor: v, obs: obs || null, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); },
     async cancelarNota(nid, motivo) { if (role !== "admin") throw new Error("Só admin cancela nota"); const n = N.find(x => x.nota_id === nid); if (n.status === "cancelada") throw new Error("Nota já cancelada");
-      IT.filter(i => i.nota_id === nid).forEach(i => P.find(p => p.sku === i.sku).estoque += i.qtd);
+      IT.filter(i => i.nota_id === nid).forEach(devolverItem);
       const liq = {}; MV.filter(m => m.nota_id === nid).forEach(m => liq[m.caixa_id] = (liq[m.caixa_id] || 0) + (m.tipo === "venda" ? m.valor : m.tipo === "estorno" ? -m.valor : 0));
       Object.entries(liq).forEach(([k, v]) => { if (v > 0.001) mov(+k, "estorno", v, `Cancelamento nota ${String(nid).padStart(6, "0")}: ${motivo}`, nid, meU); });
       if (n.cxesp_mov && !CXE.some(x => x.estorno_de === n.cxesp_mov)) { const ent = CXE.find(x => x.id === n.cxesp_mov); if (ent) CXE.push({ id: id++, tipo: "saida", valor: ent.valor, motivo: `Cancelamento nota ${String(nid).padStart(6, "0")}: ${motivo}`, estorno_de: ent.id, nota_id: nid, created_at: new Date().toISOString() }); }
       n.cxesp_mov = null; n.status = "cancelada"; },
-    async nota(nid) { const n = vis().find(x => x.nota_id === nid); return n ? IT.filter(i => i.nota_id === nid).map(i => ({ ...n, ...i })) : []; },
+    async nota(nid) { const n = vis().find(x => x.nota_id === nid); return n ? IT.filter(i => i.nota_id === nid).map(i => ({ ...n, ...i, estoque_origem: i.origem === "especial" ? "especial" : "principal" })) : []; },
     async notaPag(nid) { return vis().some(x => x.nota_id === nid) ? PG.filter(g => g.nota_id === nid) : []; },
     async notas() { return vis(); },
     async extrato(d) { const ns = vis().filter(n => n.data === d), ids = ns.map(n => n.nota_id), lucro = {}; const itens = IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...ns.find(n => n.nota_id === i.nota_id), ...i }));
@@ -471,7 +482,7 @@ if (!MOCK && !CONFIGURED) {
       const e = MV.find(x => x.estorno_de === mid); if (e) return { ja_estornado: true, estorno_id: e.id }; if (o.estorno_de || o.tipo === "estorno") throw new Error("Este movimento já é um estorno");
       if (o.tipo === "venda") { const n = N.find(x => x.nota_id === o.nota_id), liq = MV.filter(x => x.nota_id === o.nota_id && x.caixa_id === o.caixa_id).reduce((a, x) => a + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0), 0);
         if (liq <= 0) throw new Error("Nota sem valor neste caixa"); mov(o.caixa_id, "estorno", liq, `${cn ? "Cancelamento nota" : "Estorno caixa nota"} ${String(o.nota_id).padStart(6, "0")}${cn ? "" : " (volta p/ lançar)"}: ${m}`, o.nota_id, meU);
-        if (n) { n.caixa_lancada_id = null; if (cn) { n.status = "cancelada"; IT.filter(i => i.nota_id === n.nota_id).forEach(i => { const p = P.find(x => x.sku === i.sku); if (p) p.estoque += i.qtd; }); } } }
+        if (n) { n.caixa_lancada_id = null; if (cn) { n.status = "cancelada"; IT.filter(i => i.nota_id === n.nota_id).forEach(devolverItem); } } }
       else mov(o.caixa_id, o.tipo === "entrada" ? "saida" : "entrada", o.valor, `Estorno mov #${o.id} (${o.motivo || ""}): ${m}`, null, meU);
       const nw = MV[MV.length - 1]; nw.estorno_de = mid; nw.forma = o.forma; return { estorno_id: nw.id, acao: o.tipo === "venda" ? (cn ? "nota_cancelada" : "nota_volta_a_lancar") : "manual" }; },
     async caixaLancar(m) { needCx(); if (!m.motivo || m.motivo.trim().length < 3) throw new Error("Informe o motivo"); mov(m.caixa_id, m.tipo, Number(m.valor), m.motivo, null, meU); },
@@ -981,9 +992,19 @@ async function viewSeguranca() {
 }
 async function viewNota() {
   const P = (await api.products()).filter(p => p.ativo); let items = [];
+  const VO = globalThis.BAGDA_VENDA_ORIGEM;
+  const podeEspecial = me.role === "admin" || me.role === "estoque";
+  let esp = [], espErro = "", origemPronta = false;
+  if (podeEspecial) {
+    try { origemPronta = await api.vendaOrigemPronta(); } catch { origemPronta = false; }
+    if (origemPronta) { try { const raw = await api.depEsp(); esp = Array.isArray(raw) ? raw : []; } catch (e) { espErro = e.message || "Depósito Especial indisponível"; } }
+  }
+  const oferece = podeEspecial && origemPronta && !espErro;
+  const espDe = sku => { const d = esp.find(x => x.sku === sku); const n = d ? Number(d.qtd) : 0; return Number.isFinite(n) && n > 0 ? n : 0; };
   app.innerHTML = `<div class="card"><h2>Nova nota</h2><form id="f">
   <label>Produto</label><input id="bq" type="search" autocomplete="off" placeholder="Digite nome, marca ou SKU… (Enter seleciona)" autofocus>
   <ul id="sug" class="sug"></ul><input type="hidden" id="sku"><div id="sel" class="muted"></div>
+  ${oferece ? `<label for="origem">De qual estoque</label><select id="origem"><option value="principal">Principal</option><option value="especial">Especial</option></select><p class="muted" id="odisp"></p>` : `<input type="hidden" id="origem" value="principal">${espErro ? `<p class="warn">${esc(espErro)}</p>` : ""}${podeEspecial && !origemPronta ? `<p class="muted">Venda pelo Depósito Especial ainda depende da atualização do banco. Esta nota sai só do Principal.</p>` : ""}`}
   <div class="grid"><div><label>Quantidade</label><input id="q" type="number" min="1" step="1" value="1" required></div>
   <div><label>Preço vendido (R$/un) — obrigatório</label><input id="pv" type="number" min="0.01" step="0.01" required></div></div>
   <p class="warn" id="w"></p><button class="btn ghost">+ Adicionar item</button></form>
@@ -1000,16 +1021,22 @@ async function viewNota() {
   <div id="cform" hidden class="grid" style="margin-top:8px"><div><label>Nome do cliente</label><input id="cn" maxlength="120"></div><div><label>Atendimento número</label><select id="cat"><option value="">— selecione —</option>${ATEND.map(a => `<option>${a}</option>`).join("")}</select></div><div><button type="button" class="btn" id="csave">Salvar cliente</button></div></div>
   <button class="btn gold" id="fin">Finalizar e gerar nota</button></div>`;
   if (caxinhaOn()) $("#cxbox").innerHTML = `<label>Caxinha d Natal R$ — opcional (até 24/12/2026)</label><input id="cxn" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">`;
-  let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)}</td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + (freN() > 0 ? `<tr><td><b>Frete</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(freN())}</td><td></td></tr>` : "") + (cxN() > 0 ? `<tr><td><b>Caxinha d Natal</b></td><td class="n">—</td><td class="n">—</td><td class="n">${brl(cxN())}</td><td></td></tr>` : "") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(totalN())}</th><th></th></tr>`;
+  const origemSel = () => VO.origemOf({ origem: ($("#origem") || {}).value });
+  const showDisp = () => { const p = P.find(x => x.sku === $("#sku").value); if (!$("#odisp")) return; if (!p) { $("#odisp").textContent = oferece ? "Principal é a loja. Especial é o Depósito Especial. A venda não transfere de um para o outro." : ""; return; }
+    const o = origemSel(), have = VO.available(p.estoque, espDe(p.sku), o); $("#odisp").textContent = `${VO.origemLabel(o)}: ${have} un. ${have === 1 ? "disponível" : "disponíveis"} neste estoque.`; };
+  let draw = () => { $("#it").innerHTML = `<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Total</th><th></th></tr>` + items.map((x, i) => `<tr><td>${esc(x.nome)} <span class="src ${x.origem === "especial" ? "esp" : ""}">${esc(VO.origemLabel(x.origem))}</span></td><td class="n">${x.qtd}</td><td class="n">${brl(x.preco_vendido)}</td><td class="n">${brl(x.qtd * x.preco_vendido)}</td><td><button data-i="${i}" class="rm">✕</button></td></tr>`).join("") + (freN() > 0 ? `<tr><td><b>Frete</b> (motoboy)</td><td class="n">—</td><td class="n">—</td><td class="n">${brl(freN())}</td><td></td></tr>` : "") + (cxN() > 0 ? `<tr><td><b>Caxinha d Natal</b></td><td class="n">—</td><td class="n">—</td><td class="n">${brl(cxN())}</td><td></td></tr>` : "") + `<tr><th colspan="3">TOTAL</th><th class="n">${brl(totalN())}</th><th></th></tr>`;
     document.querySelectorAll(".rm").forEach(b => b.onclick = () => { items.splice(+b.dataset.i, 1); draw(); }); };
-  const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = ""; }; /* sem trava/aviso de preço mínimo (MB 05/11) */
+  const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = ""; showDisp(); }; /* sem trava/aviso de preço mínimo (MB 05/11) */
   let hi = 0, M = [];
   const drawS = () => { const q = $("#bq").value.trim(); M = q ? P.filter(p => match(p, q)).sort((a, b) => (b.estoque > 0) - (a.estoque > 0)).slice(0, 12) : []; hi = Math.min(hi, Math.max(M.length - 1, 0));
-    $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${p.estoque < 1 ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> <small>${esc(p.sku)} · ${brl(p.preco_venda)} · ${p.estoque} disp.</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
+    $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${VO.available(p.estoque, espDe(p.sku), "principal") < 1 && (!oferece || VO.available(p.estoque, espDe(p.sku), "especial") < 1) ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> <small>${esc(p.sku)} · ${brl(p.preco_venda)} · Principal ${p.estoque}${oferece ? ` · Especial ${espDe(p.sku)}` : ""}</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
     document.querySelectorAll("#sug li[data-s]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(li.dataset.s); }); };
-  const pick = sku => { const p = P.find(x => x.sku === sku); if (!p) return; if (p.estoque < 1) return toast("Sem estoque");
+  const selTxt = p => { const d = esp.find(x => x.sku === p.sku); const custoEsp = oferece && me.role === "admin" && origemSel() === "especial" && d && d.custo != null ? ` · custo deste Especial <b>${brl(d.custo)}</b>` : "";
+    return `Selecionado: <b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> · ${esc(p.sku)} · tabela ${brl(p.preco_venda)} · Principal ${p.estoque}${oferece ? ` · Especial ${espDe(p.sku)}` : ""}${custoEsp}`; };
+  const pick = sku => { const p = P.find(x => x.sku === sku); if (!p) return;
+    if (VO.available(p.estoque, espDe(p.sku), "principal") < 1 && (!oferece || VO.available(p.estoque, espDe(p.sku), "especial") < 1)) return toast("Sem estoque");
     $("#sku").value = p.sku; $("#bq").value = `${p.marca} ${p.produto} ${p.tamanho || ""}`.trim(); M = []; hi = 0; $("#sug").innerHTML = "";
-    $("#sel").innerHTML = `Selecionado: <b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> · ${esc(p.sku)} · tabela ${brl(p.preco_venda)} · ${p.estoque} disp.`; if (me.role === "admin") api.costs().then(C => { const c = (C || []).find(x => x.sku === p.sku); if (c && c.custo != null && $("#sku").value === p.sku) $("#sel").innerHTML += ` · custo <b>${brl(c.custo)}</b>`; }).catch(() => {});
+    $("#sel").innerHTML = selTxt(p); if (me.role === "admin" && origemSel() !== "especial") api.costs().then(C => { const c = (C || []).find(x => x.sku === p.sku); if (c && c.custo != null && $("#sku").value === p.sku && origemSel() !== "especial") $("#sel").innerHTML += ` · custo <b>${brl(c.custo)}</b>`; }).catch(() => {});
     $("#pv").value = ""; chk(); $("#q").focus(); $("#q").select(); };
   $("#bq").oninput = () => { hi = 0; $("#sku").value = ""; $("#sel").innerHTML = ""; drawS(); };
   $("#q").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#pv").focus(); } };
@@ -1019,10 +1046,12 @@ async function viewNota() {
     if (!p) { toast("Escolha um produto"); return $("#bq").focus(); }
     if (!Number.isInteger(q) || q < 1) { toast("Quantidade inválida"); return $("#q").focus(); }
     if (String($("#pv").value).trim() === "" || !(pv >= 0)) { toast("Informe o preço vendido"); return $("#pv").focus(); }
-    const ja = items.filter(x => x.sku === p.sku).reduce((a, x) => a + x.qtd, 0);
-    if (q + ja > p.estoque) return toast(`Só ${p.estoque} disponível`);
-    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}` }); toast(`+ ${p.marca} ${p.produto}`);
-    $("#f").reset(); $("#sku").value = ""; $("#sel").innerHTML = ""; $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; drawS(); draw(); $("#bq").focus(); };
+    const origem = origemSel();
+    if (origem === "especial" && !oferece) return toast("Sem permissão para vender do Depósito Especial");
+    const chkQ = VO.checkQty(p.estoque, espDe(p.sku), items, p.sku, origem, q);
+    if (!chkQ.ok) return toast(origem === "especial" ? `Depósito Especial só tem ${chkQ.have} un.` : `Loja só tem ${chkQ.have} un.`);
+    items.push({ sku: p.sku, qtd: q, preco_vendido: pv, origem, nome: `${p.marca} ${p.produto} ${p.tamanho || ""}`.trim() }); toast(`+ ${p.marca} ${p.produto} (${VO.origemLabel(origem)})`);
+    $("#f").reset(); if ($("#origem")) $("#origem").value = origem; $("#sku").value = ""; $("#sel").innerHTML = ""; $("#w").textContent = ""; $("#pv").placeholder = ""; hi = 0; showDisp(); drawS(); draw(); $("#bq").focus(); };
   let cli = null;
   const setCli = c => { cli = c; $("#csel").innerHTML = c ? `Cliente: <b>${esc(c.nome)}</b> ${esc(c.telefone || "")} ${c.doc ? esc(fmtDoc(c.doc)) : ""} <button type="button" id="cx0">✕</button>` : ""; $("#csug").innerHTML = ""; if (c) { $("#cl").value = ""; $("#cx0").onclick = () => setCli(null); } };
   let ct0; $("#cl").oninput = () => { clearTimeout(ct0); ct0 = setTimeout(async () => { const q = $("#cl").value; const L = q.trim().length >= 2 ? await api.buscarClientes(q).catch(e => (toast(e.message), [])) : [];
@@ -1060,7 +1089,7 @@ async function viewNota() {
     if (LP === "CAIXA ESPECIAL" && me.role !== "admin") return toast("Somente admin");
     if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + "), FR, CXV))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = t, pagTxt = P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ");
-    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido }) => ({ sku, qtd, preco_vendido })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP, FR, CXV);
+    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido, origem }) => ({ sku, qtd, preco_vendido, ...(origem === "especial" ? { origem: "especial" } : {}) })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP, FR, CXV);
       if (!nidOk(nid)) throw new Error("Servidor não confirmou o número da nota (retorno: " + JSON.stringify(nid) + ")");
       const R = await api.nota(+nid).then(r => r && r.length ? r : api.notaHead(+nid)); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
       items = []; await viewRecibo(+nid);
@@ -1069,11 +1098,12 @@ async function viewNota() {
       banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); if (CXV > 0 && /Caxinha d Natal depende/.test(e.message || "")) toast("Caxinha d Natal depende de atualização do banco — avise o admin"); else if (FR > 0 && /Frete depende/.test(e.message || "")) toast("Frete depende de atualização do banco — avise o admin"); }
     finally { notaSaving = false; } };
   $("#lp").onchange = () => { const v = $("#lp").value; $("#lpinfo").textContent = v === "CAIXA GERAL" ? "Caixa Geral: o total sai do crédito do cliente cadastrado (as formas acima são ignoradas)." : v === "CAIXA ESPECIAL" ? "Caixa Especial: o valor pago entra agora na Caixa Especial, ligado a esta nota. Não entra em HX, Máquina nem Dinheiro." : ""; };
+  if ($("#origem") && $("#origem").tagName === "SELECT") $("#origem").onchange = () => { showDisp(); const p = P.find(x => x.sku === $("#sku").value); if (p) { $("#sel").innerHTML = selTxt(p); if (me.role === "admin" && origemSel() !== "especial") api.costs().then(C => { const c = (C || []).find(x => x.sku === p.sku); if (c && c.custo != null && $("#sku").value === p.sku && origemSel() !== "especial") $("#sel").innerHTML += ` · custo <b>${brl(c.custo)}</b>`; }).catch(() => {}); } };
   draw(); $("#bq").focus();
 }
 async function viewRecibo(nid) {
   const [R0, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]), HD = R0.length ? [] : await api.notaHead(nid).catch(() => []); if (!R0.length && !HD.length) return toast("Nota não encontrada");
-  const R = R0, h = { ...(R0[0] || HD[0]), ...((await api.notasInfo([nid]).catch(() => []))[0] || {}) }, tot = R.reduce((a, r) => a + Number(r.total), 0);
+  const R = R0.map(r => { const o = r.estoque_origem === "especial" ? "Especial" : "Principal"; return { ...r, produto: `${r.produto} (${o})` }; }), h = { ...(R0[0] || HD[0]), ...((await api.notasInfo([nid]).catch(() => []))[0] || {}) }, tot = R.reduce((a, r) => a + Number(r.total), 0);
   app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
   ${reciboTxt("BAGDA STORES", nid, h, R, tot, PGN.map(g => (PAYL[g.metodo] || g.metodo) + (PGN.length > 1 ? " R$ " + rnum(g.valor) : "")), h.status === "cancelada")}`;
   $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
