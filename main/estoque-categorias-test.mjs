@@ -92,6 +92,7 @@ ok(fx.length > 0 && fx.every(p => String(p.produto).includes("FIXTURE")), "fixtu
 ok(fx.every(p => !Object.prototype.hasOwnProperty.call(p, "custo")), "fixtures have no cost field");
 ok(new Set(fx.map(sku)).size === fx.length, "fixture skus unique");
 const fxExpect = {
+  "FX-APL-18A": ["apple", "iphones"], "FX-APL-18P": ["apple", "iphones"], "FX-APL-18Z": ["apple", "iphones"], "FX-APL-NG": ["apple", "iphones"],
   "FX-APL-IP": ["apple", "iphones"], "FX-APL-MB": ["apple", "macbooks"], "FX-APL-AW": ["apple", "watch"],
   "FX-APL-PD": ["apple", "airpods"], "FX-APL-CB": ["apple", "acessorios"], "FX-APL-PD2": ["apple", "outros"],
   "FX-XIA-NT": ["xiaomi", "celulares"], "FX-XIA-BD": ["xiaomi", "fones"], "FX-XIA-WA": ["xiaomi", "relogios"],
@@ -154,24 +155,58 @@ ok(EC.filterList(all, { q: "" }).length === all.length, "empty search resets to 
 ok(EC.matchProduct({ sku: "FX", marca: "Ápple", produto: "Íphone 15", tamanho: "128GB" }, "IPHONE"), "search folds case and accents");
 ok(EC.matchProduct({ sku: "Z", marca: "Apple", produto: "Película", tamanho: "" }, "pelicula"), "search folds ç");
 
+const phones = [
+  { sku: "IP-AZUL", marca: "Apple", produto: "iPhone 18 Pro Max", tamanho: "Azul", estoque: 1, preco_venda: 10 },
+  { sku: "IP-PRETO", marca: "Apple", produto: "iPhone 18 Pro Max", tamanho: "Preto", estoque: 20, preco_venda: 10 },
+  { sku: "IP-BRANCO", marca: "Apple", produto: "iPhone 18 Pro Max", tamanho: "Branco", estoque: 0, preco_venda: 10 },
+  { sku: "IP-VERDE", marca: "Apple", produto: "iPhone 18 Pro Max", tamanho: "Verde", estoque: -2, preco_venda: 10, custo: 4 }
+];
+const oneSku = EC.tally([phones[1]]);
+ok(oneSku.avail === 1 && oneSku.units === 20 && oneSku.missing === 0, "20 units of one SKU count as 1 available product");
+const twoColors = EC.tally(phones.slice(0, 2));
+ok(twoColors.avail === 2 && twoColors.units === 21, "two color SKUs count as 2 available products");
+const phoneTall = EC.tally(phones);
+ok(phoneTall.avail === 2 && phoneTall.missing === 2 && phoneTall.units === 19, "zero and negative stay unavailable and units stay exact");
+const phoneNav = EC.navHtml(phones, { cat: "apple", sub: "iphones" });
+ok(/data-cat="apple" data-n="2"/.test(phoneNav) && /data-sub="iphones" data-n="2"/.test(phoneNav), "chip count is stocked variants, not units");
+ok(!phoneNav.toLowerCase().includes("custo") && !phoneNav.includes("4"), "availability chips do not disclose cost");
+const secs = EC.saleSections(phones);
+ok(secs.priority.map(p => p.sku).join(",") === "IP-AZUL", "stock of 1 is the sell-priority group");
+ok(secs.available.map(p => p.sku).join(",") === "IP-PRETO", "stock of 2 or more comes after the last unit");
+ok(secs.missing.map(p => p.sku).join(",") === "IP-BRANCO,IP-VERDE", "zero and negative stay below and are not sellable");
+ok(secs.priority.length + secs.available.length === phoneTall.avail, "priority ordering does not change the available count");
+const beforeOrder = JSON.stringify(phones);
+EC.orderForSale(phones);
+ok(JSON.stringify(phones) === beforeOrder, "sale order does not change stock or price");
+const onlyOut = [{ sku: "SW-0", marca: "Nintendo", produto: "Switch OLED", tamanho: "Neon", estoque: 0 }];
+const outNav = EC.navHtml(onlyOut, { cat: "" });
+ok(/data-cat="games" data-n="0"/.test(outNav) && /data-cat="" data-n="0"/.test(outNav), "a family with only missing stock stays reachable at zero");
+ok(EC.navHtml(onlyOut, { cat: "games" }).includes('data-sub="consoles" data-n="0"'), "its subtype stays reachable");
+ok(EC.filterList(onlyOut, { cat: "", q: "" }).length === 1, "reset still returns the missing catalog row");
+
 const html = EC.navHtml(fx, { cat: "apple", sub: "iphones" });
 ok(html.includes('role="toolbar"') && html.includes('aria-label="Categorias do estoque"') && html.includes('aria-label="Tipos em Apple"'), "toolbars named");
 ok(html.includes('type="button"') && html.includes('aria-pressed="true"') && html.includes('data-cat="apple"') && html.includes('data-sub="iphones"'), "pressed state and buttons");
 for (const label of ["Todos", "Games", "Apple", "Xiaomi", "Perfumes", "Outros", "iPhones", "MacBooks", "Apple Watch", "AirPods", "Acessórios"]) ok(html.includes(label), `label ${label}`);
 ok(!/xaiomi/i.test(html), "Xiaomi is spelled correctly");
+const fxAvail = fx.filter(p => Number(p.estoque) > 0).length;
 const catNs = [...html.matchAll(/data-cat="([^"]*)" data-n="(\d+)"/g)].map(m => [m[1], +m[2]]);
 const todos = catNs.find(x => x[0] === "");
-ok(todos && todos[1] === fx.length && catNs.filter(x => x[0]).reduce((a, x) => a + x[1], 0) === fx.length, "chip counts sum to the fixture total");
+ok(todos && todos[1] === fxAvail && todos[1] < fx.length && catNs.filter(x => x[0]).reduce((a, x) => a + x[1], 0) === fxAvail, "chip counts sum to stocked fixtures, not every catalog row");
 const subNs = [...html.matchAll(/data-sub="([^"]*)" data-n="(\d+)"/g)].map(m => [m[1], +m[2]]);
 const subTodos = subNs.find(x => x[0] === "");
-ok(subTodos && subNs.filter(x => x[0]).reduce((a, x) => a + x[1], 0) === subTodos[1], "Apple subtype counts sum to Apple");
+ok(subTodos && subNs.filter(x => x[0]).reduce((a, x) => a + x[1], 0) === subTodos[1], "Apple subtype available counts sum to Apple");
+ok(html.includes("produtos disponíveis"), "chip label says produtos disponíveis");
 ok(EC.navHtml(fx, { cat: "" }).includes("data-row=\"cat\"") && !EC.navHtml(fx, { cat: "" }).includes("data-row=\"sub\""), "Todos hides subtypes");
 ok(!EC.navHtml([{ sku: "JBL-001", marca: "JBL", produto: "Flip", estoque: 1 }], { cat: "" }).includes("Games"), "empty families stay hidden");
 
-ok(EC.summaryText(10, 40, 10, 10, 40) === "10 produtos · 40 un.", "summary when everything is visible");
-ok(EC.summaryText(10, 40, 10, 4, 9) === "4 de 10 produtos · 9 de 40 un.", "summary for a category");
-ok(EC.summaryText(10, 40, 3, 3, 8) === "3 de 10 produtos na busca · 8 de 40 un.", "summary for a search");
-ok(EC.summaryText(10, 40, 3, 1, 2) === "1 de 3 na busca · estoque completo 10 produtos, 40 un.", "summary keeps the full stock while a subtype is active");
+const full = { avail: 8, missing: 2, units: 40 };
+ok(EC.summaryText(full, full, full) === "8 produtos disponíveis · 2 sem estoque · 40 un.", "summary names available, missing, and units");
+const narrowed = { avail: 2, missing: 1, units: 21 };
+ok(EC.summaryText(narrowed, full, full) === "Neste filtro: 2 produtos disponíveis · 1 sem estoque · 21 un. · lista da tela: 8 disponíveis, 2 sem estoque, 40 un.", "category scope stays separate from the full list");
+const busca = { avail: 3, missing: 0, units: 8 };
+ok(EC.summaryText(busca, busca, full).startsWith("Na busca: 3 produtos disponíveis"), "search scope is labeled");
+ok(EC.summaryText(narrowed, busca, full).includes("Neste filtro:") && EC.summaryText(narrowed, busca, full).includes("na busca:"), "filter inside a search names both scopes");
 
 ok(EC.nextChipIndex(4, 0, "ArrowRight") === 1 && EC.nextChipIndex(4, 0, "ArrowDown") === 1, "arrow forward");
 ok(EC.nextChipIndex(4, 0, "ArrowLeft") === 3 && EC.nextChipIndex(4, 0, "ArrowUp") === 3, "arrow wraps backward");
@@ -193,18 +228,21 @@ ok(EC.onToolbarKey({ key: "Enter", target: bar.buttons[1], preventDefault() { th
 const css = read("loja.css");
 ok(css.includes(".est-row{display:flex;flex-wrap:wrap") && css.includes(".est-chip:focus-visible"), "desktop chips wrap and show focus");
 ok(/@media\(max-width:720px\)\{[^}]*\.est-row\{flex-wrap:nowrap;overflow-x:auto/.test(css) && css.includes("min-height:36px"), "mobile row scrolls instead of squeezing");
-ok(css.includes(".est-nav,.est-sum{display:none!important}") && css.includes(".stk-wrap{overflow:visible}") && css.includes("html[data-theme=dark] .est-chip"), "print hides the filter, the table can scroll on screen, and dark mode keeps contrast");
+ok(css.includes(".est-nav{display:none!important}") && css.includes(".ult") && css.includes(".stk-wrap{overflow:visible}") && css.includes("html[data-theme=dark] .est-chip"), "print hides chips, keeps the last-unit label, and dark mode keeps contrast");
 
 const app = read("app.js");
 const view = app.slice(app.indexOf("async function viewEstoque"), app.indexOf("async function viewRelatorio"));
 ok(view.includes("await api.products()") && view.includes("await api.estoqueVendedor()") && view.includes("stockSort("), "admin and seller stock sources unchanged");
-ok(view.includes("REPOR") && view.includes("Sem estoque") && view.includes('placeholder="Buscar produto, marca ou SKU…"') && view.includes("Imprimir / PDF"), "stock table, search, and print stay");
-ok(view.includes('me.role === "admin"') && view.includes("preco_venda") && !view.includes("custo") && !view.includes("product_costs"), "sale price stays admin-only and cost is absent");
+ok(view.includes("REPOR") && view.includes("Sem estoque") && view.includes("Produtos disponíveis") && view.includes("Prioridade de venda") && view.includes("Última peça") && view.includes('placeholder="Buscar produto, marca ou SKU…"') && view.includes("Imprimir / PDF"), "stock table, priority label, search, and print stay");
+ok(view.includes('me.role === "admin"') && view.includes("preco_venda") && view.includes("const rowSeller") && view.includes("const rowAdm"), "admin and seller rows stay separate");
+const sellerPart = view.slice(view.indexOf("const rowSeller"), view.indexOf("const row ="));
+ok(!sellerPart.includes("Editar custo") && !sellerPart.includes("product_costs") && !sellerPart.includes("preco_venda"), "seller row has no price and no cost control");
+ok(view.includes("if (adm)") && view.includes("await api.costs()") && view.includes("Editar custo") && view.includes("api.custoSalvar"), "cost read and edit stay inside the admin branch");
 ok(view.includes('qs.has("estfix")') && view.includes("MOCK &&"), "synthetic preview is mock-only");
 ok(app.includes('estoque: "vendas|estoque"') && app.includes('vendedor: ["vendas"]') && app.includes('estoque: ["estoque"]'), "route and role permissions unchanged");
 
 const htmlMain = read("index.html");
-ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("app.js?v=20261109a"), "classifier loads before the app");
+ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("custo-valor.js") && htmlMain.indexOf("custo-valor.js") < htmlMain.indexOf("app.js?v=20261109b"), "classifier and cost parser load before the app");
 const kioskJs = readFileSync(join(dir, "../kiosk/app.js"), "utf8");
 const kioskHtml = readFileSync(join(dir, "../kiosk/index.html"), "utf8");
 ok(!kioskJs.includes("BAGDA_ESTOQUE_CATS") && !kioskJs.includes("est-nav") && !kioskHtml.includes("estoque-categorias"), "kiosk estoque is untouched");
@@ -212,7 +250,8 @@ ok(!kioskJs.includes("BAGDA_ESTOQUE_CATS") && !kioskJs.includes("est-nav") && !k
 const labels = EC.CATS.map(c => c.label).join("|");
 ok(labels === "Games|Apple|Xiaomi|Perfumes|Outros", "family order");
 ok(same(EC.APPLE_SUBS.map(s => s.label), ["iPhones", "MacBooks", "Apple Watch", "AirPods", "Acessórios", "Outros"]), "Apple types");
-ok(EC.summaryText(all.length, stockSum, all.length, tall.cats.apple.n, tall.cats.apple.units).includes(String(tall.cats.apple.n)), "visible apple count fits the reconciled total");
+ok(tall.avail === ["games", "apple", "xiaomi", "perfume", "outros"].reduce((a, cat) => a + ((tall.cats[cat] && tall.cats[cat].avail) || 0), 0), "available family counts reconcile");
+ok(tall.avail + tall.missing === all.length, "available plus missing is the whole catalog");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
 console.log("estoque categorias ok");

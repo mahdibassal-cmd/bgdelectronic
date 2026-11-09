@@ -62,6 +62,8 @@
   const outros = () => pack("outros", "", "");
   const perfumeOf = b => pack("perfume", b.id, b.label);
   const units = p => { const n = Number(p && p.estoque); return Number.isFinite(n) ? n : 0; };
+  const nameColl = new Intl.Collator("pt-BR", { sensitivity: "base" });
+  const inStock = p => units(p) > 0;
   const skuOf = p => String(p && p.sku || "").toUpperCase().replace(/\s+/g, "");
 
   function matchKey(marcaF, keys) {
@@ -221,56 +223,84 @@
       return !sub || c.sub === sub;
     });
   }
+  function byName(a, b) {
+    return nameColl.compare(a.produto || "", b.produto || "") || nameColl.compare(a.marca || "", b.marca || "") || nameColl.compare(a.tamanho || "", b.tamanho || "") || nameColl.compare(String(a.sku || ""), String(b.sku || ""));
+  }
+  function orderForSale(list) {
+    const rank = p => { const n = units(p); return n === 1 ? 0 : n > 1 ? 1 : 2; };
+    return [...(list || [])].sort((a, b) => rank(a) - rank(b) || byName(a, b));
+  }
+  function saleSections(list) {
+    const ordered = orderForSale(list);
+    return {
+      priority: ordered.filter(p => units(p) === 1),
+      available: ordered.filter(p => units(p) > 1),
+      missing: ordered.filter(p => !inStock(p))
+    };
+  }
   function tally(list) {
     const cats = {};
-    let n = 0, u = 0;
+    let n = 0, u = 0, avail = 0, missing = 0;
     for (const p of list || []) {
       const c = classify(p);
       const un = units(p);
+      const ok = un > 0;
       n++; u += un;
-      const bucket = cats[c.cat] || (cats[c.cat] = { n: 0, units: 0, subs: {} });
+      if (ok) avail++; else missing++;
+      const bucket = cats[c.cat] || (cats[c.cat] = { n: 0, avail: 0, units: 0, subs: {} });
       bucket.n++; bucket.units += un;
+      if (ok) bucket.avail++;
       if (c.sub) {
-        const s = bucket.subs[c.sub] || (bucket.subs[c.sub] = { n: 0, label: c.subLabel });
+        const s = bucket.subs[c.sub] || (bucket.subs[c.sub] = { n: 0, avail: 0, label: c.subLabel });
         s.n++;
+        if (ok) s.avail++;
       }
     }
-    return { total: n, units: u, cats };
+    return { total: n, units: u, avail, missing, cats };
   }
   function orderedSubs(cat, subs, active) {
     const show = id => (subs[id] && subs[id].n > 0) || id === active;
+    const item = (id, label, src) => ({ id, label, n: (src && src.avail) || 0 });
     if (cat === "perfume") {
       const out = [];
       const known = new Set(PERFUME_BRANDS.map(b => b.id).concat(["outros"]));
-      for (const b of PERFUME_BRANDS) if (show(b.id)) out.push({ id: b.id, label: (subs[b.id] && subs[b.id].label) || b.label, n: (subs[b.id] && subs[b.id].n) || 0 });
-      for (const id of Object.keys(subs).filter(id => !known.has(id) && show(id)).sort((a, b) => String(subs[a].label).localeCompare(String(subs[b].label), "pt"))) out.push({ id, label: subs[id].label, n: subs[id].n });
-      if (show("outros")) out.push({ id: "outros", label: "Outros", n: (subs.outros && subs.outros.n) || 0 });
+      for (const b of PERFUME_BRANDS) if (show(b.id)) out.push(item(b.id, (subs[b.id] && subs[b.id].label) || b.label, subs[b.id]));
+      for (const id of Object.keys(subs).filter(id => !known.has(id) && show(id)).sort((a, b) => String(subs[a].label).localeCompare(String(subs[b].label), "pt"))) out.push(item(id, subs[id].label, subs[id]));
+      if (show("outros")) out.push(item("outros", "Outros", subs.outros));
       return out;
     }
-    return (SUBS[cat] || []).filter(s => show(s.id)).map(s => ({ id: s.id, label: s.label, n: (subs[s.id] && subs[s.id].n) || 0 }));
+    return (SUBS[cat] || []).filter(s => show(s.id)).map(s => item(s.id, s.label, subs[s.id]));
   }
   function chip(attr, id, n, on, label) {
-    return `<button type="button" class="est-chip${on ? " on" : ""}" ${attr}="${esc(id)}" data-n="${n}" aria-pressed="${on ? "true" : "false"}" aria-label="${esc(label)}, ${n} produtos">${esc(label)} <span class="est-n" aria-hidden="true">${n}</span></button>`;
+    const zero = n === 0 ? " zero" : "";
+    return `<button type="button" class="est-chip${on ? " on" : ""}${zero}" ${attr}="${esc(id)}" data-n="${n}" aria-pressed="${on ? "true" : "false"}" aria-label="${esc(label)}, ${n} produtos disponíveis">${esc(label)} <span class="est-n" aria-hidden="true">${n}</span></button>`;
   }
   function navHtml(list, state) {
     const cat = state && state.cat || "";
     const sub = state && state.sub || "";
     const tall = tally(list);
-    const cats = [{ id: "", label: "Todos", n: tall.total }].concat(CATS.map(c => ({ id: c.id, label: c.label, n: (tall.cats[c.id] && tall.cats[c.id].n) || 0 }))).filter(c => c.id === "" || c.n > 0 || c.id === cat);
+    const cats = [{ id: "", label: "Todos", n: tall.avail, catalog: tall.total }].concat(CATS.map(c => ({ id: c.id, label: c.label, n: (tall.cats[c.id] && tall.cats[c.id].avail) || 0, catalog: (tall.cats[c.id] && tall.cats[c.id].n) || 0 }))).filter(c => c.id === "" || c.catalog > 0 || c.id === cat);
     let html = `<div class="est-row" role="toolbar" aria-label="Categorias do estoque" data-row="cat">${cats.map(c => chip("data-cat", c.id, c.n, c.id === cat, c.label)).join("")}</div>`;
     if (cat && SUBS[cat] || cat === "perfume") {
-      const bucket = tall.cats[cat] || { n: 0, subs: {} };
-      const subs = [{ id: "", label: "Todos", n: bucket.n }].concat(orderedSubs(cat, bucket.subs, sub));
+      const bucket = tall.cats[cat] || { n: 0, avail: 0, subs: {} };
+      const subs = [{ id: "", label: "Todos", n: bucket.avail }].concat(orderedSubs(cat, bucket.subs, sub));
       const catLabel = (CATS.find(c => c.id === cat) || {}).label || cat;
       if (subs.length > 1) html += `<div class="est-row est-sub" role="toolbar" aria-label="Tipos em ${esc(catLabel)}" data-row="sub">${subs.map(s => chip("data-sub", s.id, s.n, s.id === sub, s.label)).join("")}</div>`;
     }
     return html;
   }
-  function summaryText(totalN, totalU, matchedN, shownN, shownU) {
-    if (shownN === totalN && matchedN === totalN) return `${totalN} produtos · ${totalU} un.`;
-    if (matchedN === totalN) return `${shownN} de ${totalN} produtos · ${shownU} de ${totalU} un.`;
-    if (shownN === matchedN) return `${shownN} de ${totalN} produtos na busca · ${shownU} de ${totalU} un.`;
-    return `${shownN} de ${matchedN} na busca · estoque completo ${totalN} produtos, ${totalU} un.`;
+  function countsOf(list) {
+    const t = tally(list);
+    return { avail: t.avail, missing: t.missing, units: t.units, catalog: t.total };
+  }
+  function summaryText(view, search, all) {
+    const line = s => `${s.avail} produtos disponíveis · ${s.missing} sem estoque · ${s.units} un.`;
+    const same = (a, b) => a && b && a.avail === b.avail && a.missing === b.missing && a.units === b.units;
+    if (!all || same(view, all)) return line(view);
+    const full = `lista da tela: ${all.avail} disponíveis, ${all.missing} sem estoque, ${all.units} un.`;
+    if (!search || same(view, search)) return `Na busca: ${line(view)} · ${full}`;
+    if (same(search, all)) return `Neste filtro: ${line(view)} · ${full}`;
+    return `Neste filtro: ${line(view)} · na busca: ${search.avail} disponíveis, ${search.missing} sem estoque, ${search.units} un. · ${full}`;
   }
   function nextChipIndex(len, i, key) {
     if (!(len > 0) || i < 0 || i >= len) return -1;
@@ -294,6 +324,10 @@
   function previewFixtures() {
     const row = (sku, marca, produto, tamanho, estoque, preco) => ({ sku, marca, produto, tamanho, estoque, estoque_minimo: 2, preco_venda: preco, ativo: true });
     return [
+      row("FX-APL-18A", "Apple", "iPhone 18 Pro Max FIXTURE", "Azul", 1, 9999),
+      row("FX-APL-18P", "Apple", "iPhone 18 Pro Max FIXTURE", "Preto", 20, 9999),
+      row("FX-APL-18Z", "Apple", "iPhone 18 Pro Max FIXTURE", "Branco", 0, 9999),
+      row("FX-APL-NG", "Apple", "iPhone 16 FIXTURE", "Preto", -1, 7999),
       row("FX-APL-IP", "Ápple", "Íphone 15 FIXTURE", "128GB", 3, 4999),
       row("FX-APL-MB", "Apple", "MacBook Air FIXTURE", "13 pol", 1, 8999),
       row("FX-APL-AW", "Apple", "Watch Series 9 FIXTURE", "45mm", 2, 3499),
@@ -320,7 +354,7 @@
   }
 
   root.BAGDA_ESTOQUE_CATS = {
-    fold, norm, classify, matchProduct, filterList, tally, navHtml, summaryText, nextChipIndex, onToolbarKey, previewFixtures,
+    fold, norm, classify, matchProduct, filterList, tally, countsOf, orderForSale, saleSections, navHtml, summaryText, nextChipIndex, onToolbarKey, previewFixtures,
     CATS, APPLE_SUBS, GAME_SUBS, XIAOMI_SUBS, PERFUME_BRANDS
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
