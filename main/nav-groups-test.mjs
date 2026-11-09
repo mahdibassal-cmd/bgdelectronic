@@ -78,7 +78,7 @@ ok(labels("financeiro").includes("Sair") && !labels("financeiro").includes("UsuÃ
 ok(/nav \.navg[\s\S]*g\.hidden = bs\.length > 0 && bs\.every\(b => b\.hidden\)/.test(js), "app hides empty groups");
 ok(/function navMark\(/.test(js) && /aria-current/.test(js) && /navMark\(v\)/.test(js) && /navMark\("imei"\)/.test(js), "active page mark kept");
 ok(css.includes(".ngh") && css.includes("@media(max-width:720px)") && css.includes("nav button.on") && /@media print[\s\S]*nav,button,header\{display:none!important\}/.test(css), "compact, responsive, active, print hide");
-ok(html.includes("loja.css?v=20261108d") && html.includes("estoque-categorias.js?v=20261108d") && html.includes("custo-valor.js?v=20261108d") && html.includes("app.js?v=20261108d"), "script cache for the client statement");
+ok(html.includes("loja.css?v=20261109b") && html.includes("estoque-categorias.js?v=20261109b") && html.includes("custo-valor.js?v=20261109b") && html.includes("app.js?v=20261109b"), "script cache for the client statement");
 ok(!html.includes("data-v=\"comprovante\""), "no invented comprovante button");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
