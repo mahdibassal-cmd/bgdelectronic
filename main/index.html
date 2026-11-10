@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'">
 <script src="/theme-mode.js?v=20261103d"></script>
 <title>Sistema - BAGDA STORES</title>
 <link rel="stylesheet" href="loja.css?v=20261109e">
+<link rel="stylesheet" href="ponto.css?v=20261110b">
 </head>
 <body>
 <header class="top">
@@ -50,6 +51,7 @@
     <div class="navg" data-g="sistema" role="group" aria-labelledby="ng-sis">
       <span class="ngh" id="ng-sis">Sistema</span>
       <div class="ngb">
+        <button type="button" data-v="ponto">Ponto</button>
         <button type="button" data-v="usuarios" data-p="admin">Usuários</button>
         <button type="button" data-v="seguranca">Segurança</button>
         <button type="button" id="sair">Sair</button>
@@ -68,6 +70,7 @@
 <script src="estoque-categorias.js?v=20261109e"></script>
 <script src="custo-valor.js?v=20261109e"></script>
 <script src="venda-origem.js?v=20261109e"></script>
-<script src="app.js?v=20261110a"></script>
+<script src="ponto.js?v=20261110b"></script>
+<script src="app.js?v=20261110b"></script>
 </body>
 </html>

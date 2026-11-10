@@ -1,0 +1,29 @@
+/* Ponto eletrônico — tela, totem e espelho A4 */
+.ponto-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.ponto-tabs button{margin:0}
+.ponto-cam{position:relative;background:#111;border-radius:16px;overflow:hidden;aspect-ratio:4/3;max-width:520px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;color:#fff}
+.ponto-cam video,.ponto-cam canvas,.ponto-cam img{width:100%;height:100%;object-fit:cover;display:block}
+.ponto-cam .ph{text-align:center;padding:24px;color:#eee}
+.ponto-cam .ph b{display:block;font-size:1.15em;margin:0 0 6px}
+.ponto-face{width:120px;height:120px;border-radius:50%;border:3px solid rgba(255,255,255,.7);margin:0 auto 10px;background:radial-gradient(circle at 50% 30%,#555,#222)}
+.ponto-ok{color:#86efac;font-weight:700}
+.ponto-bad{color:#fecaca;font-weight:700}
+.ponto-consent{background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px 14px;margin:10px 0;font-size:.95em;line-height:1.45}
+.ponto-consent label{display:flex!important;gap:10px;align-items:flex-start;margin-top:10px;width:100%}
+.ponto-consent label input[type=checkbox]{width:auto!important;flex:0 0 auto;margin-top:3px}
+.espelho-a4{background:#fff;color:#111;padding:16px 18px;border-radius:8px;max-width:210mm;margin:0 auto}
+.espelho-a4 h2{margin:0 0 4px;font-size:1.25em}
+.espelho-a4 table{width:100%;border-collapse:collapse;font-size:12px}
+.espelho-a4 th,.espelho-a4 td{border:1px solid #222;padding:3px 5px;text-align:center}
+.espelho-a4 th{background:#f3f3f3}
+.espelho-a4 td.l{text-align:left}
+.espelho-a4 .tot{font-weight:700;background:#f3f3f3}
+.ponto-totem header.top,.ponto-totem #mockbar{display:none!important}
+.ponto-totem main#app{max-width:720px;margin:24px auto}
+.ponto-hello{font-size:1.6em;text-align:center;margin:8px 0}
+@media print{
+  .noprint,.ponto-tabs,nav,header,.top,#toast,#mockbar,#who{display:none!important}
+  body,.ponto-print-root,main#app{background:#fff!important;margin:0;padding:0}
+  .espelho-a4{max-width:none;padding:0;border:0}
+  @page{size:A4;margin:12mm}
+}
