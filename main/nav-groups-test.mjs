@@ -29,7 +29,7 @@ const expected = {
   notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["lancar", "financas", "Notas a lançar"], ["clientes", "financas", "Clientes"]],
   financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
   compras: [["compras", "admin", "Compras"], ["imei", "financas|estoque", "Compras & IMEI"], ["estoque", "vendas|estoque", "Estoque"], ["produtos", "admin", "Produtos"], ["depesp", "admin|estoque", "Depósito Especial"]],
-  sistema: [["usuarios", "admin", "Usuários"], ["seguranca", "", "Segurança"], ["", "", "Sair"]],
+  sistema: [["ponto", "", "Ponto"], ["usuarios", "admin", "Usuários"], ["seguranca", "", "Segurança"], ["", "", "Sair"]],
 };
 for (const g of groups) {
   const got = g.buttons.map(b => [b.v, b.p, b.label].join("|")).join(" ; ");
@@ -42,7 +42,7 @@ ok(sair && sair.label === "Sair" && sair.p === "" && sair.v === "", "Sair stays 
 const seg = groups.flatMap(g => g.buttons).find(b => b.v === "seguranca");
 ok(seg && seg.p === "", "Segurança has no data-p");
 const views = groups.flatMap(g => g.buttons).map(b => b.v).filter(Boolean);
-ok(new Set(views).size === views.length && views.length === 20, "each route once, no extras");
+ok(new Set(views).size === views.length && views.length === 21, "each route once, no extras");
 
 const perms = JSON.parse(js.match(/const PERMS = (\{[^}]+\})/)[1].replace(/(\w+):/g, '"$1":'));
 const can = (role, p) => role === "admin" || p.split("|").some(x => (perms[role] || []).includes(x));
@@ -54,10 +54,10 @@ function visible(role) {
 }
 const labels = role => visible(role).flatMap(g => g.buttons);
 const expectRole = {
-  admin: ["Nova nota", "Notas", "Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Caixa Especial", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Usuários", "Segurança", "Sair"],
-  financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Segurança", "Sair"],
-  vendedor: ["Nova nota", "Notas", "Estoque", "Segurança", "Sair"],
-  estoque: ["Compras & IMEI", "Estoque", "Depósito Especial", "Segurança", "Sair"],
+  admin: ["Nova nota", "Notas", "Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Caixa Especial", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Ponto", "Usuários", "Segurança", "Sair"],
+  financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Ponto", "Segurança", "Sair"],
+  vendedor: ["Nova nota", "Notas", "Estoque", "Ponto", "Segurança", "Sair"],
+  estoque: ["Compras & IMEI", "Estoque", "Depósito Especial", "Ponto", "Segurança", "Sair"],
 };
 for (const [role, want] of Object.entries(expectRole)) {
   ok(labels(role).join("|") === want.join("|"), `${role} visible ${labels(role).join(", ")}`);
@@ -78,7 +78,7 @@ ok(labels("financeiro").includes("Sair") && !labels("financeiro").includes("Usu�
 ok(/nav \.navg[\s\S]*g\.hidden = bs\.length > 0 && bs\.every\(b => b\.hidden\)/.test(js), "app hides empty groups");
 ok(/function navMark\(/.test(js) && /aria-current/.test(js) && /navMark\(v\)/.test(js) && /navMark\("imei"\)/.test(js), "active page mark kept");
 ok(css.includes(".ngh") && css.includes("@media(max-width:720px)") && css.includes("nav button.on") && /@media print[\s\S]*nav,button,header\{display:none!important\}/.test(css), "compact, responsive, active, print hide");
-ok(html.includes("loja.css?v=20261109e") && html.includes("estoque-categorias.js?v=20261109e") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("app.js?v=20261110a"), "script cache for the client statement");
+ok(html.includes("loja.css?v=20261109e") && html.includes("estoque-categorias.js?v=20261109e") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("ponto.js?v=20261110b") && html.includes("app.js?v=20261110b") && html.includes("ponto.css?v=20261110b"), "script cache for the client statement");
 ok(!html.includes("data-v=\"comprovante\""), "no invented comprovante button");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }

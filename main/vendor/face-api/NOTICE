@@ -1,0 +1,6 @@
+@vladmandic/face-api 1.7.15 is vendored here under the MIT License
+(see LICENSE in this folder). Source: https://github.com/vladmandic/face-api
+
+These files are served from this app so facial time-clock matching runs
+in the browser with no paid API and no runtime CDN for the models.
+Only the detector, tiny landmarks, and recognition models are included.

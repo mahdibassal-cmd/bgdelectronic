@@ -264,15 +264,32 @@ if (!MOCK && !CONFIGURED) {
     async saveProduct(p, custo) {
       ok(await sb.from("products").upsert(p));
       if (custo !== "" && custo != null) ok(await sb.from("product_costs").upsert({ sku: p.sku, custo: Number(custo) }));
-    }
+    },
+    async pontoMinhaFace() { const r = await sb.from("ponto_faces").select("user_id,foto_path,consentimento_em,cadastrado_em,descriptor").eq("user_id", me.id).maybeSingle(); if (r.error) throw new Error(r.error.message); return r.data; },
+    async pontoMeusRegistros() { return ok(await sb.from("v_ponto_registros").select("*").eq("user_id", me.id).eq("excluido", false).order("registrado_em", { ascending: false }).limit(400)); },
+    async pontoRegistrosMes(ym) { const a = ym + "-01", b = ym + "-31"; return ok(await sb.from("v_ponto_registros").select("*").gte("data_sp", a).lte("data_sp", b).eq("excluido", false).order("registrado_em")); },
+    async pontoJornadas() { return ok(await sb.from("ponto_jornadas").select("*")); },
+    async pontoTotens() { return ok(await sb.from("ponto_totens").select("*")); },
+    async pontoFalhas() { return ok(await sb.from("ponto_falhas").select("*").order("criado_em", { ascending: false }).limit(200)); },
+    async pontoSouTotem() { return ok(await sb.rpc("ponto_e_totem")); },
+    async pontoUploadFoto(path, blob) { if (!blob) return path; const r = await sb.storage.from("ponto").upload(path, blob, { upsert: true, contentType: (blob.type || "image/jpeg") }); if (r.error) throw new Error(r.error.message); return path; },
+    async pontoCadastrarFace(desc, path, consent, texto, uid) { return ok(await sb.rpc("ponto_cadastrar_face", { p_descriptor: desc, p_foto_path: path, p_consentimento: !!consent, p_consentimento_texto: texto, p_user_id: uid || null })); },
+    async pontoExcluirFace(uid, mot) { return ok(await sb.rpc("ponto_excluir_face", { p_user_id: uid, p_motivo: mot })); },
+    async registrarPonto(tipo, desc, path, ua, lat, lng) { return ok(await sb.rpc("registrar_ponto", { p_tipo: tipo, p_descriptor: desc, p_foto_path: path, p_user_agent: ua || null, p_lat: lat ?? null, p_lng: lng ?? null })); },
+    async registrarPontoTotem(tipo, desc, path, ua, lat, lng) { return ok(await sb.rpc("registrar_ponto_totem", { p_tipo: tipo, p_descriptor: desc, p_foto_path: path, p_user_agent: ua || null, p_lat: lat ?? null, p_lng: lng ?? null })); },
+    async pontoEditarRegistro(id, tipo, mot) { return ok(await sb.rpc("ponto_editar_registro", { p_id: id, p_tipo: tipo, p_motivo: mot })); },
+    async pontoExcluirRegistro(id, mot) { return ok(await sb.rpc("ponto_excluir_registro", { p_id: id, p_motivo: mot })); },
+    async pontoSetJornada(uid, e, s, a, dias, tol) { return ok(await sb.rpc("ponto_set_jornada", { p_user_id: uid, p_entrada: e, p_saida: s, p_almoco_minutos: a, p_dias_semana: dias, p_tolerancia_minutos: tol })); },
+    async pontoSetTotem(uid, on, nome) { return ok(await sb.rpc("ponto_set_totem", { p_user_id: uid, p_on: !!on, p_nome: nome || null })); }
   };
 } else {
   $("#mockbar").hidden = false;
-  const role = ["vendedor", "financeiro", "estoque"].includes(qs.get("mock")) ? qs.get("mock") : "admin";
-  const W = { admin: ["@mike", "Mike"], vendedor: ["@kaio", "Kaio"], financeiro: ["@pamela", "Pamela"], estoque: ["@rafa", "Rafa"] }[role];
+  const role = ["vendedor", "financeiro", "estoque", "totem"].includes(qs.get("mock")) ? qs.get("mock") : "admin";
+  const W = { admin: ["@mike", "Mike"], vendedor: ["@kaio", "Kaio"], financeiro: ["@pamela", "Pamela"], estoque: ["@rafa", "Rafa"], totem: ["@totem", "Totem Loja"] }[role];
   const meU = { id: "u-" + role, handle: W[0], nome: W[1], role, ativo: true };
   const U = [meU, ...[["@sam", "Sam", "admin"], ["@hadi", "Hadi", "admin"], ["@bianca", "Bianca", "vendedor"], ["@suelen", "Suelen", "vendedor"], ["@leticia", "Leticia", "financeiro"]].map(([h, n, r]) => ({ id: "u" + h, handle: h, nome: n, role: r, ativo: true }))];
   if (role !== "vendedor") U.push({ id: "u@kaio", handle: "@kaio", nome: "Kaio", role: "vendedor", ativo: true });
+  if (role !== "totem") U.push({ id: "u@totem", handle: "@totem", nome: "Totem Loja", role: "vendedor", ativo: true });
   const P = [["JBL-001", "JBL", "Flip 6", "Azul", 799], ["JBL-002", "JBL", "Go 4", "Preto", 349], ["XIA-001", "Xiaomi", "Redmi Buds 5", null, 199], ["XIA-002", "Xiaomi", "Redmi Note 13", "128GB", 1499],
     ["SAM-001", "Samsung", "Galaxy A15", "128GB", 1199], ["APL-001", "Apple", "AirPods 4", null, 1299], ["BAS-001", "Baseus", "Cabo USB-C 1m", null, 49.9], ["BAS-002", "Baseus", "Carregador 30W", null, 129],
     ["ANK-001", "Anker", "Power Bank 10000mAh", null, 199], ["LEN-001", "Lenovo", "Fone LP40", null, 89.9], ["MUL-001", "Multilaser", "Mouse sem fio", null, 59.9], ["KAP-001", "Kapbom", "Suporte veicular", null, 39.9],
@@ -325,6 +342,29 @@ if (!MOCK && !CONFIGURED) {
     CP.push({ id: 1, fornecedor_id: 1, valor: 3200, vencimento: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), descricao: "Lote fones JBL" }, { id: 2, fornecedor_id: 1, valor: 450, vencimento: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), descricao: "Frete" });
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2)); mov(1, "entrada", 150, "Recebimento cliente Maria Souza", null, U[0], H(1)); MV[MV.length - 1].cliente = "Maria Souza"; mov(3, "entrada", 28600, "DANIEL IPHONE DUO", null, U.find(u => /pamela/i.test(u.handle || "")) || U[0], H(0.2)); MV[MV.length - 1].forma = "cartao";
   });
+  const vec = (seed) => Array.from({ length: 128 }, (_, i) => Number(((i + 1) * 0.001 + seed).toFixed(6)));
+  const PONTOfaces = [];
+  const PONTOregs = [];
+  const PONTOfalhas = [];
+  const PONTOjor = [];
+  const PONTOtotem = [];
+  const PONTOaudit = [];
+  let pontoId = 1;
+  const enrollDemo = (u, seed) => PONTOfaces.push({ user_id: u.id, descriptor: vec(seed), foto_path: u.id + "/ref.jpg", consentimento_em: new Date().toISOString(), cadastrado_em: new Date().toISOString(), cadastrado_por: u.id });
+  U.forEach((u, i) => { if (u.role !== "estoque") enrollDemo(u, 0.1 + i * 0.05); });
+  const atDay = (ymd, hh, mm) => new Date(ymd + "T" + String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":00-03:00").toISOString();
+  const punchDemo = (u, ymd, tipo, hh, mm, origem) => PONTOregs.push({ id: pontoId++, user_id: u.id, handle: u.handle, nome: u.nome, tipo, registrado_em: atDay(ymd, hh, mm), data_sp: ymd, foto_path: u.id + "/" + tipo + ".jpg", score: 0.12, match_ok: true, origem: origem || "app", excluido: false });
+  const ka = U.find(u => /kaio/i.test(u.handle)) || U.find(u => u.role === "vendedor");
+  const mik = U.find(u => /mike/i.test(u.handle)) || U.find(u => u.role === "admin");
+  const pamu = U.find(u => /pamela/i.test(u.handle));
+  const y = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+  const mk = (n) => y + "-" + String(n).padStart(2, "0");
+  if (ka) { punchDemo(ka, mk(3), "entrada", 8, 4); punchDemo(ka, mk(3), "saida_almoco", 12, 2); punchDemo(ka, mk(3), "volta_almoco", 13, 5); punchDemo(ka, mk(3), "saida", 18, 8); punchDemo(ka, mk(4), "entrada", 8, 22); punchDemo(ka, mk(4), "saida", 18, 1); }
+  if (mik) { punchDemo(mik, mk(3), "entrada", 7, 55); punchDemo(mik, mk(3), "saida_almoco", 12, 0); punchDemo(mik, mk(3), "volta_almoco", 13, 0); punchDemo(mik, mk(3), "saida", 19, 10); }
+  if (pamu) { punchDemo(pamu, mk(5), "entrada", 8, 0, "totem"); punchDemo(pamu, mk(5), "saida", 17, 58, "totem"); }
+  const limiarDemo = 0.55;
+  const distDemo = (a, b) => Math.sqrt(a.reduce((s, x, i) => s + (x - b[i]) * (x - b[i]), 0));
+  const todaySP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   const crOk = k => !k.nota_id || (N.find(n => n.nota_id === k.nota_id) || {}).status === "ativa";
   const crSaldo = cid => CR.filter(k => k.cliente_id === cid && crOk(k)).reduce((a, k) => a + (k.tipo === "entrada" ? k.valor : -k.valor), 0);
   const needFin = () => { if (role === "vendedor") throw new Error("Sem permissão (financeiro/admin)"); };
@@ -504,6 +544,67 @@ if (!MOCK && !CONFIGURED) {
       mov(destino, "entrada", v, "Transferência de " + o.nome + ": " + mot, null, meU);
       return { origem, destino, valor: v, saldo_origem: saldo(origem), saldo_destino: saldo(destino) };
     },
+    async pontoMinhaFace() { const f = PONTOfaces.find(x => x.user_id === meU.id); return f ? { ...f } : null; },
+    async pontoFacesDemo() { return PONTOfaces.map(x => ({ ...x })); },
+    async pontoMeusRegistros() { return PONTOregs.filter(r => r.user_id === meU.id && !r.excluido).map(r => ({ ...r })); },
+    async pontoRegistrosMes(ym) { if (role !== "admin") throw new Error("Só o administrador vê o espelho de todos"); return PONTOregs.filter(r => !r.excluido && String(r.data_sp).startsWith(ym)).map(r => ({ ...r })); },
+    async pontoJornadas() { return PONTOjor.map(x => ({ ...x })); },
+    async pontoTotens() { return PONTOtotem.map(x => ({ ...x })); },
+    async pontoFalhas() { if (role !== "admin") throw new Error("Só o administrador vê as falhas"); return PONTOfalhas.map(x => ({ ...x, nome: (U.find(u => u.id === x.user_id) || {}).nome })); },
+    async pontoSouTotem() { return role === "admin" || role === "totem" || PONTOtotem.some(t => t.user_id === meU.id); },
+    async pontoUploadFoto(path) { return path; },
+    async pontoCadastrarFace(desc, path, consent, texto, uid) {
+      if (!consent || !(texto || "").trim() || (texto || "").trim().length < 20) throw new Error("É preciso aceitar o termo de consentimento (LGPD)");
+      const alvo = uid || meU.id;
+      if (alvo !== meU.id && role !== "admin") throw new Error("Só o administrador cadastra o rosto de outra pessoa");
+      if (!Array.isArray(desc) || desc.length !== 128) throw new Error("Descritor facial inválido");
+      const row = { user_id: alvo, descriptor: desc.slice(), foto_path: path, consentimento_em: new Date().toISOString(), consentimento_texto: texto, cadastrado_em: new Date().toISOString(), cadastrado_por: meU.id };
+      const i = PONTOfaces.findIndex(x => x.user_id === alvo);
+      if (i >= 0) PONTOfaces[i] = row; else PONTOfaces.push(row);
+      return { ok: true, user_id: alvo };
+    },
+    async pontoExcluirFace(uid, mot) {
+      if ((uid || meU.id) !== meU.id && role !== "admin") throw new Error("Sem permissão");
+      if (!(mot || "").trim() || (mot || "").trim().length < 3) throw new Error("Informe o motivo");
+      const i = PONTOfaces.findIndex(x => x.user_id === (uid || meU.id));
+      if (i >= 0) PONTOfaces.splice(i, 1);
+      PONTOaudit.push({ acao: "excluir", motivo: "Cadastro facial: " + mot, user_id: meU.id, at: new Date().toISOString() });
+      return { ok: true };
+    },
+    async registrarPonto(tipo, desc, path, ua, lat, lng) {
+      if (role === "totem") throw new Error("No totem, use registrar_ponto_totem");
+      const face = PONTOfaces.find(x => x.user_id === meU.id);
+      if (!face) throw new Error("Cadastre seu rosto antes de bater ponto");
+      const score = distDemo(desc, face.descriptor);
+      if (score > limiarDemo) {
+        PONTOfalhas.push({ user_id: meU.id, tipo, foto_path: path, score, motivo: "Rosto não confere com o cadastro", user_agent: ua, latitude: lat, longitude: lng, origem: "app", criado_em: new Date().toISOString(), criado_por: meU.id });
+        return { ok: false, motivo: "Rosto não confere com o cadastro. O ponto não foi registrado.", score };
+      }
+      const d = todaySP();
+      if (PONTOregs.some(r => r.user_id === meU.id && r.data_sp === d && r.tipo === tipo && !r.excluido)) throw new Error("Este tipo de ponto já foi registrado hoje");
+      const row = { id: pontoId++, user_id: meU.id, handle: meU.handle, nome: meU.nome, tipo, registrado_em: new Date().toISOString(), data_sp: d, foto_path: path, score, match_ok: true, user_agent: ua, latitude: lat, longitude: lng, origem: "app", excluido: false };
+      PONTOregs.push(row);
+      return { ok: true, id: row.id, tipo, score, registrado_em: row.registrado_em };
+    },
+    async registrarPontoTotem(tipo, desc, path, ua, lat, lng) {
+      if (role !== "admin" && role !== "totem" && !PONTOtotem.some(t => t.user_id === meU.id)) throw new Error("Sem permissão de totem");
+      let best = null, score = Infinity;
+      for (const f of PONTOfaces) { const s = distDemo(desc, f.descriptor); if (s < score) { score = s; best = f; } }
+      if (!best || score > limiarDemo) {
+        PONTOfalhas.push({ user_id: best && best.user_id, tipo, foto_path: path, score: Number.isFinite(score) ? score : null, motivo: "Nenhum rosto cadastrado conferiu", user_agent: ua, latitude: lat, longitude: lng, origem: "totem", criado_em: new Date().toISOString(), criado_por: meU.id });
+        return { ok: false, motivo: "Rosto não reconhecido. O ponto não foi registrado.", score };
+      }
+      const u = U.find(x => x.id === best.user_id) || { nome: "Colaborador", handle: "", id: best.user_id };
+      const d = todaySP();
+      if (PONTOregs.some(r => r.user_id === u.id && r.data_sp === d && r.tipo === tipo && !r.excluido)) throw new Error("Este tipo de ponto já foi registrado hoje para esta pessoa");
+      const row = { id: pontoId++, user_id: u.id, handle: u.handle, nome: u.nome, tipo, registrado_em: new Date().toISOString(), data_sp: d, foto_path: path, score, match_ok: true, user_agent: ua, latitude: lat, longitude: lng, origem: "totem", excluido: false };
+      PONTOregs.push(row);
+      return { ok: true, id: row.id, user_id: u.id, nome: u.nome, tipo, score, registrado_em: row.registrado_em };
+    },
+    async pontoEditarRegistro(id, tipo, mot) { if (role !== "admin") throw new Error("Só o administrador altera um ponto"); if (!(mot || "").trim() || mot.trim().length < 3) throw new Error("Informe o motivo"); const r = PONTOregs.find(x => x.id === id && !x.excluido); if (!r) throw new Error("Registro não encontrado"); PONTOaudit.push({ registro_id: id, acao: "editar", motivo: mot, antes: { tipo: r.tipo }, depois: { tipo }, user_id: meU.id, at: new Date().toISOString() }); r.tipo = tipo; return { ok: true, id }; },
+    async pontoExcluirRegistro(id, mot) { if (role !== "admin") throw new Error("Só o administrador exclui um ponto"); if (!(mot || "").trim() || mot.trim().length < 3) throw new Error("Informe o motivo"); const r = PONTOregs.find(x => x.id === id && !x.excluido); if (!r) throw new Error("Registro não encontrado"); r.excluido = true; PONTOaudit.push({ registro_id: id, acao: "excluir", motivo: mot, user_id: meU.id, at: new Date().toISOString() }); return { ok: true, id }; },
+    async pontoSetJornada(uid, e, s, a, dias, tol) { if (role !== "admin") throw new Error("Só o administrador define a jornada"); if (!e || !s || s <= e) throw new Error("Jornada inválida"); const row = { user_id: uid, entrada: e, saida: s, almoco_minutos: a, dias_semana: dias || [1, 2, 3, 4, 5], tolerancia_minutos: tol == null ? 10 : tol }; const i = PONTOjor.findIndex(x => x.user_id === uid); if (i >= 0) PONTOjor[i] = row; else PONTOjor.push(row); return { ok: true }; },
+    async pontoSetTotem(uid, on, nome) { if (role !== "admin") throw new Error("Só o administrador define o totem"); const i = PONTOtotem.findIndex(x => x.user_id === uid); if (on) { const row = { user_id: uid, nome: nome || "Totem loja" }; if (i >= 0) PONTOtotem[i] = row; else PONTOtotem.push(row); } else if (i >= 0) PONTOtotem.splice(i, 1); return { ok: true }; },
     async caixaAbrir(c, v) { needCx(); if (SE.some(x => x.caixa_id === c && x.data === today())) throw new Error("Caixa já aberto hoje"); SE.push({ caixa_id: c, data: today(), abertura_valor: v, abertura_sistema: saldo(c), aberto_em: new Date().toISOString() }); },
     async caixaFechar(c, v) { needCx(); const x = SE.find(y => y.caixa_id === c && y.data === today() && !y.fechado_em); if (!x) throw new Error("Caixa não está aberto hoje (ou já foi fechado)"); Object.assign(x, { fechamento_contado: v, fechamento_sistema: saldo(c), diferenca: v - saldo(c), fechado_em: new Date().toISOString() }); return x.diferenca; },
     async usuarios() { return role === "admin" ? U : []; },
@@ -574,11 +675,11 @@ function navMark(v) {
 }
 function go(v) {
   const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
-  if (!need[v] && v !== "seguranca") v = "nota";
+  if (!need[v] && v !== "seguranca" && v !== "ponto") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
   navMark(v);
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei() }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei(), ponto: () => window.BAGDA_PONTO.view({ $, app, me, api, toast, esc, today }) }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
