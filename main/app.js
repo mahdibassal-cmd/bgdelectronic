@@ -28,7 +28,7 @@ const MOCK = qs.has("mock");
 if (MOCK) window.__demo = { get api() { return api; }, viewComprovante: (...a) => viewComprovante(...a), viewImei: (...a) => viewImei(...a), get me() { return me; } };
 const PAY = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["prazo", "Paga Depois"]];
 const PAYL = { ...Object.fromEntries(PAY), credito: "Caixa Geral (crédito)" };
-const LOCAIS = ["MAQUINA", "HX", "DINHEIRO", "CAIXA GERAL"];
+const LOCAIS = ["MAQUINA", "HX", "DINHEIRO", "CAIXA GERAL", "CAIXA S2", "PRESTIGE AURA"];
 const ROLEL = { admin: "Admin", vendedor: "Vendedor(a)", financeiro: "Financeiro", estoque: "Estoque" };
 /* permissões por papel (espelha public.role_perms no banco; o banco é quem garante) */
 const PERMS = { admin: ["admin", "vendas", "caixa", "financas", "estoque"], vendedor: ["vendas"], financeiro: ["caixa", "financas"], estoque: ["estoque"] };
