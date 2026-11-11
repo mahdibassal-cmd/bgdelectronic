@@ -477,11 +477,79 @@
     };
   }
 
-  async function maybePrompt(deps) {
+  const shouldPromptLogout = nxt => !!(nxt && !nxt.done && nxt.tipo && nxt.tipo !== "entrada");
+
+  function showPunchPrompt({ face, nxt, day, mode }) {
+    const leaving = mode === "logout";
+    return new Promise(resolve => {
+      const mock = isMock();
+      const o = document.createElement("div");
+      o.id = "ponto-prompt";
+      o.className = "ponto-prompt-overlay noprint";
+      o.dataset.mode = leaving ? "logout" : "login";
+      o.innerHTML = `<div class="ponto-prompt" role="dialog" aria-modal="true" aria-labelledby="ponto-prompt-title">
+        <h2 id="ponto-prompt-title">Bater ponto agora?</h2>
+        <p class="muted">${leaving ? "Antes de sair do sistema. " : ""}O horário gravado é o do servidor, não o deste aparelho.</p>
+        ${mock ? mockPreview("Câmera", "Olhe para a câmera. Neste modo o reconhecimento é simulado.") : `<div class="ponto-cam"><video id="ppv" playsinline autoplay muted></video></div>`}
+        <p class="ponto-tipo-sug">Tipo agora: <b id="ptipo-lab">${esc(TLAB[nxt.tipo])}</b></p>
+        <p class="ponto-tipo-change"><label>Alterar tipo <select id="pptipo">${TIPOS.map(t => `<option value="${t.id}" ${t.id === nxt.tipo ? "selected" : ""}>${t.label}</option>`).join("")}</select></label></p>
+        <p id="ppmsg" class="muted" style="text-align:center;min-height:1.3em"></p>
+        <p class="ponto-prompt-actions">
+          <button type="button" class="btn ghost" id="ppular">Pular</button>
+          <button type="button" class="btn" id="pgo">Bater ponto</button>
+        </p>
+      </div>`;
+      document.body.appendChild(o);
+      const finish = why => { closePrompt(); resolve(why || "done"); };
+      const video = o.querySelector("#ppv");
+      if (video) startCam(video).catch(e => {
+        const m = o.querySelector("#ppmsg");
+        if (m) m.innerHTML = `<span class="ponto-bad">${esc("Câmera: " + (e.message || "sem permissão"))}</span>`;
+      });
+      const lab = o.querySelector("#ptipo-lab");
+      const sel = o.querySelector("#pptipo");
+      sel.onchange = () => { lab.textContent = TLAB[sel.value] || sel.value; };
+      o.querySelector("#ppular").onclick = () => { markSkipped(me.id, day, nxt.tipo); finish("skip"); };
+      o.querySelector("#pgo").onclick = async ev => {
+        ev.preventDefault();
+        const b = ev.currentTarget, tp = sel.value, msg = o.querySelector("#ppmsg");
+        b.disabled = true;
+        try {
+          let desc, blob;
+          if (mock) {
+            desc = (face && face.descriptor) || Array.from({ length: 128 }, (_, i) => (i + 1) * 0.001);
+            blob = null;
+          } else {
+            if (!video || !video.srcObject) throw new Error("Câmera indisponível");
+            const g = await grab(video);
+            blob = g.blob;
+            desc = await describe(g.canvas);
+          }
+          const gpos = await geo();
+          const path = await maybeUpload((me.id || "eu") + "/prompt", blob);
+          const r = await api.registrarPonto(tp, desc, path, navigator.userAgent, gpos.lat, gpos.lng);
+          if (r && r.ok === false) {
+            msg.innerHTML = `<span class="ponto-bad">${esc(r.motivo || "Rosto não confere. O ponto não foi registrado.")}</span>`;
+            toast(r.motivo || "Rosto não confere. O ponto não foi registrado.");
+          } else {
+            msg.innerHTML = `<span class="ponto-ok">Ponto registrado: ${esc(TLAB[tp])} ✓</span>`;
+            toast("Ponto registrado ✓");
+            setTimeout(() => finish("ok"), leaving ? 500 : 700);
+          }
+        } catch (e) { rpcToast(e.message); }
+        finally { b.disabled = false; }
+      };
+    });
+  }
+
+  async function maybePrompt(deps, opts) {
     if (deps) ({ $, app, me, api, toast, esc, today } = deps);
     if (!me || !api || !today) return false;
+    const mode = (opts && opts.mode) || "login";
+    const leaving = mode === "logout";
     const qsNow = new URLSearchParams(location.search);
     if (qsNow.has("demo") || qsNow.get("ponto_prompt") === "0") return false;
+    if (!leaving && qsNow.get("ponto_logout") === "1") return false;
     if (document.getElementById("ponto-prompt")) return false;
     if (document.body.classList.contains("ponto-totem")) return false;
     if (await isTotemAccount()) return false;
@@ -494,76 +562,30 @@
     const j = (jors || []).find(x => x.user_id === me.id);
     if (!isWorkDay(j, day)) return false;
     if (!face) {
-      let hinted = false;
-      try { hinted = sessionStorage.getItem(hintKey(me.id, day)) === "1"; } catch {}
-      if (!hinted) showCadastroHint();
+      if (!leaving) {
+        let hinted = false;
+        try { hinted = sessionStorage.getItem(hintKey(me.id, day)) === "1"; } catch {}
+        if (!hinted) showCadastroHint();
+      }
       return false;
     }
     const nxt = proximoTipo(regs, day);
-    if (nxt.done || !nxt.tipo) return false;
+    if (leaving) {
+      if (!shouldPromptLogout(nxt)) return false;
+    } else if (nxt.done || !nxt.tipo) return false;
     if (wasSkipped(me.id, day, nxt.tipo)) return false;
+    return showPunchPrompt({ face, nxt, day, mode });
+  }
 
-    const mock = isMock();
-    const o = document.createElement("div");
-    o.id = "ponto-prompt";
-    o.className = "ponto-prompt-overlay noprint";
-    o.innerHTML = `<div class="ponto-prompt" role="dialog" aria-modal="true" aria-labelledby="ponto-prompt-title">
-      <h2 id="ponto-prompt-title">Bater ponto agora?</h2>
-      <p class="muted">O horário gravado é o do servidor, não o deste aparelho.</p>
-      ${mock ? mockPreview("Câmera", "Olhe para a câmera. Neste modo o reconhecimento é simulado.") : `<div class="ponto-cam"><video id="ppv" playsinline autoplay muted></video></div>`}
-      <p class="ponto-tipo-sug">Tipo agora: <b id="ptipo-lab">${esc(TLAB[nxt.tipo])}</b></p>
-      <p class="ponto-tipo-change"><label>Alterar tipo <select id="pptipo">${TIPOS.map(t => `<option value="${t.id}" ${t.id === nxt.tipo ? "selected" : ""}>${t.label}</option>`).join("")}</select></label></p>
-      <p id="ppmsg" class="muted" style="text-align:center;min-height:1.3em"></p>
-      <p class="ponto-prompt-actions">
-        <button type="button" class="btn ghost" id="ppular">Pular</button>
-        <button type="button" class="btn" id="pgo">Bater ponto</button>
-      </p>
-    </div>`;
-    document.body.appendChild(o);
-    const video = o.querySelector("#ppv");
-    if (video) startCam(video).catch(e => {
-      const m = o.querySelector("#ppmsg");
-      if (m) m.innerHTML = `<span class="ponto-bad">${esc("Câmera: " + (e.message || "sem permissão"))}</span>`;
-    });
-    const lab = o.querySelector("#ptipo-lab");
-    const sel = o.querySelector("#pptipo");
-    sel.onchange = () => { lab.textContent = TLAB[sel.value] || sel.value; };
-    o.querySelector("#ppular").onclick = () => { markSkipped(me.id, day, nxt.tipo); closePrompt(); };
-    o.querySelector("#pgo").onclick = async ev => {
-      ev.preventDefault();
-      const b = ev.currentTarget, tp = sel.value, msg = o.querySelector("#ppmsg");
-      b.disabled = true;
-      try {
-        let desc, blob;
-        if (mock) {
-          desc = (face && face.descriptor) || Array.from({ length: 128 }, (_, i) => (i + 1) * 0.001);
-          blob = null;
-        } else {
-          if (!video || !video.srcObject) throw new Error("Câmera indisponível");
-          const g = await grab(video);
-          blob = g.blob;
-          desc = await describe(g.canvas);
-        }
-        const gpos = await geo();
-        const path = await maybeUpload((me.id || "eu") + "/prompt", blob);
-        const r = await api.registrarPonto(tp, desc, path, navigator.userAgent, gpos.lat, gpos.lng);
-        if (r && r.ok === false) {
-          msg.innerHTML = `<span class="ponto-bad">${esc(r.motivo || "Rosto não confere. O ponto não foi registrado.")}</span>`;
-          toast(r.motivo || "Rosto não confere. O ponto não foi registrado.");
-        } else {
-          msg.innerHTML = `<span class="ponto-ok">Ponto registrado: ${esc(TLAB[tp])} ✓</span>`;
-          toast("Ponto registrado ✓");
-          setTimeout(closePrompt, 700);
-        }
-      } catch (e) { rpcToast(e.message); }
-      finally { b.disabled = false; }
-    };
-    return true;
+  async function maybePromptLogout(deps) {
+    return maybePrompt(deps, { mode: "logout" });
   }
 
   window.BAGDA_PONTO = {
     view: (deps) => { ({ $, app, me, api, toast, esc, today } = deps); return view(); },
     maybePrompt,
+    maybePromptLogout,
+    shouldPromptLogout,
     consentimento: CONSENT,
     tipos: TIPOS,
     nextTipo,

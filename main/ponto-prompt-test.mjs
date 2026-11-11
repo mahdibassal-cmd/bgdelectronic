@@ -36,7 +36,11 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(js, sandbox);
 const P = sandbox.window.BAGDA_PONTO;
-ok(!!P && typeof P.maybePrompt === "function" && typeof P.proximoTipo === "function", "BAGDA_PONTO exports maybePrompt and proximoTipo");
+ok(!!P && typeof P.maybePrompt === "function" && typeof P.maybePromptLogout === "function" && typeof P.proximoTipo === "function", "BAGDA_PONTO exports maybePrompt, maybePromptLogout and proximoTipo");
+ok(P.shouldPromptLogout({ tipo: "saida_almoco", done: false }) === true, "logout prompt after entrada suggests saida_almoco");
+ok(P.shouldPromptLogout({ tipo: "saida", done: false }) === true, "logout prompt after volta_almoco suggests saida");
+ok(P.shouldPromptLogout({ tipo: "entrada", done: false }) === false, "logout does not ask entrada if they never punched in");
+ok(P.shouldPromptLogout({ tipo: "saida", done: true }) === false, "logout does not ask after saida is already recorded");
 
 const day = "2026-11-11"; // Wednesday, work day (3)
 const r = (tipo, d = day) => ({ tipo, data_sp: d, excluido: false });
@@ -57,8 +61,9 @@ ok(P.isWorkDay({ dias_semana: [3] }, "2026-11-11") === true, "custom jornada can
 
 ok(P.skipKey("u1", day, "saida_almoco") === "bagda-ponto-skip:u1:2026-11-11:saida_almoco", "skip key is user+day+type in this browser session");
 
-ok(html.includes("ponto.js?v=20261111a") && html.includes("app.js?v=20261111a") && html.includes("ponto.css?v=20261111a"), "cache 20261111a");
-ok(app.includes("BAGDA_PONTO.maybePrompt") && app.includes('qs.get("ponto_hoje")'), "boot + demo seed wired");
+ok(html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261111d") && html.includes("ponto.css?v=20261111d"), "cache 20261111d");
+ok(app.includes("BAGDA_PONTO.maybePrompt") && app.includes("BAGDA_PONTO.maybePromptLogout") && app.includes('qs.get("ponto_hoje")') && app.includes('qs.get("ponto_logout")'), "boot + Sair hook + demo seed wired");
+ok(app.includes("$(\"#sair\").onclick") && app.includes("maybePromptLogout") && js.includes("Antes de sair do sistema") && js.includes('dataset.mode'), "Sair shows the leaving punch modal, then logs out either way");
 ok(js.includes("registrarPonto") && js.includes("Rosto não confere") && js.includes("ppular"), "mismatch stays in the modal (retry or skip) and punch goes through registrar_ponto");
 ok(!js.includes("signInWithPassword") && app.includes("signInWithPassword") && /type="password"/.test(app), "auth remains email+password");
 const login = app.slice(app.indexOf("function viewLogin"), app.indexOf("async function viewMfaChallenge"));

@@ -669,7 +669,11 @@ async function boot() {
   if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
   go(location.hash.slice(1) || (can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca"));
-  if (window.BAGDA_PONTO && BAGDA_PONTO.maybePrompt) Promise.resolve(BAGDA_PONTO.maybePrompt({ $, app, me, api, toast, esc, today })).catch(() => {});
+  if (window.BAGDA_PONTO) {
+    const deps = { $, app, me, api, toast, esc, today };
+    if (qs.get("ponto_logout") === "1" && BAGDA_PONTO.maybePromptLogout) Promise.resolve(BAGDA_PONTO.maybePromptLogout(deps)).catch(() => {});
+    else if (BAGDA_PONTO.maybePrompt) Promise.resolve(BAGDA_PONTO.maybePrompt(deps)).catch(() => {});
+  }
 }
 function navMark(v) {
   document.querySelectorAll("nav button[data-v]").forEach(b => {
@@ -688,7 +692,12 @@ function go(v) {
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
-$("#sair").onclick = async () => { await api.logout(); location.hash = ""; location.reload(); };
+$("#sair").onclick = async () => {
+  const b = $("#sair"); if (b) b.disabled = true;
+  try { if (window.BAGDA_PONTO && BAGDA_PONTO.maybePromptLogout) await BAGDA_PONTO.maybePromptLogout({ $, app, me, api, toast, esc, today }); }
+  catch (e) { toast(e && e.message ? e.message : "Erro"); }
+  await api.logout(); location.hash = ""; location.reload();
+};
 
 function viewNaoConfigurado() {
   $("#nav").hidden = true;
