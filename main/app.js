@@ -245,7 +245,13 @@ if (!MOCK && !CONFIGURED) {
     async hxConfigSet(on) { return ok(await sb.rpc("caixa_hx_config_set", { p_on: on })); },
     async caixaSessoes(d) { return ok(await sb.from("caixa_sessoes").select("*").eq("data", d)); },
     async caixaLancar(m) { ok(await sb.from("caixa_movimentos").insert(m)); },
-    async transferirCaixa(origem, destino, valor, motivo) { return ok(await sb.rpc("transferir_caixa", { p_origem: origem, p_destino: destino, p_valor: valor, p_motivo: motivo })); },
+    async transferirCaixa(origem, destino, valor, motivo, esp) {
+      const oEsp = !!(esp && esp.origemEspecial), dEsp = !!(esp && esp.destinoEspecial);
+      const r = await sb.rpc("transferir_caixa", { p_origem: oEsp ? null : origem, p_destino: dEsp ? null : destino, p_valor: valor, p_motivo: motivo, p_origem_especial: oEsp, p_destino_especial: dEsp });
+      if (r.error && /PGRST202|42883|transferir_caixa|schema cache|does not exist/i.test((r.error.code || "") + " " + (r.error.message || "")))
+        throw new Error((oEsp || dEsp) ? "Transferir envolvendo a Caixa Especial ainda depende da atualização do banco (supabase-loja/migration-transferir-especial.sql). Nada foi lançado." : "Transferir entre caixas ainda depende da atualização do banco (supabase-loja/migration-transferir-caixa.sql). Nada foi lançado.");
+      return ok(r);
+    },
     async estornarMov(mid, m, cn) { const r = await sb.rpc("estornar_movimento_caixa", { p_mov: mid, p_motivo: m, p_cancelar_nota: !!cn }); if (r.error && /PGRST202|42883|estornar_movimento_caixa/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Estornar movimento de caixa ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
     async caixaAbrir(c, v) { return ok(await sb.rpc("caixa_abrir", { p_caixa: c, p_valor: v })); },
     async caixaFechar(c, v) { return ok(await sb.rpc("caixa_fechar", { p_caixa: c, p_contado: v })); },
@@ -448,8 +454,10 @@ if (!MOCK && !CONFIGURED) {
     async cxEspSaida(v, m, cid) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (!m || m.length < 3) throw new Error("Informe o motivo / para onde vai o dinheiro"); const sd = CXE.reduce((a, x) => a + (x.tipo === "entrada" ? x.valor : -x.valor), 0); if (v > sd + 0.001) throw new Error(`Saldo da Caixa Especial insuficiente (${brl(sd)})`);
       if (cid && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); const mid = id++; let cr = null; if (cid) { cr = id++; CR.push({ id: cr, cliente_id: cid, tipo: "uso", valor: v, obs: `Devolução em dinheiro (Caixa Especial #${mid}): ${m}`, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); }
       CXE.push({ id: mid, tipo: "saida", valor: v, motivo: m, cliente_id: cid || null, credito_id: cr, created_at: new Date().toISOString() }); },
-    async cxEspEstornar(i, m) { if (meU.role !== "admin") throw new Error("Somente admin"); const x = CXE.find(y => y.id === i); if (CXE.some(y => y.estorno_de === i)) return { ja_estornado: true }; CXE.push({ id: id++, tipo: x.tipo === "entrada" ? "saida" : "entrada", valor: x.valor, motivo: `Estorno #${i}: ${m}`, cliente_id: x.cliente_id, estorno_de: i, created_at: new Date().toISOString() });
-      if (x.credito_id) CR.push({ id: id++, cliente_id: x.cliente_id, tipo: "entrada", valor: x.valor, obs: `Estorno devolução Caixa Especial #${i}: ${m}`, nota_id: null, estorno_de: x.credito_id, handle: meU.handle, created_at: new Date().toISOString() }); return {}; },
+    async cxEspEstornar(i, m) { if (meU.role !== "admin") throw new Error("Somente admin"); const x = CXE.find(y => y.id === i); if (CXE.some(y => y.estorno_de === i)) return { ja_estornado: true }; const nid = id++; CXE.push({ id: nid, tipo: x.tipo === "entrada" ? "saida" : "entrada", valor: x.valor, motivo: `Estorno #${i}: ${m}`, cliente_id: x.cliente_id, estorno_de: i, created_at: new Date().toISOString() });
+      if (x.credito_id) CR.push({ id: id++, cliente_id: x.cliente_id, tipo: "entrada", valor: x.valor, obs: `Estorno devolução Caixa Especial #${i}: ${m}`, nota_id: null, estorno_de: x.credito_id, handle: meU.handle, created_at: new Date().toISOString() });
+      if (x.caixa_mov_id) { const o = MV.find(y => y.id === x.caixa_mov_id); if (o && !o.estorno_de && o.tipo !== "estorno" && !MV.some(y => y.estorno_de === o.id)) { mov(o.caixa_id, o.tipo === "entrada" ? "saida" : "entrada", o.valor, `Estorno mov #${o.id} (transferência Caixa Especial #${i}): ${m}`, null, meU); const nw = MV[MV.length - 1]; nw.estorno_de = o.id; nw.forma = o.forma; CXE.find(y => y.id === nid).caixa_mov_id = nw.id; } }
+      return {}; },
     async estornarCredito(kid, m) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar"); const k = CR.find(x => x.id === kid); if (CR.some(x => x.estorno_de === kid)) return { ja_estornado: true };
       if (k.estorno_de) throw new Error("Este lançamento já é um estorno"); if (k.nota_id) throw new Error("Uso ligado à nota: cancele a nota"); if (k.recebimento_id && RC.some(r => r.id === k.recebimento_id)) throw new Error(`Uso ligado ao recebimento #${k.recebimento_id}: estorne em Contas a receber`);
       if (k.tipo === "entrada" && k.valor > crSaldo(k.cliente_id) + 0.001) throw new Error(`Saldo de crédito ficaria negativo (saldo ${brl(crSaldo(k.cliente_id))})`);
@@ -533,14 +541,43 @@ if (!MOCK && !CONFIGURED) {
         if (liq <= 0) throw new Error("Nota sem valor neste caixa"); mov(o.caixa_id, "estorno", liq, `${cn ? "Cancelamento nota" : "Estorno caixa nota"} ${String(o.nota_id).padStart(6, "0")}${cn ? "" : " (volta p/ lançar)"}: ${m}`, o.nota_id, meU);
         if (n) { n.caixa_lancada_id = null; if (cn) { n.status = "cancelada"; IT.filter(i => i.nota_id === n.nota_id).forEach(devolverItem); } } }
       else mov(o.caixa_id, o.tipo === "entrada" ? "saida" : "entrada", o.valor, `Estorno mov #${o.id} (${o.motivo || ""}): ${m}`, null, meU);
-      const nw = MV[MV.length - 1]; nw.estorno_de = mid; nw.forma = o.forma; return { estorno_id: nw.id, acao: o.tipo === "venda" ? (cn ? "nota_cancelada" : "nota_volta_a_lancar") : "manual" }; },
+      const nw = MV[MV.length - 1]; nw.estorno_de = mid; nw.forma = o.forma;
+      const esp = CXE.find(x => x.caixa_mov_id === mid);
+      if (esp && !CXE.some(x => x.estorno_de === esp.id)) {
+        const sd = CXE.reduce((a, x) => a + (x.tipo === "entrada" ? x.valor : -x.valor), 0);
+        if (esp.tipo === "entrada" && esp.valor > sd + 0.001) throw new Error("Saldo da Caixa Especial ficaria negativo");
+        CXE.push({ id: id++, tipo: esp.tipo === "entrada" ? "saida" : "entrada", valor: esp.valor, motivo: `Estorno transferência #${esp.id} (mov #${mid}): ${m}`, estorno_de: esp.id, caixa_mov_id: nw.id, created_at: new Date().toISOString() });
+        return { estorno_id: nw.id, acao: "transferencia_especial" };
+      }
+      return { estorno_id: nw.id, acao: o.tipo === "venda" ? (cn ? "nota_cancelada" : "nota_volta_a_lancar") : "manual" }; },
     async caixaLancar(m) { needCx(); if (!m.motivo || m.motivo.trim().length < 3) throw new Error("Informe o motivo"); mov(m.caixa_id, m.tipo, Number(m.valor), m.motivo, null, meU); },
-    async transferirCaixa(origem, destino, valor, motivo) {
+    async transferirCaixa(origem, destino, valor, motivo, esp) {
       needCx();
       const v = Math.round(Number(valor) * 100) / 100, mot = (motivo || "").trim();
+      const oEsp = !!(esp && esp.origemEspecial), dEsp = !!(esp && esp.destinoEspecial);
       if (!(v > 0)) throw new Error("Informe um valor maior que zero");
       if (mot.length < 3) throw new Error("Informe o motivo");
-      if (origem === destino) throw new Error("Escolha caixas diferentes");
+      if ((oEsp && dEsp) || (!oEsp && !dEsp && origem === destino)) throw new Error("Escolha caixas diferentes");
+      if (oEsp || dEsp) {
+        if (meU.role !== "admin") throw new Error("Somente admin pode transferir envolvendo a Caixa Especial");
+        const sdEsp = CXE.reduce((a, x) => a + (x.tipo === "entrada" ? x.valor : -x.valor), 0);
+        if (oEsp) {
+          const d = CX.find(c => c.caixa_id === destino); if (!d) throw new Error("Caixa de destino inválido");
+          if (sdEsp + 1e-9 < v) throw new Error("Saldo da Caixa Especial insuficiente");
+          mov(destino, "entrada", v, "Transferência de CAIXA ESPECIAL: " + mot, null, meU);
+          const ent = MV[MV.length - 1];
+          const cxid = id++;
+          CXE.push({ id: cxid, tipo: "saida", valor: v, motivo: "Transferência para " + d.nome + ": " + mot, caixa_mov_id: ent.id, created_at: new Date().toISOString() });
+          return { origem: "cxesp", destino, valor: v, cxesp_id: cxid, saldo_origem: sdEsp - v, saldo_destino: saldo(destino) };
+        }
+        const o = CX.find(c => c.caixa_id === origem); if (!o) throw new Error("Caixa de origem inválido");
+        if (saldo(origem) + 1e-9 < v) throw new Error("Saldo insuficiente no caixa de origem");
+        mov(origem, "saida", v, "Transferência para CAIXA ESPECIAL: " + mot, null, meU);
+        const sai = MV[MV.length - 1];
+        const cxid = id++;
+        CXE.push({ id: cxid, tipo: "entrada", valor: v, motivo: "Transferência de " + o.nome + ": " + mot, caixa_mov_id: sai.id, created_at: new Date().toISOString() });
+        return { origem, destino: "cxesp", valor: v, cxesp_id: cxid, saldo_origem: saldo(origem), saldo_destino: sdEsp + v };
+      }
       const o = CX.find(c => c.caixa_id === origem), d = CX.find(c => c.caixa_id === destino);
       if (!o || !d) throw new Error("Caixa inválido");
       if (saldo(origem) + 1e-9 < v) throw new Error("Saldo insuficiente no caixa de origem");
@@ -1306,10 +1343,10 @@ async function viewCaixa(d = today()) {
     <div><label>Valor (R$)</label><input id="lv" type="number" min="0.01" step="0.01" required></div></div>
     <label>Motivo (obrigatório)</label><input id="lm" minlength="3" maxlength="300" required><button class="btn">Lançar</button></form></div>
     <div class="card noprint"><h2>Transferir entre caixas</h2><form id="tf"><div class="grid">
-    <div><label>De</label><select id="tde">${SA.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === 1 ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select></div>
-    <div><label>Para</label><select id="tpa">${SA.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === 12 ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select></div>
+    <div><label>De</label><select id="tde">${SA.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === 1 ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}${adm ? `<option value="cxesp">CAIXA ESPECIAL</option>` : ""}</select></div>
+    <div><label>Para</label><select id="tpa">${SA.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === 12 ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}${adm ? `<option value="cxesp">CAIXA ESPECIAL</option>` : ""}</select></div>
     <div><label>Valor (R$)</label><input id="tv" type="number" min="0.01" step="0.01" required></div></div>
-    <label>Motivo (obrigatório)</label><input id="tm" minlength="3" maxlength="300" required placeholder="Ex.: sangria para GASTOS LOJA"><button class="btn">Transferir</button></form></div>
+    <label>Motivo (obrigatório)</label><input id="tm" minlength="3" maxlength="300" required placeholder="Ex.: sangria para GASTOS LOJA">${adm ? `<p class="muted">Como admin, você também pode transferir de um caixa do dia (ex.: Caixa Dinheiro) para a <b>CAIXA ESPECIAL</b>, ou o caminho inverso. O financeiro não vê nem usa a Caixa Especial aqui.</p>` : ""}<button class="btn">Transferir</button></form></div>
   </div>` : ""}
   <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2>${!adm && !hoje && SA.some(c => /HX/.test(c.nome || "")) ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin.</p>' : ""}<div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Cliente</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
   ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Sem movimentos.</td></tr>'}
@@ -1325,13 +1362,13 @@ async function viewCaixa(d = today()) {
     try { const dif = await api.caixaFechar(+b.dataset.c, +v); toast(`Caixa fechado · diferença ${brl(dif)}`); viewCaixa(d); } catch (e) { toast(e.message); } });
   if ($("#lf")) $("#lf").onsubmit = async ev => { ev.preventDefault(); const m = $("#lm").value.trim(); if (m.length < 3) return toast("Informe o motivo");
     try { await api.caixaLancar({ caixa_id: +$("#lc").value, tipo: $("#lt").value, valor: +$("#lv").value, motivo: m }); toast("Lançado ✓"); viewCaixa(d); } catch (e) { toast(e.message); } };
-  if ($("#tf")) $("#tf").onsubmit = async ev => { ev.preventDefault(); const de = +$("#tde").value, pa = +$("#tpa").value, vv = Math.round(+$("#tv").value * 100) / 100, m = $("#tm").value.trim();
-    if (de === pa) return toast("Escolha caixas diferentes"); if (!(vv > 0)) return toast("Informe um valor maior que zero"); if (m.length < 3) return toast("Informe o motivo");
-    const nDe = (SA.find(c => c.caixa_id === de) || {}).nome || de, nPa = (SA.find(c => c.caixa_id === pa) || {}).nome || pa;
-    if (!(await confirmBox(`Transferir <b>${brl(vv)}</b> de <b>${esc(String(nDe))}</b> para <b>${esc(String(nPa))}</b>?<br><small>Sai do primeiro caixa e entra no segundo, no mesmo momento.</small>`))) return;
+  if ($("#tf")) $("#tf").onsubmit = async ev => { ev.preventDefault(); const deRaw = $("#tde").value, paRaw = $("#tpa").value, oEsp = deRaw === "cxesp", dEsp = paRaw === "cxesp", de = oEsp ? null : +deRaw, pa = dEsp ? null : +paRaw, vv = Math.round(+$("#tv").value * 100) / 100, m = $("#tm").value.trim();
+    if ((oEsp && dEsp) || (!oEsp && !dEsp && de === pa)) return toast("Escolha caixas diferentes"); if ((oEsp || dEsp) && !adm) return toast("Somente admin pode transferir envolvendo a Caixa Especial"); if (!(vv > 0)) return toast("Informe um valor maior que zero"); if (m.length < 3) return toast("Informe o motivo");
+    const nDe = oEsp ? "CAIXA ESPECIAL" : ((SA.find(c => c.caixa_id === de) || {}).nome || de), nPa = dEsp ? "CAIXA ESPECIAL" : ((SA.find(c => c.caixa_id === pa) || {}).nome || pa);
+    if (!(await confirmBox(`Transferir <b>${brl(vv)}</b> de <b>${esc(String(nDe))}</b> para <b>${esc(String(nPa))}</b>?<br><small>${oEsp || dEsp ? "Sai do primeiro e entra no segundo no mesmo momento. O estorno reverte os dois lados." : "Sai do primeiro caixa e entra no segundo, no mesmo momento."}</small>`))) return;
     const b = ev.submitter; b.disabled = true;
-    try { await api.transferirCaixa(de, pa, vv, m); toast("Transferência lançada ✓"); viewCaixa(d); }
-    catch (e) { const em = e.message || ""; toast(/PGRST202|42883|transferir_caixa|schema cache|does not exist/i.test(em) ? "Transferir entre caixas ainda depende da atualização do banco (supabase-loja/migration-transferir-caixa.sql). Nada foi lançado." : em); b.disabled = false; } };
+    try { await api.transferirCaixa(de, pa, vv, m, { origemEspecial: oEsp, destinoEspecial: dEsp }); toast("Transferência lançada ✓"); viewCaixa(d); }
+    catch (e) { const em = e.message || ""; toast(/PGRST202|42883|transferir_caixa|schema cache|does not exist|migration-transferir-/i.test(em) ? ((oEsp || dEsp) ? "Transferir envolvendo a Caixa Especial ainda depende da atualização do banco (supabase-loja/migration-transferir-especial.sql). Nada foi lançado." : "Transferir entre caixas ainda depende da atualização do banco (supabase-loja/migration-transferir-caixa.sql). Nada foi lançado.") : em); b.disabled = false; } };
 }
 async function viewUsuarios() { return BGDUsers.view(app, api, me, { roles: ROLEL, toast, store: "BAGDA STORES", myId: me.id }); }
 
