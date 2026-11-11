@@ -242,7 +242,7 @@ ok(view.includes('qs.has("estfix")') && view.includes("MOCK &&"), "synthetic pre
 ok(app.includes('estoque: "vendas|estoque"') && app.includes('vendedor: ["vendas"]') && app.includes('estoque: ["estoque"]'), "route and role permissions unchanged");
 
 const htmlMain = read("index.html");
-ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("custo-valor.js") && htmlMain.indexOf("custo-valor.js") < htmlMain.indexOf("venda-origem.js") && htmlMain.indexOf("venda-origem.js") < htmlMain.indexOf("ponto.js?v=20261110b") && htmlMain.indexOf("ponto.js?v=20261110b") < htmlMain.indexOf("app.js?v=20261110b"), "classifier, cost parser, sale-source and ponto helpers load before the app");
+ok(htmlMain.indexOf("estoque-categorias.js") < htmlMain.indexOf("custo-valor.js") && htmlMain.indexOf("custo-valor.js") < htmlMain.indexOf("venda-origem.js") && htmlMain.indexOf("venda-origem.js") < htmlMain.indexOf("ponto.js?v=20261111a") && htmlMain.indexOf("ponto.js?v=20261111a") < htmlMain.indexOf("app.js?v=20261111a"), "classifier, cost parser, sale-source and ponto helpers load before the app");
 const kioskJs = readFileSync(join(dir, "../kiosk/app.js"), "utf8");
 const kioskHtml = readFileSync(join(dir, "../kiosk/index.html"), "utf8");
 ok(!kioskJs.includes("BAGDA_ESTOQUE_CATS") && !kioskJs.includes("est-nav") && !kioskHtml.includes("estoque-categorias"), "kiosk estoque is untouched");

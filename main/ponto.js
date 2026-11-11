@@ -48,10 +48,30 @@
     const last = new Date(y, m, 0).getDate();
     return Array.from({ length: last }, (_, i) => ym + "-" + pad2(i + 1));
   };
-  const nextTipo = regs => {
-    const d = today();
-    const n = (regs || []).filter(r => !r.excluido && r.data_sp === d).length;
-    return TIPOS[Math.min(n, 3)].id;
+  const proximoTipo = (regs, day) => {
+    const d = day || (typeof today === "function" ? today() : null);
+    if (!d) return { tipo: "entrada", done: false };
+    const types = new Set((regs || []).filter(r => !r.excluido && r.data_sp === d).map(r => r.tipo));
+    if (types.has("saida")) return { tipo: "saida", done: true };
+    if (types.has("volta_almoco")) return { tipo: "saida", done: false };
+    if (types.has("saida_almoco")) return { tipo: "volta_almoco", done: false };
+    if (types.has("entrada")) return { tipo: "saida_almoco", done: false };
+    return { tipo: "entrada", done: false };
+  };
+  const nextTipo = (regs, day) => proximoTipo(regs, day).tipo;
+  const isWorkDay = (j, day) => {
+    const jor = jornadaOf(j);
+    const dow = dowSP(day);
+    const dias = (jor.dias_semana || [1, 2, 3, 4, 5]).map(Number);
+    return dias.includes(dow);
+  };
+  const skipKey = (uid, day, tipo) => "bagda-ponto-skip:" + (uid || "") + ":" + day + ":" + tipo;
+  const hintKey = (uid, day) => "bagda-ponto-hint:" + (uid || "") + ":" + day;
+  const wasSkipped = (uid, day, tipo) => {
+    try { return sessionStorage.getItem(skipKey(uid, day, tipo)) === "1"; } catch { return false; }
+  };
+  const markSkipped = (uid, day, tipo) => {
+    try { sessionStorage.setItem(skipKey(uid, day, tipo), "1"); } catch {}
   };
   const dayStats = (day, j) => {
     const E = day.entrada, SA = day.saida_almoco, VA = day.volta_almoco, S = day.saida;
@@ -425,11 +445,131 @@
     </div>`;
   }
 
+  async function isTotemAccount() {
+    if (me && (me.role === "totem" || me.handle === "@totem")) return true;
+    const rows = api.pontoTotens ? await api.pontoTotens().catch(() => []) : [];
+    return (rows || []).some(t => t && t.user_id === me.id);
+  }
+
+  function closePrompt() {
+    stopCam();
+    const o = document.getElementById("ponto-prompt");
+    if (o) o.remove();
+  }
+
+  function showCadastroHint() {
+    if (document.getElementById("ponto-hint")) return;
+    const bar = document.createElement("div");
+    bar.id = "ponto-hint";
+    bar.className = "ponto-hint noprint";
+    bar.setAttribute("role", "status");
+    bar.innerHTML = `Para bater o ponto, cadastre seu rosto em <button type="button" class="link" id="phint-go">Ponto → Cadastro facial</button>. <button type="button" class="btn ghost" id="phint-x">Ok</button>`;
+    const host = document.querySelector("header.top") || document.body;
+    host.insertAdjacentElement("afterend", bar);
+    const dismiss = () => { try { sessionStorage.setItem(hintKey(me && me.id, today()), "1"); } catch {} bar.remove(); };
+    bar.querySelector("#phint-x").onclick = dismiss;
+    bar.querySelector("#phint-go").onclick = () => {
+      dismiss();
+      tab = "cadastro";
+      const b = document.querySelector('nav button[data-v="ponto"]');
+      if (b) b.click();
+      else view();
+    };
+  }
+
+  async function maybePrompt(deps) {
+    if (deps) ({ $, app, me, api, toast, esc, today } = deps);
+    if (!me || !api || !today) return false;
+    const qsNow = new URLSearchParams(location.search);
+    if (qsNow.has("demo") || qsNow.get("ponto_prompt") === "0") return false;
+    if (document.getElementById("ponto-prompt")) return false;
+    if (document.body.classList.contains("ponto-totem")) return false;
+    if (await isTotemAccount()) return false;
+    const day = today();
+    const [face, regs, jors] = await Promise.all([
+      api.pontoMinhaFace().catch(() => null),
+      api.pontoMeusRegistros().catch(() => []),
+      api.pontoJornadas ? api.pontoJornadas().catch(() => []) : []
+    ]);
+    const j = (jors || []).find(x => x.user_id === me.id);
+    if (!isWorkDay(j, day)) return false;
+    if (!face) {
+      let hinted = false;
+      try { hinted = sessionStorage.getItem(hintKey(me.id, day)) === "1"; } catch {}
+      if (!hinted) showCadastroHint();
+      return false;
+    }
+    const nxt = proximoTipo(regs, day);
+    if (nxt.done || !nxt.tipo) return false;
+    if (wasSkipped(me.id, day, nxt.tipo)) return false;
+
+    const mock = isMock();
+    const o = document.createElement("div");
+    o.id = "ponto-prompt";
+    o.className = "ponto-prompt-overlay noprint";
+    o.innerHTML = `<div class="ponto-prompt" role="dialog" aria-modal="true" aria-labelledby="ponto-prompt-title">
+      <h2 id="ponto-prompt-title">Bater ponto agora?</h2>
+      <p class="muted">O horário gravado é o do servidor, não o deste aparelho.</p>
+      ${mock ? mockPreview("Câmera", "Olhe para a câmera. Neste modo o reconhecimento é simulado.") : `<div class="ponto-cam"><video id="ppv" playsinline autoplay muted></video></div>`}
+      <p class="ponto-tipo-sug">Tipo agora: <b id="ptipo-lab">${esc(TLAB[nxt.tipo])}</b></p>
+      <p class="ponto-tipo-change"><label>Alterar tipo <select id="pptipo">${TIPOS.map(t => `<option value="${t.id}" ${t.id === nxt.tipo ? "selected" : ""}>${t.label}</option>`).join("")}</select></label></p>
+      <p id="ppmsg" class="muted" style="text-align:center;min-height:1.3em"></p>
+      <p class="ponto-prompt-actions">
+        <button type="button" class="btn ghost" id="ppular">Pular</button>
+        <button type="button" class="btn" id="pgo">Bater ponto</button>
+      </p>
+    </div>`;
+    document.body.appendChild(o);
+    const video = o.querySelector("#ppv");
+    if (video) startCam(video).catch(e => {
+      const m = o.querySelector("#ppmsg");
+      if (m) m.innerHTML = `<span class="ponto-bad">${esc("Câmera: " + (e.message || "sem permissão"))}</span>`;
+    });
+    const lab = o.querySelector("#ptipo-lab");
+    const sel = o.querySelector("#pptipo");
+    sel.onchange = () => { lab.textContent = TLAB[sel.value] || sel.value; };
+    o.querySelector("#ppular").onclick = () => { markSkipped(me.id, day, nxt.tipo); closePrompt(); };
+    o.querySelector("#pgo").onclick = async ev => {
+      ev.preventDefault();
+      const b = ev.currentTarget, tp = sel.value, msg = o.querySelector("#ppmsg");
+      b.disabled = true;
+      try {
+        let desc, blob;
+        if (mock) {
+          desc = (face && face.descriptor) || Array.from({ length: 128 }, (_, i) => (i + 1) * 0.001);
+          blob = null;
+        } else {
+          if (!video || !video.srcObject) throw new Error("Câmera indisponível");
+          const g = await grab(video);
+          blob = g.blob;
+          desc = await describe(g.canvas);
+        }
+        const gpos = await geo();
+        const path = await maybeUpload((me.id || "eu") + "/prompt", blob);
+        const r = await api.registrarPonto(tp, desc, path, navigator.userAgent, gpos.lat, gpos.lng);
+        if (r && r.ok === false) {
+          msg.innerHTML = `<span class="ponto-bad">${esc(r.motivo || "Rosto não confere. O ponto não foi registrado.")}</span>`;
+          toast(r.motivo || "Rosto não confere. O ponto não foi registrado.");
+        } else {
+          msg.innerHTML = `<span class="ponto-ok">Ponto registrado: ${esc(TLAB[tp])} ✓</span>`;
+          toast("Ponto registrado ✓");
+          setTimeout(closePrompt, 700);
+        }
+      } catch (e) { rpcToast(e.message); }
+      finally { b.disabled = false; }
+    };
+    return true;
+  }
+
   window.BAGDA_PONTO = {
     view: (deps) => { ({ $, app, me, api, toast, esc, today } = deps); return view(); },
+    maybePrompt,
     consentimento: CONSENT,
     tipos: TIPOS,
     nextTipo,
+    proximoTipo,
+    isWorkDay,
+    skipKey,
     dayStats,
     jornadaOf,
     fmtHM
