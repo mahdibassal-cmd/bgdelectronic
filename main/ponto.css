@@ -27,3 +27,16 @@
   .espelho-a4{max-width:none;padding:0;border:0}
   @page{size:A4;margin:12mm}
 }
+
+.ponto-prompt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}
+.ponto-prompt{background:#fff;color:#111;border-radius:16px;max-width:440px;width:100%;padding:20px 22px 18px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.ponto-prompt h2{margin:0 0 6px;font-size:1.35em}
+.ponto-prompt .ponto-cam{max-width:100%;margin:10px auto}
+.ponto-tipo-sug{text-align:center;font-size:1.12em;margin:10px 0 4px}
+.ponto-tipo-sug b{font-size:1.2em}
+.ponto-tipo-change{text-align:center;font-size:.9em;margin:0 0 8px;color:#444}
+.ponto-tipo-change label{display:inline-flex;gap:8px;align-items:center}
+.ponto-tipo-change select{width:auto;margin:0}
+.ponto-prompt-actions{display:flex;gap:10px;justify-content:center;margin:12px 0 0}
+.ponto-hint{background:#fff7ed;border-bottom:1px solid #fdba74;color:#111;padding:8px 14px;font-size:.95em;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.ponto-hint .link{background:none;border:0;padding:0;color:#9a3412;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
