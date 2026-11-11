@@ -38,10 +38,10 @@ const app = $("#app");
 const banner = (ok, html) => { document.querySelectorAll(".nb").forEach(x => x.remove()); const d = document.createElement("div"); d.className = "nb noprint"; d.setAttribute("role", ok ? "status" : "alert"); d.style.cssText = `background:${ok ? "#15803d" : "#b91c1c"};color:#fff;padding:18px 20px;border-radius:12px;margin:0 0 14px;font-size:1.35em;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.25)`; d.innerHTML = html; app.prepend(d); d.scrollIntoView({ block: "start" }); return d; };
 const nidOk = n => Number.isInteger(+n) && +n > 0 && n !== null && n !== "";
 let notaSaving = false;
-const confirmNota = (items, total, pag, frete = 0, caxinha = 0) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+const confirmNota = (items, total, pag, frete = 0, caxinha = 0, prazoTxt = "") => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal noprint"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
   o.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;color:#111;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.35)"><h2 style="margin:0 0 12px">Confirmar nota</h2>
   <table style="width:100%;border-collapse:collapse;font-size:1.05em"><tr><th style="text-align:left">Item</th><th style="text-align:right">Qtd</th><th style="text-align:right">Total</th></tr>${items.map(x => `<tr><td style="padding:6px 0;border-top:1px solid #eee">${esc(x.nome)}${x.origem && globalThis.BAGDA_VENDA_ORIGEM ? " · " + esc(globalThis.BAGDA_VENDA_ORIGEM.origemLabel(x.origem)) : ""}</td><td style="text-align:right;border-top:1px solid #eee">${x.qtd}</td><td style="text-align:right;border-top:1px solid #eee">${brl(x.qtd * x.preco_vendido)}</td></tr>`).join("")}${frete > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Frete</b> (motoboy)</td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(frete)}</td></tr>` : ""}${caxinha > 0 ? `<tr><td style="padding:6px 0;border-top:1px solid #eee"><b>Caxinha d Natal</b></td><td style="text-align:right;border-top:1px solid #eee">—</td><td style="text-align:right;border-top:1px solid #eee">${brl(caxinha)}</td></tr>` : ""}</table>
-  <p style="font-size:1.4em;margin:14px 0 6px"><b>TOTAL: ${brl(total)}</b></p><p style="font-size:1.1em;margin:0 0 18px">Pagamento: <b>${pag}</b></p>
+  <p style="font-size:1.4em;margin:14px 0 6px"><b>TOTAL: ${brl(total)}</b></p><p style="font-size:1.1em;margin:0 0 18px">Pagamento: <b>${pag}</b>${prazoTxt ? `<br>Paga em: <b>${prazoTxt}</b>` : ""}</p>
   <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn ghost" id="nmv">Voltar</button><button type="button" class="btn gold" id="nmc">Confirmar e salvar</button></div></div>`;
   const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
   document.body.append(o); o.querySelector("#nmv").onclick = () => done(false); o.querySelector("#nmc").onclick = () => done(true); document.addEventListener("keydown", k); o.querySelector("#nmc").focus(); });
@@ -81,7 +81,7 @@ const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.rou
     "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
     ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
     rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(legado ? 0 : tot)), ...(legado ? [rcDot("DIVIDA ANTERIOR", rnum(fr || tot))] : [...(fr > 0 ? [rcDot("FRETE", rnum(fr))] : []), ...(cx > 0 ? [rcDot("CAXINHA D NATAL", rnum(cx))] : [])]), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(legado ? (fr || tot) : tot + fr + cx)), D,
-    ...pays.map(p => rcWrap("Pago: " + p)), ...(h.local_pagamento ? [rcWrap("Local pagto: " + h.local_pagamento)] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
+    ...pays.map(p => rcWrap("Pago: " + p)), ...(h.prazo_dias ? [rcWrap("Paga em: " + h.prazo_dias + (Number(h.prazo_dias) === 1 ? " dia" : " dias") + (h.vencimento ? " (vence " + String(h.vencimento).slice(0, 10).split("-").reverse().join("/") + ")" : ""))] : []), ...(h.local_pagamento ? [rcWrap("Local pagto: " + h.local_pagamento)] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -168,15 +168,19 @@ if (!MOCK && !CONFIGURED) {
     async repSeller(d) { return ok(await sb.from("v_report_seller").select("*").eq("data", d)); },
     async repPay(d) { return ok(await sb.from("v_report_payment").select("*").eq("data", d)); },
     async repProfit(d) { return ok(await sb.from("v_report_profit").select("*").eq("data", d)); },
-    async criarNota(items, pagamentos, cliente, clienteId, local, obs, frete, caxinha) { const a = { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null }, f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caxinha || 0) * 100) / 100;
+    async criarNota(items, pagamentos, cliente, clienteId, local, obs, frete, caxinha, prazoDias) { const a = { p_items: items, p_pagamentos: pagamentos, p_cliente: cliente || null, p_cliente_id: clienteId || null, p_local: local || null, p_obs: obs || null }, f = Math.round((+frete || 0) * 100) / 100, c = Math.round((+caxinha || 0) * 100) / 100;
+      const dias = prazoDias == null || prazoDias === "" ? null : +prazoDias;
+      if (dias != null) a.p_prazo_dias = dias;
       const rpcLocal = async args => { const r = await sb.rpc("criar_nota_local", args); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
         if (r.error && a.p_local === "CAIXA ESPECIAL" && /Escolha o Local do pagamento|notas_local_pag|23514/.test(em)) throw new Error("Caixa Especial na nota ainda depende da atualização do banco (supabase-loja/migration-nota-caixa-especial.sql). Nada foi salvo.");
+        if (r.error && dias != null && /PGRST202|42883|p_prazo_dias|schema cache|does not exist/i.test(em)) throw new Error("Prazo de Paga Depois ainda depende da atualização do banco (supabase-loja/migration-prazo-vencimento.sql). Nada foi salvo.");
         return r; };
-      if (!(f > 0) && !(c > 0)) return ok(await rpcLocal(a)); /* sem frete/caxinha: chamada antiga */
-      const extra = { ...a, p_frete: f, ...(c > 0 ? { p_caxinha_natal: c } : {}) };
+      if (!(f > 0) && !(c > 0) && dias == null) return ok(await rpcLocal(a)); /* chamada antiga, sem extras */
+      const extra = { ...a, ...(f > 0 ? { p_frete: f } : {}), ...(c > 0 ? { p_caxinha_natal: c } : {}) };
       const r = await rpcLocal(extra); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
       if (r.error && c > 0 && /PGRST202|42883|p_caxinha/.test(em)) throw new Error("Caxinha d Natal depende de atualização do banco — avise o admin.");
       if (r.error && f > 0 && /PGRST202|42883|p_frete/.test(em)) throw new Error("Frete depende de atualização do banco — avise o admin.");
+      if (r.error && dias != null && /PGRST202|42883|p_prazo_dias|schema cache|does not exist/i.test(em)) throw new Error("Prazo de Paga Depois ainda depende da atualização do banco (supabase-loja/migration-prazo-vencimento.sql). Nada foi salvo.");
       return ok(r); },
     async freteDia(d) { const r = await sb.rpc("frete_dia", { p_data: d }); return r.error ? null : r.data; },
     async caxinhaDia(d) { const r = await sb.rpc("caxinha_dia", { p_data: d }); return r.error ? null : r.data; },
@@ -191,7 +195,7 @@ if (!MOCK && !CONFIGURED) {
     async dispensarNota(nid, m) { const r = await sb.rpc("dispensar_nota", { p_nota: nid, p_motivo: m || null }); if (r.error && /PGRST202|42883|dispensar_nota/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("'Não lançar' ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
     async desfazerDispensa(nid) { return ok(await sb.rpc("desfazer_dispensa_nota", { p_nota: nid })); },
     async lancarNotaCG(nid) { const r = await sb.rpc("lancar_nota_caixa_geral", { p_nota: nid }); if (r.error && /PGRST202|42883|lancar_nota_caixa_geral/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Caixa Geral (débito do cliente) ainda depende de uma atualização do banco — avise o admin."); return ok(r); },
-    async notasInfo(ids) { if (!ids.length) return []; let r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete,caxinha_natal").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
+    async notasInfo(ids) { if (!ids.length) return []; let r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete,caxinha_natal,prazo_dias,vencimento").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete,caxinha_natal").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento,frete").in("id", ids); if (r.error) r = await sb.from("notas").select("id,local_pagamento,obs_pagamento").in("id", ids); return r.error ? [] : r.data; },
     async fretesDia(d) { const r = await sb.from("notas").select("id,frete").eq("data", d).gt("frete", 0).limit(5000); return r.error ? [] : r.data; },
     async caxinhasDia(d) { const r = await sb.from("notas").select("id,caxinha_natal").eq("data", d).gt("caxinha_natal", 0).limit(5000); return r.error ? [] : r.data; },
     async creditos() { return ok(await sb.from("v_cliente_credito").select("*").order("nome")); },
@@ -209,8 +213,9 @@ if (!MOCK && !CONFIGURED) {
       return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); }
       catch (e) { limpo(e); } },
     async clienteExtrato(id) { const r = await sb.rpc("cliente_extrato", { p_cliente: id }); if (r.error && /PGRST202|42883|cliente_extrato/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Extrato do cliente depende de atualização do banco — avise o admin (supabase-loja/migration-cliente-extrato.sql)."); return ok(r); },
-    async clientes() { const L = ok(await sb.from("v_clientes_saldo").select("*").order("nome")); const A = await sb.from("clientes").select("id,atendimento").limit(5000);
-      if (!A.error && A.data) { const m = Object.fromEntries(A.data.map(x => [x.id, x.atendimento])); L.forEach(c => { if (c.atendimento == null) c.atendimento = m[c.id] ?? null; }); } return L; },
+    async clientes() { const L = ok(await sb.from("v_clientes_saldo").select("*").order("nome")); let extra = await sb.from("clientes").select("id,atendimento,limite_prazo").limit(5000);
+      if (extra.error) extra = await sb.from("clientes").select("id,atendimento").limit(5000);
+      if (!extra.error && extra.data) { const m = Object.fromEntries(extra.data.map(x => [x.id, x])); L.forEach(c => { const e = m[c.id] || {}; if (c.atendimento == null) c.atendimento = e.atendimento ?? null; if (c.limite_prazo == null && e.limite_prazo != null) c.limite_prazo = e.limite_prazo; }); } return L; },
     async salvarCliente(id, c) { const CN = globalThis.BAGDA_CLIENTE_NOME; if (CN && c && (c.nome || c.doc || c.telefone)) { const dup = await localizarClienteDuplicado(c, id); if (dup) throw new Error(CN.mensagem(dup)); }
       try { ok(await sb.from("clientes").update(c).eq("id", id)); } catch (e) { throw new Error(CN ? CN.limparErro(e.message) : e.message); } },
     async fornecedores() { return ok(await sb.from("fornecedores").select("*").order("nome")); },
@@ -220,6 +225,9 @@ if (!MOCK && !CONFIGURED) {
     async pagarConta(id, v, cx, forma, data) { return ok(await sb.rpc("pagar_conta", { p_conta: id, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null })); },
     async contaPagamentos() { return ok(await sb.from("conta_pagamentos").select("*").order("id", { ascending: false }).limit(100)); },
     async recebimentos() { return ok(await sb.from("v_recebimentos").select("*").order("id", { ascending: false }).limit(100)); },
+    async cobrancaAlertas() { const r = await sb.rpc("cobranca_alertas"); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|cobranca_alertas|schema cache|does not exist/i.test(em)) return { hoje: today(), clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_limite: 0, pendente_sql: true };
+      return ok(r); },
     async estornarRecebimento(rid, m) { return ok(await sb.rpc("estornar_recebimento", { p_rec: rid, p_motivo: m })); },
     async estornarCredito(kid, m) { return ok(await sb.rpc("estornar_credito", { p_id: kid, p_motivo: m })); },
     async cxEsp() { return ok(await sb.from("v_caixa_especial").select("*").order("id", { ascending: false }).limit(300)); },
@@ -320,7 +328,7 @@ if (!MOCK && !CONFIGURED) {
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
-  const mkNota = (items, pags, cliente, user, at, clienteId, local, obs, frete = 0, caxinha = 0) => { frete = Math.round((+frete || 0) * 100) / 100; caxinha = Math.round((+caxinha || 0) * 100) / 100; if (frete < 0) throw new Error("Frete inválido"); if (caxinha < 0) throw new Error("Caxinha d Natal inválido"); if (!items.length && !(frete > 0) && !(caxinha > 0)) throw new Error("Nota sem itens");
+  const mkNota = (items, pags, cliente, user, at, clienteId, local, obs, frete = 0, caxinha = 0, prazoDias = null) => { frete = Math.round((+frete || 0) * 100) / 100; caxinha = Math.round((+caxinha || 0) * 100) / 100; if (frete < 0) throw new Error("Frete inválido"); if (caxinha < 0) throw new Error("Caxinha d Natal inválido"); if (!items.length && !(frete > 0) && !(caxinha > 0)) throw new Error("Nota sem itens");
     if (pags.some(g => g.metodo === "prazo") && !clienteId) throw new Error("Paga Depois exige cliente cadastrado");
     if (clienteId) cliente = (CL.find(c => c.id === clienteId) || {}).nome || cliente;
     const tot = items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + frete + caxinha, pt = pags.reduce((a, x) => a + Number(x.valor), 0);
@@ -335,7 +343,12 @@ if (!MOCK && !CONFIGURED) {
       if (origem === "especial") { const d = DE.find(x => x.sku === it.sku); const antes = d.qtd; d.qtd -= it.qtd; custo = d.custo; DEM.unshift({ id: id++, sku: it.sku, tipo: "venda", qtd: -it.qtd, qtd_antes: antes, qtd_depois: d.qtd, custo_unit: d.custo, motivo: "Venda nota " + nid, created_at: ts }); }
       else p.estoque -= it.qtd;
       IT.push({ nota_id: nid, sku: p.sku, marca: p.marca, produto: p.produto, tamanho: p.tamanho, qtd: it.qtd, preco_vendido: it.preco_vendido, total: it.qtd * it.preco_vendido, custo, origem }); }
-    N.push({ frete, caxinha_natal: caxinha, local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+") });
+    const dataSp = new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    const temPrazo = pags.some(g => g.metodo === "prazo");
+    const dias = temPrazo && prazoDias != null && prazoDias !== "" ? +prazoDias : null;
+    if (temPrazo && prazoDias != null && prazoDias !== "" && (!(dias >= 1 && dias <= 30))) throw new Error("Informe o prazo (1 a 30 dias) para Paga Depois");
+    const venc = dias ? (globalThis.BAGDA_PRAZO ? BAGDA_PRAZO.addDays(dataSp, dias) : dataSp) : null;
+    N.push({ frete, caxinha_natal: caxinha, local_pagamento: local || null, obs_pagamento: obs || null, cliente_id: clienteId || null, nota_id: nid, data: dataSp, created_at: ts, cliente: cliente || null, status: "ativa", total: tot, handle: user.handle, nome: user.nome, pagamento: pags.map(x => x.metodo).join("+"), prazo_dias: dias, vencimento: venc });
     for (const g of pags) PG.push({ nota_id: nid, metodo: g.metodo, valor: Number(g.valor) }); /* pendente: o financeiro lança no caixa */
     return nid; };
   const devolverItem = i => { if (i.origem === "especial") { let d = DE.find(x => x.sku === i.sku); if (!d) DE.push(d = { sku: i.sku, qtd: 0, custo: i.custo || 0 }); d.qtd += i.qtd; } else { const p = P.find(x => x.sku === i.sku); if (p) p.estoque += i.qtd; } };
@@ -357,6 +370,25 @@ if (!MOCK && !CONFIGURED) {
     N.filter(n => n.nota_id !== 3).forEach(n => PG.filter(g => g.nota_id === n.nota_id && !["prazo", "credito"].includes(g.metodo)).forEach(g => mov(CX.find(c => c.metodo === g.metodo).caixa_id, "venda", g.valor, "Nota " + String(n.nota_id).padStart(6, "0"), n.nota_id, meU, n.created_at)));
     FO.push({ id: 1, nome: "Distribuidora Tech SP", cnpj: "11222333000181", contato: "Ana", telefone: "(11) 3333-0000", email: "vendas@tech.com", obs: "", ativo: true });
     CP.push({ id: 1, fornecedor_id: 1, valor: 3200, vencimento: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), descricao: "Lote fones JBL" }, { id: 2, fornecedor_id: 1, valor: 450, vencimento: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), descricao: "Frete" });
+    const PZ = globalThis.BAGDA_PRAZO, hj = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    const dAdd = (n) => PZ ? PZ.addDays(hj, n) : hj;
+    const seedPrazo = (cli, nome, valor, venc, data, alloc, dias) => {
+      const nid = id++;
+      N.push({ frete: 0, caxinha_natal: 0, local_pagamento: null, obs_pagamento: null, cliente_id: cli, nota_id: nid, data: data || venc || hj, created_at: (data || hj) + "T12:00:00-03:00", cliente: nome, status: "ativa", total: valor, handle: "@kaio", nome: "Kaio", pagamento: "prazo", prazo_dias: dias == null ? null : dias, vencimento: venc || null });
+      PG.push({ nota_id: nid, metodo: "prazo", valor });
+      if (alloc > 0) { const rid = id++; RC.unshift({ id: rid, cliente_id: cli, valor: alloc, caixa_id: 1, forma: "pix", data: hj, obs: "quitação demo" }); AL.push({ nota_id: nid, valor: alloc, rec: rid }); }
+      return nid;
+    };
+    const cMaria = CL.find(c => c.id === 1); if (cMaria) cMaria.limite_prazo = 500;
+    CL.push({ id: 4, nome: "Carlos Mendes", doc: null, telefone: "(11) 97777-3333", email: "", endereco: "", obs: "", ativo: true, limite_prazo: null },
+            { id: 5, nome: "Rita Alves", doc: null, telefone: "(11) 96666-4444", email: "", endereco: "", obs: "", ativo: true, limite_prazo: null },
+            { id: 6, nome: "Sofia Prado", doc: null, telefone: "(11) 95555-5555", email: "", endereco: "", obs: "", ativo: true, limite_prazo: 1000 },
+            { id: 7, nome: "Pedro Pago", doc: null, telefone: "(11) 94444-6666", email: "", endereco: "", obs: "", ativo: true, limite_prazo: null });
+    seedPrazo(4, "Carlos Mendes", 650, dAdd(-5), dAdd(-12), 0, 7);
+    seedPrazo(5, "Rita Alves", 280, dAdd(2), hj, 0, 2);
+    seedPrazo(2, "João Lima", 420, hj, dAdd(-1), 0, 1);
+    seedPrazo(6, "Sofia Prado", 1500, dAdd(15), hj, 0, 15);
+    seedPrazo(7, "Pedro Pago", 400, dAdd(-10), dAdd(-17), 400, 7);
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2)); mov(1, "entrada", 150, "Recebimento cliente Maria Souza", null, U[0], H(1)); MV[MV.length - 1].cliente = "Maria Souza"; mov(3, "entrada", 28600, "DANIEL IPHONE DUO", null, U.find(u => /pamela/i.test(u.handle || "")) || U[0], H(0.2)); MV[MV.length - 1].forma = "cartao";
   });
   const vec = (seed) => Array.from({ length: 128 }, (_, i) => Number(((i + 1) * 0.001 + seed).toFixed(6)));
@@ -430,7 +462,7 @@ if (!MOCK && !CONFIGURED) {
     async clientePorNome(nome) { const CN = globalThis.BAGDA_CLIENTE_NOME; return CN ? CN.findNome(CL, nome) : null; },
     async criarCliente(c) { if (role === "financeiro" && false) return; if (!c.nome || c.nome.trim().length < 2) throw new Error("Informe o nome do cliente"); const d = dig(c.doc) || null; if (d && !docOk(d)) throw new Error("CPF/CNPJ inválido"); const ex = d && CL.find(x => x.doc === d); if (ex) return ex.id;
       const dupN = globalThis.BAGDA_CLIENTE_NOME && BAGDA_CLIENTE_NOME.duplicata(CL, c, null); if (dupN) throw new Error(BAGDA_CLIENTE_NOME.mensagem(dupN));
-      const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", atendimento: c.atendimento || null, ativo: true }; CL.push(nc); return nc.id; },
+      const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", atendimento: c.atendimento || null, limite_prazo: c.limite_prazo == null || c.limite_prazo === "" ? null : Number(c.limite_prazo), ativo: true }; CL.push(nc); return nc.id; },
     async clientes() { await ready; needFin(); return CL.map(c => ({ ...c, total_fiado: fiado(c.id), total_recebido: recebido(c.id), saldo: fiado(c.id) - recebido(c.id) })); },
     async clienteExtrato(cid) { await ready; needFin(); const c = CL.find(x => x.id === cid); if (!c) throw new Error("Cliente não encontrado");
       const notas = N.filter(n => n.cliente_id === cid).map(n => { const itens = IT.filter(i => i.nota_id === n.nota_id).map(({ sku, marca, produto, tamanho, qtd, preco_vendido, total }) => ({ sku, marca, produto, tamanho, qtd, preco_vendido, total })); const pags = PG.filter(g => g.nota_id === n.nota_id).map(g => ({ metodo: g.metodo, valor: g.valor })); const prazo = pags.filter(g => g.metodo === "prazo").reduce((a, g) => a + g.valor, 0); const legado = String(n.obs_pagamento || "").startsWith("DÍVIDA ANTERIOR");
@@ -448,6 +480,14 @@ if (!MOCK && !CONFIGURED) {
     async pagarConta(kid, v, cx, forma, data) { needFin(); const k = CP.find(x => x.id === kid); if (pago(kid) + v > k.valor + 0.001) throw new Error("Pagamento maior que o saldo da conta"); CPG.unshift({ id: id++, conta_id: kid, valor: v, caixa_id: cx, forma, data: data || today() }); mov(cx, "saida", v, `Pagamento fornecedor ${(FO.find(f => f.id === k.fornecedor_id) || {}).nome} — conta ${kid}`, null, meU); },
     async contaPagamentos() { needFin(); return CPG; },
     async recebimentos() { needFin(); return RC.map(r => ({ ...r, cliente: CL.find(c => c.id === r.cliente_id).nome, caixa: r.cxesp ? "CAIXA SPECIAL" : r.caixa_id ? CX.find(c => c.caixa_id === r.caixa_id).nome : "Caixa Geral (crédito)", handle: meU.handle })); },
+    async cobrancaAlertas() { await ready; needFin(); const PZ = globalThis.BAGDA_PRAZO; const hj = today();
+      const notas = N.filter(n => n.status === "ativa" && n.cliente_id).map(n => {
+        const prazo = PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0);
+        const pago = AL.filter(x => x.nota_id === n.nota_id).reduce((a, x) => a + x.valor, 0);
+        const c = CL.find(x => x.id === n.cliente_id) || {};
+        return { nota_id: n.nota_id, cliente_id: n.cliente_id, nome: c.nome || n.cliente, em_aberto: Math.round((prazo - pago) * 100) / 100, vencimento: n.vencimento || null, prazo_dias: n.prazo_dias == null ? null : n.prazo_dias };
+      });
+      return PZ ? PZ.montar({ hoje: hj, notas, clientes: CL }) : { hoje: hj, clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_limite: 0 }; },
     async estornarRecebimento(rid, m) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar"); const r = RC.find(x => x.id === rid); if (!r) return { ja_estornado: true };
       const nm = CL.find(c => c.id === r.cliente_id).nome; if (r.cxesp) { if (CXE.some(y => y.estorno_de === r.cxesp)) return { ja_estornado: true }; const ent = CXE.find(y => y.id === r.cxesp), kex = r.excedente ? CR.find(x => x.id === r.excedente) : null; if (kex && kex.valor > crSaldo(r.cliente_id) + 0.001) throw new Error("Crédito do excedente já foi usado"); CXE.push({ id: id++, tipo: "saida", valor: ent ? ent.valor : r.valor, motivo: `Estorno recebimento #${rid} ${nm}: ${m}`, estorno_de: r.cxesp, created_at: new Date().toISOString() }); if (kex) CR.push({ id: id++, cliente_id: r.cliente_id, tipo: "uso", valor: kex.valor, obs: `Estorno excedente recebimento #${rid}: ${m}`, estorno_de: r.excedente, handle: meU.handle, created_at: new Date().toISOString() }); }
       else if (r.forma === "credito") { const u = CR.find(k => k.recebimento_id === rid && k.tipo === "uso"); CR.push({ id: id++, cliente_id: r.cliente_id, tipo: "entrada", valor: r.valor, obs: `Estorno recebimento #${rid}: ${m}`, nota_id: null, estorno_de: u ? u.id : null, handle: meU.handle, created_at: new Date().toISOString() }); }
@@ -492,12 +532,13 @@ if (!MOCK && !CONFIGURED) {
       mm.notas = al.join(", "); },
     async receberCxesp(cli, v0, forma, data, obs, chave) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!chave || String(chave).length < 8) throw new Error("Informe a chave do recebimento"); if (!["dinheiro", "pix", "cartao", "transferencia"].includes(forma)) throw new Error("Forma de pagamento inválida"); const sig = chave + "|" + cli + "|" + v0 + "|" + forma; if (RC._cx && RC._cx[sig]) return { ...RC._cx[sig], idempotente: true }; const sd = Math.max(fiado(cli) - recebido(cli), 0), v = Math.min(v0, sd), ex = Math.round((v0 - v) * 100) / 100, antes = MV.length; const mid = id++; CXE.push({ id: mid, tipo: "entrada", valor: v0, motivo: "Recebimento cliente " + CL.find(c => c.id === cli).nome, created_at: new Date().toISOString() }); let rid = null, cred = null; if (v > 0) { rid = id++; RC.unshift({ id: rid, cliente_id: cli, valor: v, caixa_id: null, cxesp: mid, forma, data: data || today(), obs }); let rest = v; for (const n of N.filter(x => x.cliente_id === cli && x.status === "ativa").sort((a, b) => a.nota_id - b.nota_id)) { if (rest <= 0) break; const open = PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0) - AL.filter(x => x.nota_id === n.nota_id).reduce((a, x) => a + x.valor, 0); if (open <= 0) continue; const a = Math.min(open, rest); AL.push({ nota_id: n.nota_id, valor: a, rec: rid }); rest -= a; } } if (ex > 0) { cred = id++; CR.push({ id: cred, cliente_id: cli, tipo: "entrada", valor: ex, obs: v > 0 ? "Excedente pagamento" : "Excedente pagamento (sem dívida em aberto)", nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); if (rid) RC[0].excedente = cred; } if (MV.length !== antes) throw new Error("CAIXA SPECIAL não entra nos caixas do dia"); const res = { recebimento_id: rid, quitado: v, credito: ex, cxesp_id: mid, destino: "cxesp", idempotente: false }; RC._cx = RC._cx || {}; RC._cx[sig] = res; return res; },
     async caixasLista() { needCx(); return CX; },
-    async criarNota(items, pags, cliente, clienteId, local, obs, frete = 0, caxinha = 0) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); const locaisOk = LOCAIS.concat(meU.role === "admin" ? ["CAIXA ESPECIAL"] : []); if (local ? !locaisOk.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
+    async criarNota(items, pags, cliente, clienteId, local, obs, frete = 0, caxinha = 0, prazoDias = null) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); const locaisOk = LOCAIS.concat(meU.role === "admin" ? ["CAIXA ESPECIAL"] : []); if (local ? !locaisOk.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
+      if (pags.some(g => g.metodo === "prazo") && (prazoDias == null || prazoDias === "" || !(+prazoDias >= 1 && +prazoDias <= 30))) throw new Error("Informe o prazo (1 a 30 dias) para Paga Depois");
       if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + (+frete || 0) + (+caxinha || 0)) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
-        const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs, frete, caxinha); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
-      if (local === "CAIXA ESPECIAL") { if (meU.role !== "admin") throw new Error("Somente admin"); const pago = Math.round(pags.filter(g => g.metodo !== "prazo" && g.metodo !== "credito").reduce((a, g) => a + Number(g.valor), 0) * 100) / 100; if (!(pago > 0)) throw new Error("Nota sem valor para a Caixa Especial"); const antes = MV.length; const nid = mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha); if (MV.length !== antes) throw new Error("CAIXA ESPECIAL não entra nos caixas do dia"); const mid = id++; CXE.push({ id: mid, tipo: "entrada", valor: pago, motivo: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, created_at: new Date().toISOString() }); const n = N.find(x => x.nota_id === nid); n.cxesp_mov = mid; n.caixa_lancada_id = null; n.lancada_em = n.created_at; return nid; }
+        const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs, frete, caxinha, null); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
+      if (local === "CAIXA ESPECIAL") { if (meU.role !== "admin") throw new Error("Somente admin"); const pago = Math.round(pags.filter(g => g.metodo !== "prazo" && g.metodo !== "credito").reduce((a, g) => a + Number(g.valor), 0) * 100) / 100; if (!(pago > 0)) throw new Error("Nota sem valor para a Caixa Especial"); const antes = MV.length; const nid = mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha, prazoDias); if (MV.length !== antes) throw new Error("CAIXA ESPECIAL não entra nos caixas do dia"); const mid = id++; CXE.push({ id: mid, tipo: "entrada", valor: pago, motivo: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, created_at: new Date().toISOString() }); const n = N.find(x => x.nota_id === nid); n.cxesp_mov = mid; n.caixa_lancada_id = null; n.lancada_em = n.created_at; return nid; }
       if (+caxinha > 0 && qs.has("nocaxinha")) throw new Error("Caxinha d Natal depende de atualização do banco — avise o admin.");
-      if (+frete > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin."); return mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha); },
+      if (+frete > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin."); return mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha, prazoDias); },
     async freteDia(d) { if (role !== "admin" && role !== "financeiro") return null; const L = N.filter(n => n.data === d && n.status === "ativa" && !String(n.obs_pagamento || "").startsWith("DÍVIDA ANTERIOR")); return { data: d, frete: L.reduce((a, n) => a + (n.frete || 0), 0), notas: L.filter(n => n.frete > 0).length }; },
     async caxinhaDia(d) { if (role !== "admin" && role !== "financeiro") return null; const L = N.filter(n => n.data === d && n.status === "ativa"); return { data: d, caxinha: L.reduce((a, n) => a + (n.caxinha_natal || 0), 0), notas: L.filter(n => n.caxinha_natal > 0).length }; },
     async notaHead(nid) { return vis().filter(x => x.nota_id === nid); },
@@ -518,7 +559,7 @@ if (!MOCK && !CONFIGURED) {
     async dispensarNota(nid, m) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada"); if (n.dispensada_em) return { mudou: false }; Object.assign(n, { dispensada_em: new Date().toISOString(), dispensa_motivo: m || null, dispensada_por: meU.handle }); SE.push({ kind: "nota_dispensada", detail: { nota_id: nid, motivo: m } }); return { mudou: true }; },
     async desfazerDispensa(nid) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n.dispensada_em) return { mudou: false }; Object.assign(n, { dispensada_em: null, dispensa_motivo: null, dispensada_por: null }); SE.push({ kind: "nota_dispensa_desfeita", detail: { nota_id: nid } }); return { mudou: true }; },
     async lancarNotaCG(nid) { needFin(); const n = N.find(x => x.nota_id === nid); if (!n || n.status !== "ativa") throw new Error("Nota cancelada não pode ser lançada"); if (!n.cliente_id) throw new Error("Nota sem cliente cadastrado — não dá para lançar como débito"); const v = PG.filter(g => g.nota_id === nid && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0); if (!(v > 0)) throw new Error("Nota sem parte Paga Depois"); if (n.prazo_lancada_em) return { mudou: false, valor: v }; n.prazo_lancada_em = new Date().toISOString(); SE.push({ kind: "nota_prazo_lancada", detail: { nota_id: nid, cliente_id: n.cliente_id, valor: v } }); return { mudou: true, valor: v }; },
-    async notasInfo(ids) { return N.filter(n => ids.includes(n.nota_id)).map(n => ({ id: n.nota_id, local_pagamento: n.local_pagamento, obs_pagamento: n.obs_pagamento, frete: n.frete || 0, caxinha_natal: n.caxinha_natal || 0 })); },
+    async notasInfo(ids) { return N.filter(n => ids.includes(n.nota_id)).map(n => ({ id: n.nota_id, local_pagamento: n.local_pagamento, obs_pagamento: n.obs_pagamento, frete: n.frete || 0, caxinha_natal: n.caxinha_natal || 0, prazo_dias: n.prazo_dias == null ? null : n.prazo_dias, vencimento: n.vencimento || null })); },
     async creditos() { await ready; needFin(); return [...new Set(CR.map(k => k.cliente_id))].map(cid => { const c = CL.find(x => x.id === cid), L = CR.filter(k => k.cliente_id === cid && crOk(k)); return { cliente_id: cid, nome: c.nome, telefone: c.telefone, doc: c.doc, total_entradas: L.filter(k => k.tipo === "entrada").reduce((a, k) => a + k.valor, 0), total_usos: L.filter(k => k.tipo === "uso").reduce((a, k) => a + k.valor, 0), saldo: crSaldo(cid), ultimo_mov: L.length ? L[L.length - 1].created_at : null }; }).sort((a, b) => a.nome.localeCompare(b.nome)); },
     async creditoMov(cid) { needFin(); return CR.filter(k => !cid || k.cliente_id === cid).map(k => ({ ...k, cliente: CL.find(c => c.id === k.cliente_id).nome, nota_status: k.nota_id ? (N.find(n => n.nota_id === k.nota_id) || {}).status : null, estornado: CR.some(x => x.estorno_de === k.id) })).reverse(); },
     async lancarCredito(cid, tipo, v, obs) { needFin(); if (!(v > 0)) throw new Error("Informe um valor maior que zero"); if (tipo === "uso" && v > crSaldo(cid) + 0.001) throw new Error(`Valor maior que o crédito do cliente (${brl(crSaldo(cid))})`); CR.push({ id: id++, cliente_id: cid, tipo, valor: v, obs: obs || null, nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); },
@@ -715,8 +756,10 @@ async function boot() {
   if (window.BGDSwitch) BGDSwitch.mount(me, MOCK ? "mb@demo.local" : await api.email().catch(() => ""));
   document.querySelectorAll("nav button[data-p]").forEach(b => b.hidden = !can(b.dataset.p));
   document.querySelectorAll("nav .navg").forEach(g => { const bs = [...g.querySelectorAll("button")]; g.hidden = bs.length > 0 && bs.every(b => b.hidden); });
+  if (globalThis.BAGDA_PRAZO && BAGDA_PRAZO.installStyles) BAGDA_PRAZO.installStyles();
+  refreshCobrancaBadge();
   if (MOCK && qs.get("demo") === "resumo") { const L = await api.caixasLista(), px = L.find(x => x.metodo === "pix").caixa_id; await api.caixaAbrir(px, 0).catch(() => {}); await api.receber(1, 500, px, "pix", null, "parcial"); return viewResumo(today(), px); }
-  if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1));
+  if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1, "DINHEIRO", null, 0, 0, 7));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
   go(location.hash.slice(1) || (can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca"));
   if (window.BAGDA_PONTO) {
@@ -724,6 +767,21 @@ async function boot() {
     if (qs.get("ponto_logout") === "1" && BAGDA_PONTO.maybePromptLogout) Promise.resolve(BAGDA_PONTO.maybePromptLogout(deps)).catch(() => {});
     else if (BAGDA_PONTO.maybePrompt) Promise.resolve(BAGDA_PONTO.maybePrompt(deps)).catch(() => {});
   }
+}
+async function refreshCobrancaBadge() {
+  const b = document.querySelector('nav button[data-v="receber"]');
+  if (!b) return;
+  let el = b.querySelector("#rec-badge");
+  if (!el) { el = document.createElement("span"); el.id = "rec-badge"; el.className = "nav-alert"; el.hidden = true; el.setAttribute("aria-label", "clientes para cobrança"); b.append(" ", el); }
+  if (!me || me.role === "vendedor" || me.role === "estoque" || !can("financas") || !api.cobrancaAlertas) { el.hidden = true; el.textContent = ""; return; }
+  try {
+    const x = await api.cobrancaAlertas();
+    const n = x && !x.pendente_sql ? Number(x.n_clientes || 0) : 0;
+    el.textContent = n ? String(n) : "";
+    el.hidden = !n;
+    if (n) el.title = n === 1 ? "1 cliente para cobrança" : n + " clientes para cobrança";
+    else el.removeAttribute("title");
+  } catch { el.hidden = true; el.textContent = ""; }
 }
 function navMark(v) {
   document.querySelectorAll("nav button[data-v]").forEach(b => {
@@ -1238,6 +1296,7 @@ async function viewNota() {
   <h3>Pagamento</h3><div id="pgs"></div><button class="btn ghost" id="addpg" type="button">+ Dividir pagamento</button> <span id="pgok" class="muted"></span>
   <div class="grid" id="lpbox"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.concat(me.role === "admin" ? ["CAIXA ESPECIAL"] : []).map(l => `<option>${l}</option>`).join("")}</select></div>
   <div><label>Observação (opcional)</label><input id="obp" maxlength="200" placeholder="Ex.: maquininha 2, pago pelo marido…"></div></div><p class="muted" id="lpinfo"></p>
+  <div id="prazobox" hidden><label for="pagaem">Paga em *</label><select id="pagaem">${(globalThis.BAGDA_PRAZO ? BAGDA_PRAZO.optionsHtml(7) : "")}</select><p class="muted" id="pagavenc"></p></div>
   <label>Nome do cliente (referência, sem cadastro)</label><input id="cref" maxlength="120" placeholder="Opcional — sai no cupom como Cliente:">
   <label>Cliente cadastrado (obrigatório para Paga Depois e Caixa Geral)</label><input id="cl" type="search" autocomplete="off" maxlength="120" placeholder="Buscar por nome, telefone ou CPF…">
   <ul id="csug" class="sug"></ul><div id="csel" class="muted"></div>
@@ -1291,7 +1350,17 @@ async function viewNota() {
     catch (e) { const msg = CN ? CN.limparErro(e.message) : e.message; const parsed = CN && CN.parseErro(msg); if (parsed) return escolher(parsed); toast(msg); } };
   let pgs = [{ metodo: "", valor: null }]; /* sem forma pré-escolhida: antes vinha PIX e uma nota refeita podia sair como PIX sem querer */
   const lpNeed = () => pgs.length === 1 ? !!pgs[0].metodo && pgs[0].metodo !== "prazo" : pgs.some(g => g.metodo && g.metodo !== "prazo" && +g.valor > 0);
-  const lpSync = () => { const n = lpNeed(); $("#lpbox").style.display = n ? "" : "none"; $("#lp").required = n; $("#lpinfo").hidden = !n; };
+  const prazoNeed = () => pgs.some(g => g.metodo === "prazo" && (pgs.length === 1 || +g.valor > 0));
+  const prazoSync = () => {
+    const n = prazoNeed(), box = $("#prazobox"), sel = $("#pagaem"), lab = $("#pagavenc");
+    if (!box) return;
+    box.hidden = !n; if (sel) sel.required = n;
+    if (n && sel && lab && globalThis.BAGDA_PRAZO) {
+      const dias = +sel.value || BAGDA_PRAZO.DEFAULT_DIAS, venc = BAGDA_PRAZO.addDays(today(), dias);
+      lab.innerHTML = `Vencimento: <b>${dBR(venc)}</b>. O prazo conta a partir de hoje (data da nota).`;
+    }
+  };
+  const lpSync = () => { const n = lpNeed(); $("#lpbox").style.display = n ? "" : "none"; $("#lp").required = n; $("#lpinfo").hidden = !n; prazoSync(); };
   function freN() { const v = Math.round(+String(($("#fre") || {}).value || "0").replace(",", ".") * 100) / 100; return v > 0 ? v : 0; }
   function cxN() { const v = Math.round(+String(($("#cxn") || {}).value || "0").replace(",", ".") * 100) / 100; return v > 0 ? v : 0; }
   function totalN() { return Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + freN() + cxN()) * 100) / 100; }
@@ -1305,6 +1374,7 @@ async function viewNota() {
     document.querySelectorAll(".pv2").forEach(x => x.onchange = () => { pgs[+x.dataset.i].valor = +x.value; drawPg(); });
     document.querySelectorAll(".rmpg").forEach(x => x.onclick = () => { pgs.splice(+x.dataset.i, 1); drawPg(); }); };
   $("#addpg").onclick = () => { if (pgs.length >= 3) return; const t = totalN(), soma = pgs.reduce((a, g) => a + (+g.valor || 0), 0); if (pgs.length === 1) pgs[0].valor = t; pgs.push({ metodo: PAY.map(x => x[0]).find(m => !pgs.some(g => g.metodo === m)) || "dinheiro", valor: Math.max(Math.round((t - soma) * 100) / 100, 0) || null }); drawPg(); };
+  if ($("#pagaem")) $("#pagaem").onchange = prazoSync;
   const draw0 = draw; draw = () => { draw0(); drawPg(); };
   $("#fre").oninput = () => draw(); if ($("#cxn")) $("#cxn").oninput = () => draw();
   $("#fin").onclick = async () => { const FR = freN(), CXV = cxN(); if (+String(($("#fre") || {}).value || "0").replace(",", ".") < 0) return toast("Frete inválido"); if (+String(($("#cxn") || {}).value || "0").replace(",", ".") < 0) return toast("Caxinha d Natal inválido"); if (!items.length && !(FR > 0) && !(CXV > 0)) return toast("Adicione pelo menos 1 item (ou informe Frete / Caxinha)"); if (items.some(x => !(+x.preco_vendido >= 0))) return toast("Há item com preço inválido — remova e adicione de novo");
@@ -1312,18 +1382,21 @@ async function viewNota() {
     if (P2.some(g => !g.metodo)) return toast("Escolha a forma de pagamento (PIX, Dinheiro, Cartão ou Paga Depois)");
     if (Math.round(P2.reduce((a, g) => a + g.valor, 0) * 100) !== Math.round(t * 100)) return toast("A soma dos pagamentos precisa ser igual ao total");
     if (P2.some(g => g.metodo === "prazo") && !cli) return toast("Paga Depois exige cliente — busque ou cadastre o cliente");
+    const prazoDias = P2.some(g => g.metodo === "prazo") ? +(($("#pagaem") || {}).value || 0) : null;
+    if (P2.some(g => g.metodo === "prazo") && !(prazoDias >= 1 && prazoDias <= 30)) { toast("Informe em quantos dias o cliente paga (1 a 30)"); return $("#pagaem") && $("#pagaem").focus(); }
+    const prazoTxt = prazoDias ? (prazoDias === 1 ? "1 dia" : prazoDias + " dias") + (globalThis.BAGDA_PRAZO ? " (vence " + dBR(BAGDA_PRAZO.addDays(today(), prazoDias)) + ")" : "") : "";
     const lpN = P2.some(g => g.metodo !== "prazo"), LP = lpN ? $("#lp").value : null, OBP = lpN ? $("#obp").value.trim() : ""; if (lpN && !LP) { toast("Escolha o Local do pagamento"); return $("#lp").focus(); }
     if (LP === "CAIXA GERAL") { if (!cli) return toast("Caixa Geral exige cliente cadastrado — busque ou cadastre o cliente"); P2.splice(0, P2.length, { metodo: "credito", valor: t }); }
     if (LP === "CAIXA ESPECIAL" && me.role !== "admin") return toast("Somente admin");
-    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + "), FR, CXV))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
+    if (notaSaving) return; notaSaving = true; if (!(await confirmNota(items, t, P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + "), FR, CXV, prazoTxt))) { notaSaving = false; return; } const fb = $("#fin"), lbl = fb.textContent; fb.disabled = true; fb.textContent = "Salvando..."; document.querySelectorAll(".nb").forEach(x => x.remove());
     const total = t, pagTxt = P2.map(g => `${esc(PAYL[g.metodo] || g.metodo)} ${brl(g.valor)}`).join(" + ");
-    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido, origem }) => ({ sku, qtd, preco_vendido, ...(origem === "especial" ? { origem: "especial" } : {}) })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP, FR, CXV);
+    try { const nid = await api.criarNota(items.map(({ sku, qtd, preco_vendido, origem }) => ({ sku, qtd, preco_vendido, ...(origem === "especial" ? { origem: "especial" } : {}) })), P2, cli ? cli.nome : ($("#cref").value.trim() || $("#cl").value), cli ? cli.id : null, LP, OBP, FR, CXV, prazoDias);
       if (!nidOk(nid)) throw new Error("Servidor não confirmou o número da nota (retorno: " + JSON.stringify(nid) + ")");
       const R = await api.nota(+nid).then(r => r && r.length ? r : api.notaHead(+nid)); if (!R || !R.length) throw new Error("Nota " + nid + " não encontrada após salvar");
       items = []; await viewRecibo(+nid);
       banner(true, `✅ <b>Nota salva nº ${String(nid).padStart(6, "0")}</b><br>Total: <b>${brl(total)}</b>${FR > 0 ? ` (frete ${brl(FR)})` : ""}${CXV > 0 ? ` (caxinha ${brl(CXV)})` : ""} · Pagamento: <b>${pagTxt}</b>${LP === "CAIXA ESPECIAL" ? " · entrou na Caixa Especial" : ""}`);  printBtns();}
     catch (e) { console.error("Nota NÃO salva:", e); fb.disabled = false; fb.textContent = lbl;
-      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); if (CXV > 0 && /Caxinha d Natal depende/.test(e.message || "")) toast("Caxinha d Natal depende de atualização do banco — avise o admin"); else if (FR > 0 && /Frete depende/.test(e.message || "")) toast("Frete depende de atualização do banco — avise o admin"); }
+      banner(false, `❌ <b>Nota NÃO salva — tente de novo</b><br><small>${esc(e.message || String(e))}</small>${!LP && /Local do pagamento/.test(e.message || "") ? "<br><small>Paga Depois sem Local ainda depende de uma atualização do banco — avise o admin.</small>" : ""}<br><small>Os itens continuam no carrinho.</small>`); if (CXV > 0 && /Caxinha d Natal depende/.test(e.message || "")) toast("Caxinha d Natal depende de atualização do banco — avise o admin"); else if (FR > 0 && /Frete depende/.test(e.message || "")) toast("Frete depende de atualização do banco — avise o admin"); else if (/Prazo de Paga Depois ainda depende/.test(e.message || "")) toast("Prazo de Paga Depois ainda depende da atualização do banco — avise o admin"); }
     finally { notaSaving = false; } };
   $("#lp").onchange = () => { const v = $("#lp").value; $("#lpinfo").textContent = v === "CAIXA GERAL" ? "Caixa Geral: o total sai do crédito do cliente cadastrado (as formas acima são ignoradas)." : v === "CAIXA ESPECIAL" ? "Caixa Especial: o valor pago entra agora na Caixa Especial, ligado a esta nota. Não entra em HX, Máquina nem Dinheiro." : ""; };
   if ($("#origem") && $("#origem").tagName === "SELECT") $("#origem").onchange = () => { showDisp(); const p = P.find(x => x.sku === $("#sku").value); if (p) { $("#sel").innerHTML = selTxt(p); if (me.role === "admin" && origemSel() !== "especial") api.costs().then(C => { const c = (C || []).find(x => x.sku === p.sku); if (c && c.custo != null && $("#sku").value === p.sku && origemSel() !== "especial") $("#sel").innerHTML += ` · custo <b>${brl(c.custo)}</b>`; }).catch(() => {}); } };
@@ -1459,17 +1532,29 @@ async function viewClientes() {
   <div><label>Nome *</label><input id="n" maxlength="120" required></div><div><label>CPF/CNPJ</label><input id="d" maxlength="18" inputmode="numeric"></div>
   <div><label>Telefone</label><input id="t" maxlength="30" inputmode="tel"></div><div><label>E-mail</label><input id="e" type="email" maxlength="160"></div></div>
   <label>Endereço</label><input id="a" maxlength="300"><label>Observações</label><input id="o" maxlength="500">
+  <div><label>Limite Paga Depois (R$) — opcional</label><input id="lim" inputmode="decimal" placeholder="vazio = sem limite"><p class="muted">Se o saldo em aberto chegar a esse valor, aparece em Contas a receber → Cobrança para o financeiro iniciar a cobrança.</p></div>
   <button class="btn" id="sv">Salvar cliente</button> <button type="button" class="btn ghost" id="cn" hidden>Cancelar edição</button></form></div>
   <div class="card"><h2>Clientes</h2><input id="b" type="search" placeholder="Buscar nome, telefone ou CPF…"><table id="tb" class="stk"></table></div>`;
   const draw = () => { const q = norm($("#b").value), dq = dig($("#b").value); const F = L.filter(c => !q || norm(c.nome).includes(q) || (dq && (dig(c.doc).includes(dq) || dig(c.telefone).includes(dq))));
-    $("#tb").innerHTML = `<tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Atend.</th><th class="n">Saldo a receber</th><th></th></tr>` + (F.map(c => `<tr><td>${esc(c.nome)}${c.email ? `<br><small class="muted">${esc(c.email)}</small>` : ""}</td><td>${esc(fmtDoc(c.doc))}</td><td>${esc(c.telefone || "")}</td><td>${esc(c.atendimento || "")}</td><td class="n ${+c.saldo > 0 ? "low" : ""}">${brl(c.saldo)}</td><td><button class="vn" data-i="${c.id}">Ver notas</button> <button class="ed" data-i="${c.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhum cliente.</td></tr>');
+    const limTxt = c => c.limite_prazo == null || c.limite_prazo === "" ? "—" : brl(c.limite_prazo);
+    $("#tb").innerHTML = `<tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Atend.</th><th class="n">Limite Paga Depois</th><th class="n">Saldo a receber</th><th></th></tr>` + (F.map(c => `<tr><td>${esc(c.nome)}${c.email ? `<br><small class="muted">${esc(c.email)}</small>` : ""}</td><td>${esc(fmtDoc(c.doc))}</td><td>${esc(c.telefone || "")}</td><td>${esc(c.atendimento || "")}</td><td class="n">${limTxt(c)}</td><td class="n ${+c.saldo > 0 ? "low" : ""}">${brl(c.saldo)}</td><td><button class="vn" data-i="${c.id}">Ver notas</button> <button class="ed" data-i="${c.id}">Editar</button></td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhum cliente.</td></tr>');
     document.querySelectorAll(".vn").forEach(b => b.onclick = () => viewClienteExtrato(+b.dataset.i));
-    document.querySelectorAll(".ed").forEach(b => b.onclick = () => { const c = L.find(x => x.id === +b.dataset.i); ed = c.id; $("#n").value = c.nome; $("#d").value = fmtDoc(c.doc); $("#t").value = c.telefone || ""; $("#e").value = c.email || ""; $("#a").value = c.endereco || ""; $("#o").value = c.obs || ""; $("#cn").hidden = false; $("#sv").textContent = "Salvar alterações"; scrollTo(0, 0); }); };
+    document.querySelectorAll(".ed").forEach(b => b.onclick = () => { const c = L.find(x => x.id === +b.dataset.i); ed = c.id; $("#n").value = c.nome; $("#d").value = fmtDoc(c.doc); $("#t").value = c.telefone || ""; $("#e").value = c.email || ""; $("#a").value = c.endereco || ""; $("#o").value = c.obs || ""; $("#lim").value = c.limite_prazo == null || c.limite_prazo === "" ? "" : Number(c.limite_prazo).toFixed(2).replace(".", ","); $("#cn").hidden = false; $("#sv").textContent = "Salvar alterações"; scrollTo(0, 0); }); };
   $("#b").oninput = draw; draw(); $("#cn").onclick = () => viewClientes();
   $("#f").onsubmit = async ev => { ev.preventDefault(); const c = { nome: val("n"), doc: dig(val("d")) || null, telefone: val("t") || null, email: val("e") || null, endereco: val("a") || null, obs: val("o") || null };
+    const limRaw = val("lim");
+    if (limRaw) {
+      let raw = limRaw.replace(/\s/g, ""); if (raw.includes(",")) raw = raw.replace(/\./g, "").replace(",", ".");
+      const vv = Math.round(Number(raw) * 100) / 100;
+      if (!Number.isFinite(vv) || vv < 0) return toast("Limite inválido");
+      c.limite_prazo = vv;
+    } else c.limite_prazo = null;
     if (c.doc && !docOk(c.doc)) return toast("CPF/CNPJ inválido"); ev.submitter && (ev.submitter.disabled = true);
     if (!(await clienteCadastroLivre(c, ed))) { ev.submitter && (ev.submitter.disabled = false); return; }
-    try { ed ? await api.salvarCliente(ed, c) : await api.criarCliente(c); toast("Cliente salvo ✓"); viewClientes(); } catch (e) { toast(e.message); ev.submitter && (ev.submitter.disabled = false); } };
+    try {
+      if (ed) await api.salvarCliente(ed, c);
+      else { const nid = await api.criarCliente(c); if (c.limite_prazo != null && nid && api.salvarCliente) await api.salvarCliente(nid, { limite_prazo: c.limite_prazo }); }
+      toast("Cliente salvo ✓"); viewClientes(); } catch (e) { const em = e.message || ""; toast(/limite_prazo|PGRST204|42703|schema cache/i.test(em) ? "Limite Paga Depois ainda depende da atualização do banco (supabase-loja/migration-prazo-vencimento.sql). Nada foi salvo." : em); ev.submitter && (ev.submitter.disabled = false); } };
 }
 async function viewFornecedores() {
   const L = await api.fornecedores(); let ed = null;
@@ -1517,11 +1602,40 @@ function parseValorDivida(input) {
   return { value: vv };
 }
 async function viewReceber(rfSel = "") {
-  const [C, RC, CX, CRD] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista(), api.creditos().catch(() => [])]);
-  const crd = id => Number((CRD.find(k => k.cliente_id === id) || {}).saldo || 0), isAdm = me.role === "admin", RCf = RC.filter(r => !rfSel || r.cliente_id === +rfSel);
+  const [C, RC, CX, CRD, cob] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista(), api.creditos().catch(() => []), api.cobrancaAlertas ? api.cobrancaAlertas().catch(() => null) : Promise.resolve(null)]);
+  const crd = id => Number((CRD.find(k => k.cliente_id === id) || {}).saldo || 0), isAdm = me.role === "admin", isFin = me.role === "admin" || me.role === "financeiro", RCf = RC.filter(r => !rfSel || r.cliente_id === +rfSel);
   const dev = C.filter(c => +c.saldo > 0).sort((a, b) => b.saldo - a.saldo), tot = dev.reduce((a, c) => a + Number(c.saldo), 0);
   const ativos = C.filter(c => c.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
-  app.innerHTML = `<div class="card"><h2>Contas a receber — Paga Depois</h2><div class="grid"><div class="kpi"><small>Total a receber</small><b>${brl(tot)}</b></div><div class="kpi"><small>Clientes devendo</small><b>${dev.length}</b></div></div></div>
+  const PZ = globalThis.BAGDA_PRAZO;
+  const cobHtml = (() => {
+    if (!isFin) return "";
+    if (cob && cob.pendente_sql) return `<div class="card cobranca-panel" id="cobranca"><h2>Cobrança</h2><p class="muted">O painel de cobrança ainda depende da atualização do banco (supabase-loja/migration-prazo-vencimento.sql).</p></div>`;
+    const L = (cob && cob.clientes) || [];
+    const rows = L.flatMap(c => {
+      const motivos = [
+        c.tem_vencida ? `<span class="badge vencida">Vencida</span>` : "",
+        c.tem_vence_hoje ? `<span class="badge vence_hoje">Vence hoje</span>` : "",
+        c.tem_vence_breve ? `<span class="badge vence_breve">Vence em até 2 dias</span>` : "",
+        c.no_limite ? `<span class="badge limite">No limite${c.limite_prazo != null ? " (" + brl(c.limite_prazo) + ")" : ""}</span>` : ""
+      ].filter(Boolean).join(" ");
+      const notas = (c.notas || []).map((n, i) => {
+        const cls = n.classe || "";
+        const atraso = n.dias_atraso != null && n.classe === "vencida" ? (n.dias_atraso + (n.dias_atraso === 1 ? " dia" : " dias")) : (n.classe === "vence_hoje" ? "0" : "—");
+        return `<tr class="${esc(cls)}">${i === 0 ? `<td rowspan="${Math.max((c.notas || []).length, 1)}"><b>${esc(c.nome)}</b><br>${motivos}<br><small>Em aberto: <b>${brl(c.saldo_aberto)}</b></small></td>` : ""}<td>${esc(n.numero)}</td><td class="n">${brl(n.em_aberto)}</td><td>${n.vencimento ? esc(dBR(n.vencimento)) : "—"}</td><td>${esc(atraso)}</td><td>${cls ? `<span class="badge ${esc(cls)}">${esc(PZ ? PZ.labelClasse(cls) : cls)}</span>` : (n.vencimento ? "" : "<span class=\"muted\">sem vencimento</span>")}</td></tr>`;
+      }).join("");
+      return notas || `<tr><td><b>${esc(c.nome)}</b><br>${motivos}</td><td>—</td><td class="n">${brl(c.saldo_aberto)}</td><td>—</td><td>—</td><td></td></tr>`;
+    }).join("");
+    return `<div class="card cobranca-panel" id="cobranca"><h2>Cobrança <small class="muted">para o financeiro iniciar a cobrança</small></h2>
+    <div class="grid"><div class="kpi"><small>Clientes na lista</small><b>${L.length}</b></div>
+    <div class="kpi"><small>Vencidas</small><b class="low">${cob && cob.n_vencidas || 0}</b></div>
+    <div class="kpi"><small>Vence hoje</small><b>${cob && cob.n_vence_hoje || 0}</b></div>
+    <div class="kpi"><small>Vence em até 2 dias</small><b>${cob && cob.n_vence_breve || 0}</b></div>
+    <div class="kpi"><small>No limite</small><b>${cob && cob.n_limite || 0}</b></div></div>
+    <p class="muted">Mostra clientes com saldo em aberto cuja nota Paga Depois já venceu, vence hoje ou vence em até 2 dias, e quem chegou no limite Paga Depois cadastrado. Nota quitada em recebimento_notas não entra. Notas antigas sem prazo cadastrado não têm data de vencimento.</p>
+    <table class="stk"><tr><th>Cliente</th><th>Nota</th><th class="n">Em aberto</th><th>Vencimento</th><th>Dias em atraso</th><th>Alerta</th></tr>
+    ${rows || '<tr><td colspan="6" class="muted">Nenhum alerta no momento.</td></tr>'}</table></div>`;
+  })();
+  app.innerHTML = `${cobHtml}<div class="card"><h2>Contas a receber — Paga Depois</h2><div class="grid"><div class="kpi"><small>Total a receber</small><b>${brl(tot)}</b></div><div class="kpi"><small>Clientes devendo</small><b>${dev.length}</b></div></div></div>
   ${isAdm ? `<div class="card"><h2>Adicionar dívida</h2><p class="muted">Dívida anterior, só admin. Vira uma nota Paga Depois só de frete: sem item, sem estoque, sem entrada no caixa e sem crédito na Caixa Geral. O cliente passa a dever aqui. Não há teto comercial. O valor tem de ser positivo e caber no numeric(12,2) que frete, total e prazo já usam.</p><form id="fd"><div class="grid"><div><label>Cliente</label><select id="dc" required>${ativos.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></div><div><label>Valor (R$)</label><input id="dv" type="text" inputmode="decimal" required placeholder="0,00"></div></div><label>Observação (opcional)</label><input id="do" maxlength="160"><button class="btn">Adicionar dívida</button></form></div>` : ""}
   <div class="card"><h2>Registrar pagamento do cliente</h2><form id="f"><div class="grid"><div><label>Cliente</label><select id="c" required>${dev.map(c => `<option value="${c.id}">${esc(c.nome)} — deve ${brl(c.saldo)}</option>`).join("")}</select></div>
   <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Data</label><input id="d" type="date" value="${today()}"></div>
@@ -1536,6 +1650,7 @@ async function viewReceber(rfSel = "") {
   ${RCf.map(r => `<tr><td>${dBR(r.data)}</td><td>${esc(r.cliente)}</td><td>${esc(FORMAR[r.forma] || r.forma || "")}</td><td>${esc(r.caixa === "CAIXA SPECIAL" && r.forma === "dinheiro" ? "Entrada dinheiro — CAIXA SPECIAL" : r.caixa)}</td><td>${esc(r.handle || "")}</td><td class="n">${brl(r.valor)}</td>${isAdm ? `<td><button class="btn ghost est" style="margin:0" data-i="${r.id}">Estornar</button></td>` : ""}</tr>`).join("") || `<tr><td colspan="${isAdm ? 7 : 6}" class="muted">Nenhum recebimento.</td></tr>`}</table>
   ${isAdm ? '<p class="muted">Estornar: devolve o dinheiro do caixa (saída igual), o crédito da Caixa Geral, ou a entrada ligada na Caixa Especial. A dívida da nota volta a ficar em aberto.</p>' : ""}</div>`;
   $("#rf").onchange = e => viewReceber(e.target.value);
+  refreshCobrancaBadge();
   if ($("#fd")) $("#fd").onsubmit = async ev => { ev.preventDefault(); const parsed = parseValorDivida($("#dv").value); if (parsed.error) return toast(parsed.error); const vv = parsed.value; const cli = +$("#dc").value, nome = (ativos.find(c => c.id === cli) || {}).nome || ""; if (!(await confirmBox(`Lançar dívida anterior de <b>${brl(vv)}</b> para <b>${esc(nome)}</b>?<br><small>Nota Paga Depois só de frete. Não mexe em estoque, caixa nem crédito.</small>`))) return; const b = ev.submitter; b.disabled = true; const f = $("#fd"), sig = [cli, vv, val("do")].join("|"); if (f.dataset.divSig !== sig || !f.dataset.divChave) { f.dataset.divSig = sig; f.dataset.divChave = (crypto.randomUUID && crypto.randomUUID()) || ("dv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)); } try { const x = await api.adicionarDivida(cli, vv, val("do"), f.dataset.divChave); toast(x && x.idempotente ? "Dívida já estava lançada" : "Dívida anterior lançada ✓"); viewReceber(); } catch (e) { const em = e.message || ""; toast(/PGRST202|42883|adicionar_divida|schema cache|does not exist/i.test(em) ? "Adicionar dívida ainda depende da atualização do banco (supabase-loja/migration-adicionar-divida.sql). Nada foi lançado." : em); b.disabled = false; } };
   document.querySelectorAll(".est").forEach(b => b.onclick = async () => { const r = RC.find(x => x.id === +b.dataset.i);
     const m = await motivoBox(`Estornar o recebimento de <b>${esc(r.cliente)}</b> · ${esc(dBR(r.data))} · <b>${brl(r.valor)}</b> (${esc(FORMAR[r.forma] || r.forma)})?<br><small>${r.forma === "credito" ? "O valor volta para o crédito da Caixa Geral." : r.caixa === "CAIXA SPECIAL" ? "Estorna a entrada ligada na Caixa Especial (o excedente que virou crédito também volta, se ainda estiver lá). Os caixas do dia não mudam." : "Sai " + brl(r.valor) + " do caixa " + esc(r.caixa) + "."} A dívida volta a ficar em aberto.</small>`); if (!m) return;
