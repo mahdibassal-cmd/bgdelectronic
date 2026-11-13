@@ -27,7 +27,7 @@ ok(groups.every(g => g.labelledby && html.includes(`id="${g.labelledby}"`)), "ar
 
 const expected = {
   notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["lancar", "financas", "Notas a lançar"], ["clientes", "financas", "Clientes"]],
-  financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["cpend", "financas", "Compras pendentes"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
+  financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["cpend", "admin", "Compras pendentes"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
   compras: [["compras", "admin", "Compras"], ["imei", "financas|estoque", "Compras & IMEI"], ["estoque", "vendas|estoque", "Estoque"], ["produtos", "admin", "Produtos"], ["depesp", "admin|estoque", "Depósito Especial"]],
   sistema: [["ponto", "", "Ponto"], ["usuarios", "admin", "Usuários"], ["seguranca", "", "Segurança"], ["", "", "Sair"]],
 };
@@ -55,7 +55,7 @@ function visible(role) {
 const labels = role => visible(role).flatMap(g => g.buttons);
 const expectRole = {
   admin: ["Nova nota", "Notas", "Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Caixa Especial", "Contas a receber", "Contas a pagar", "Compras pendentes", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Ponto", "Usuários", "Segurança", "Sair"],
-  financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Compras pendentes", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Ponto", "Segurança", "Sair"],
+  financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Ponto", "Segurança", "Sair"],
   vendedor: ["Nova nota", "Notas", "Estoque", "Ponto", "Segurança", "Sair"],
   estoque: ["Compras & IMEI", "Estoque", "Depósito Especial", "Ponto", "Segurança", "Sair"],
 };
@@ -78,7 +78,7 @@ ok(labels("financeiro").includes("Sair") && !labels("financeiro").includes("Usu�
 ok(/nav \.navg[\s\S]*g\.hidden = bs\.length > 0 && bs\.every\(b => b\.hidden\)/.test(js), "app hides empty groups");
 ok(/function navMark\(/.test(js) && /aria-current/.test(js) && /navMark\(v\)/.test(js) && /navMark\("imei"\)/.test(js), "active page mark kept");
 ok(css.includes(".ngh") && css.includes("@media(max-width:720px)") && css.includes("nav button.on") && /@media print[\s\S]*nav,button,header\{display:none!important\}/.test(css), "compact, responsive, active, print hide");
-ok(html.includes("loja.css?v=20261113d") && html.includes("estoque-categorias.js?v=20261109e") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("prazo-vencimento.js?v=20261111e") && html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261113i") && html.includes("ponto.css?v=20261111d"), "script cache for the client statement");
+ok(html.includes("loja.css?v=20261113d") && html.includes("estoque-categorias.js?v=20261109e") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("prazo-vencimento.js?v=20261111e") && html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261113j") && html.includes("ponto.css?v=20261111d"), "script cache for the client statement");
 ok(!html.includes("data-v=\"comprovante\""), "no invented comprovante button");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }

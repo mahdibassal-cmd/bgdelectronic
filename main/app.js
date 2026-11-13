@@ -103,6 +103,7 @@ const docOk = v => { const d = dig(v); if (!d) return true; if (/^(\d)\1+$/.test
 const fmtDoc = v => { const d = dig(v); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5") : (v || ""); };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const spAdd = (iso, n) => { const [y, m, d] = String(iso).split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
 /* Caxinha d Natal: campo só até 24/12/2026 inclusive (calendário America/Sao_Paulo). Histórico permanece. */
 const CAXINHA_ATE = "2026-12-24";
 const caxinhaOn = () => today() <= CAXINHA_ATE;
@@ -285,7 +286,25 @@ if (!MOCK && !CONFIGURED) {
     async caixaHxDia(d) { return ok(await sb.rpc("caixa_hx_dia", { p_data: d })); },
     async hxConfig() { return ok(await sb.rpc("caixa_hx_config")); },
     async hxConfigSet(on) { return ok(await sb.rpc("caixa_hx_config_set", { p_on: on })); },
-    async caixaSessoes(d) { return ok(await sb.from("caixa_sessoes").select("*").eq("data", d)); },
+    async caixaSessoes(d) {
+      const r = await sb.rpc("caixa_sessoes_dia", { p_data: d });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (!r.error) return r.data || [];
+      if (!/PGRST202|42883|caixa_sessoes_dia|schema cache|does not exist/i.test(em)) throw new Error(r.error.message);
+      const q = await sb.from("caixa_sessoes").select("*").eq("data", d);
+      if (!q.error) return q.data;
+      return ok(await sb.from("caixa_sessoes").select("id,caixa_id,data,abertura_valor,aberto_por,aberto_em,fechamento_contado,fechado_por,fechado_em,obs").eq("data", d));
+    },
+    async caixaFinJanela() {
+      const r = await sb.rpc("caixa_fin_janela");
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|caixa_fin_janela|schema cache|does not exist/i.test(em))
+        return { ilimitado: me.role === "admin", mostra_saldo: me.role === "admin", hoje: today(), desde: me.role === "admin" ? null : spAdd(today(), -2), rotulo: me.role === "admin" ? "tudo" : "últimos 3 dias" };
+      return ok(r);
+    },
+    async caixaFinLista() { return ok(await sb.rpc("caixa_fin_lista")); },
+    async caixaFinLiberar(caixa, desde, dias, expira) { return ok(await sb.rpc("caixa_fin_liberar", { p_caixa: caixa || null, p_desde: desde || null, p_dias: dias || null, p_expira: expira || null })); },
+    async caixaFinRevogar(id) { return ok(await sb.rpc("caixa_fin_revogar", { p_id: id })); },
     async caixaLancar(m) { ok(await sb.from("caixa_movimentos").insert(m)); },
     async transferirCaixa(origem, destino, valor, motivo, esp) {
       const oEsp = !!(esp && esp.origemEspecial), dEsp = !!(esp && esp.destinoEspecial);
@@ -402,7 +421,8 @@ if (!MOCK && !CONFIGURED) {
     .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true, origem: "Nacional", preco_usd: null }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const COT = [{ valor: 5.4, alterado_em: "2026-11-13T12:00:00.000Z", handle: "@mike", nome: "Mike" }];
-  const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro", somente_admin: false }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix", somente_admin: false }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao", somente_admin: false }, { caixa_id: 12, nome: "GASTOS LOJA", metodo: null, somente_admin: false }, { caixa_id: 13, nome: "PRIME", metodo: null, somente_admin: false }, { caixa_id: 14, nome: "CAIXA S2", metodo: null, somente_admin: false }, { caixa_id: 15, nome: "PRESTIGE ROSA", metodo: null, somente_admin: false }, { caixa_id: 17, nome: "PAGAMENTO PRODUTOS", metodo: null, somente_admin: true }, { caixa_id: 18, nome: "COMPRA PRODUTOS", metodo: null, somente_admin: true }];
+  const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro", somente_admin: false }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix", somente_admin: false }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao", somente_admin: false }, { caixa_id: 10, nome: "LARANJIHA", metodo: null, somente_admin: false }, { caixa_id: 11, nome: "GETNET", metodo: null, somente_admin: false }, { caixa_id: 12, nome: "GASTOS LOJA", metodo: null, somente_admin: false }, { caixa_id: 13, nome: "PRIME", metodo: null, somente_admin: false }, { caixa_id: 14, nome: "CAIXA S2", metodo: null, somente_admin: false }, { caixa_id: 15, nome: "PRESTIGE ROSA", metodo: null, somente_admin: false }, { caixa_id: 16, nome: "BITLOG CONTAINER", metodo: null, somente_admin: true }, { caixa_id: 17, nome: "PAGAMENTO PRODUTOS", metodo: null, somente_admin: true }, { caixa_id: 18, nome: "COMPRA PRODUTOS", metodo: null, somente_admin: true }];
+  const FINH = [];
   const COMP = [], CPAGTO = [];
   const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   if (qs.has("origemfix")) { P.push({ sku: "FX-ORG-1", marca: "Apple", produto: "iPhone 18 Pro Max FIXTURE", tamanho: "Preto", preco_venda: 9999, estoque: 2, estoque_minimo: 2, ativo: true, notas: null, fornecedor: null }); DE.push({ sku: "FX-ORG-1", qtd: 5, custo: 7000 }); K["FX-ORG-1"] = 6000; }
@@ -473,6 +493,7 @@ if (!MOCK && !CONFIGURED) {
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2)); mov(1, "entrada", 150, "Recebimento cliente Maria Souza", null, U[0], H(1)); MV[MV.length - 1].cliente = "Maria Souza"; mov(3, "entrada", 28600, "DANIEL IPHONE DUO", null, U.find(u => /pamela/i.test(u.handle || "")) || U[0], H(0.2)); MV[MV.length - 1].forma = "cartao";
     mov(17, "entrada", 25000, "Saldo PAGAMENTO PRODUTOS", null, U[0], H(8)); mov(1, "entrada", 4000, "Reforço compras", null, U[0], H(8)); mov(14, "entrada", 3000, "Saldo CAIXA S2", null, U[0], H(7)); mov(15, "entrada", 2200, "Saldo PRESTIGE ROSA", null, U[0], H(7));
     mov(18, "saida", 8000, "Dívida Compra C-009010 — Distribuidora Tech SP", null, U[0], H(2));
+    mov(1, "entrada", 9000, "ENTRADA ANTIGA oculta do financeiro", null, U[0], new Date(Date.now() - 10 * 864e5).toISOString());
     COMP.push({ id: 9001, numero: "C-009001", data: "2026-11-01", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-11-10", total: 1800 }, { id: 9002, numero: "C-009002", data: "2026-11-12", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-12-01", total: 640 }, { id: 9003, numero: "C-009003", data: "2026-11-08", fornecedor: "Apple SP", pagamento: "depois", vencimento: null, total: 960 });
     CPAGTO.push({ id: id++, compra_id: 9002, valor: 200, data: "2026-11-12", caixa_id: 1, caixa: "Caixa Dinheiro", somente_admin: false });
   });
@@ -512,6 +533,19 @@ if (!MOCK && !CONFIGURED) {
   const vis = () => role === "admin" ? N : role === "vendedor" ? N.filter(n => n.handle === meU.handle) : [];
   let HXP = false; const hxR = c => role !== "admin" && !HXP && /HX/.test((CX.find(x => x.caixa_id === c) || {}).nome || ""); /* espelha caixa_dia_visivel no servidor */
   const mvV = () => MV.filter(m => !(hxR(m.caixa_id) && m.data < today()));
+  const finAtivas = () => FINH.filter(g => g.ativo && !g.revogado_em && (!g.expira_em || g.expira_em > new Date().toISOString()));
+  const finCorte = caixaId => {
+    if (role === "admin") return "0001-01-01";
+    let corte = spAdd(today(), hxR(caixaId) ? 0 : -2);
+    for (const g of finAtivas()) {
+      if (g.caixa_id != null && g.caixa_id !== caixaId) continue;
+      if (g.desde) corte = g.desde < corte ? g.desde : corte;
+      if (g.dias) { const d0 = spAdd(today(), -(g.dias - 1)); if (d0 < corte) corte = d0; }
+    }
+    return corte;
+  };
+  const finCaixa = id => { const c = CX.find(x => x.caixa_id === id); return !!c && (!c.somente_admin || role === "admin"); };
+  const finVê = m => role === "admin" || (finCaixa(m.caixa_id) && m.data >= finCorte(m.caixa_id) && m.data <= today());
   const saldo = c => mvV().filter(m => m.caixa_id === c).reduce((a, m) => a + sv(m), 0);
   const needCx = () => { if (role === "vendedor") throw new Error("Sem permissão de caixa"); };
   const grp = (rows, key, f) => Object.values(rows.reduce((a, r) => { const k = r[key]; a[k] ||= { [key]: k, nome: r.nome, vendas: 0, itens: 0, faturamento: 0, custo: 0 }; f(a[k], r); return a; }, {}));
@@ -663,20 +697,25 @@ if (!MOCK && !CONFIGURED) {
     async extrato(d) { const ns = vis().filter(n => n.data === d), ids = ns.map(n => n.nota_id), lucro = {}; const itens = IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...ns.find(n => n.nota_id === i.nota_id), ...i }));
       if (role === "admin") itens.forEach(i => lucro[i.nota_id] = (lucro[i.nota_id] || 0) + i.total - i.qtd * i.custo); const fre = {}, cn = {}; ns.forEach(n => { if (n.frete > 0) fre[n.nota_id] = n.frete; if (n.caxinha_natal > 0) cn[n.nota_id] = n.caxinha_natal; });
       return { itens, pags: PG.filter(g => ids.includes(g.nota_id)), lucro, fre, cn, heads: ns.filter(n => (n.frete > 0 || n.caxinha_natal > 0) && !IT.some(i => i.nota_id === n.nota_id)) }; },
-    async caixaSaldos() { await ready; needCx(); return CX.filter(c => !c.somente_admin || role === "admin").map(c => ({ ...c, saldo: saldo(c.caixa_id), movimento_hoje: MV.filter(m => m.caixa_id === c.caixa_id && m.data === today()).reduce((a, m) => a + sv(m), 0) })); },
-    async caixaExtrato(d) { needCx(); const vis = new Set(CX.filter(c => !c.somente_admin || role === "admin").map(c => c.caixa_id)); return mvV().filter(m => m.data === d && vis.has(m.caixa_id)).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id); return { ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id), cliente: (n && n.cliente) || m.cliente || null }; }); },
+    async caixaSaldos() { await ready; needCx(); return CX.filter(c => !c.somente_admin || role === "admin").map(c => ({ ...c, saldo: role === "admin" ? saldo(c.caixa_id) : null, movimento_hoje: MV.filter(m => m.caixa_id === c.caixa_id && m.data === today()).reduce((a, m) => a + sv(m), 0), movimento_visivel: MV.filter(m => m.caixa_id === c.caixa_id && finVê(m)).reduce((a, m) => a + sv(m), 0) })); },
+    async caixaExtrato(d) { needCx(); return MV.filter(m => m.data === d && finVê(m)).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id); return { ...m, valor_assinado: sv(m), estornado: MV.some(x => x.estorno_de === m.id), cliente: (n && n.cliente) || m.cliente || null }; }); },
     async caixaResumo(c, d) { needCx(); if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão");
-      if (hxR(c) && d < today()) throw new Error("Caixa HX: dias anteriores visíveis só para admin");
-      const cx = CX.find(x => x.caixa_id === c), ini = hxR(c) ? 0 : MV.filter(m => m.caixa_id === c && m.data < d).reduce((a, m) => a + sv(m), 0);
-      const mv = MV.filter(m => m.caixa_id === c && m.data === d).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id);
+      if (!finCaixa(c) || (role !== "admin" && !finVê({ caixa_id: c, data: d }))) throw new Error("Extrato fora da janela do financeiro");
+      const cx = CX.find(x => x.caixa_id === c), ini = role !== "admin" ? null : hxR(c) ? 0 : MV.filter(m => m.caixa_id === c && m.data < d).reduce((a, m) => a + sv(m), 0);
+      const mv = MV.filter(m => m.caixa_id === c && m.data === d && finVê(m)).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(m => { const n = N.find(x => x.nota_id === m.nota_id);
         return { id: m.id, hora: new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", ""), tipo: m.tipo, valor: m.valor, assinado: sv(m), forma: m.forma || cx.metodo, nota: m.nota_id ? String(m.nota_id).padStart(6, "0") : (m.notas || null), cliente: (n && n.cliente) || m.cliente || null, usuario: m.nome, motivo: m.motivo }; });
       const pf = {}; mv.forEach(m => pf[m.forma] = (pf[m.forma] || 0) + m.assinado); const s = SE.find(x => x.caixa_id === c && x.data === d);
-      return { caixa: cx.nome, data: d, saldo_inicial: ini, saldo_final: ini + mv.reduce((a, m) => a + m.assinado, 0), sessao: s ? { abertura_valor: s.abertura_valor, aberto_por: meU.nome, aberto_em: new Date(s.aberto_em).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }), fechamento_contado: s.fechamento_contado ?? null, diferenca: s.diferenca ?? null } : null,
+      const fim = ini == null ? null : ini + mv.reduce((a, m) => a + m.assinado, 0);
+      return { caixa: cx.nome, data: d, saldo_inicial: ini, saldo_final: fim, sessao: s ? { abertura_valor: s.abertura_valor, aberto_por: meU.nome, aberto_em: new Date(s.aberto_em).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }), fechamento_contado: s.fechamento_contado ?? null, diferenca: role === "admin" ? (s.diferenca ?? null) : null } : null,
         movimentos: mv, por_forma: pf, entradas: mv.filter(m => m.assinado > 0).reduce((a, m) => a + m.valor, 0), saidas: mv.filter(m => m.assinado < 0).reduce((a, m) => a + m.valor, 0) }; },
     async caixaHxDia(d) { if (role !== "admin") throw new Error("Somente admin"); const c = CX.find(x => /HX/.test(x.nome)).caixa_id, r = await api.caixaResumo(c, d); return { ...r, caixa_id: c, total_dia: r.movimentos.reduce((a, m) => a + m.assinado, 0) }; },
     async hxConfig() { if (role !== "admin") throw new Error("Somente admin"); return { hx_fin_ve_passado: HXP }; },
     async hxConfigSet(on) { if (role !== "admin") throw new Error("Somente admin"); const m = HXP !== on; HXP = on; return { hx_fin_ve_passado: on, mudou: m }; },
-    async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d && !(hxR(x.caixa_id) && d < today())); },
+    async caixaSessoes(d) { needCx(); return SE.filter(x => x.data === d && finVê({ caixa_id: x.caixa_id, data: d })).map(x => role === "admin" ? x : { ...x, abertura_sistema: null, fechamento_sistema: null, diferenca: null }); },
+    async caixaFinJanela() { needCx(); if (role === "admin") return { ilimitado: true, mostra_saldo: true, hoje: today(), desde: null, rotulo: "tudo" }; const desde = CX.filter(c => !c.somente_admin).reduce((a, c) => { const k = finCorte(c.caixa_id); return !a || k < a ? k : a; }, null); return { ilimitado: false, mostra_saldo: false, hoje: today(), desde, rotulo: desde === spAdd(today(), -2) ? "últimos 3 dias" : "período liberado" }; },
+    async caixaFinLista() { if (role !== "admin") throw new Error("Somente admin"); return FINH.filter(g => !g.revogado_em).map(g => ({ ...g, caixa: g.caixa_id == null ? "Todos os caixas do financeiro" : (CX.find(c => c.caixa_id === g.caixa_id) || {}).nome, ativo: g.ativo && !g.revogado_em && (!g.expira_em || g.expira_em > new Date().toISOString()) })); },
+    async caixaFinLiberar(caixa, desde, dias, expira) { if (role !== "admin") throw new Error("Somente admin"); if (caixa && !CX.some(c => c.caixa_id === +caixa && !c.somente_admin)) throw new Error("Caixa inválido para o financeiro"); if (!!desde === !!dias) throw new Error("Informe a data inicial ou o número de dias"); if (dias && dias < 3) throw new Error("A liberação só alarga a janela (mínimo 3 dias)"); const row = { id: id++, caixa_id: caixa ? +caixa : null, desde: desde || null, dias: dias || null, expira_em: expira || null, ativo: true, criado_em: new Date().toISOString(), revogado_em: null }; FINH.unshift(row); return row; },
+    async caixaFinRevogar(i) { if (role !== "admin") throw new Error("Somente admin"); const g = FINH.find(x => x.id === +i); if (!g) throw new Error("Liberação não encontrada"); g.ativo = false; g.revogado_em = new Date().toISOString(); return { id: g.id, revogado: true }; },
     async estornarMov(mid, m, cn) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar movimento de caixa"); if (!m || m.trim().length < 3) throw new Error("Informe o motivo do estorno"); const o = MV.find(x => x.id === mid); if (!o) throw new Error("Movimento não encontrado");
       const e = MV.find(x => x.estorno_de === mid); if (e) return { ja_estornado: true, estorno_id: e.id }; if (o.estorno_de || o.tipo === "estorno") throw new Error("Este movimento já é um estorno");
       if (o.tipo === "venda") { const n = N.find(x => x.nota_id === o.nota_id), liq = MV.filter(x => x.nota_id === o.nota_id && x.caixa_id === o.caixa_id).reduce((a, x) => a + (x.tipo === "venda" ? x.valor : x.tipo === "estorno" ? -x.valor : 0), 0);
@@ -834,11 +873,11 @@ if (!MOCK && !CONFIGURED) {
       return { lote, itens: itens.length, compra_id: c, numero, total: tot, origem_ok: true, pagamento_ok: true, pagamento: pag };
     },
     async comprasCaixas() {
-      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      await ready; if (role !== "admin") throw new Error("Somente admin");
       return CX.filter(c => c.ativo !== false && (!c.somente_admin || role === "admin")).map(c => ({ caixa_id: c.caixa_id, nome: c.nome, metodo: c.metodo, somente_admin: !!c.somente_admin, saldo: Math.round(saldo(c.caixa_id) * 100) / 100 }));
     },
     async comprasPendentes() {
-      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      await ready; if (role !== "admin") throw new Error("Somente admin");
       const hj = today();
       const rows = COMP.filter(c => c.pagamento === "agora" || c.pagamento === "depois" || c.pagamento === "divida").map(c => {
         const pags = CPAGTO.filter(p => p.compra_id === c.id).map(p => { const hide = !!(p.somente_admin && role !== "admin"); return { id: p.id, valor: p.valor, data: p.data, caixa: hide ? null : p.caixa, caixa_id: hide ? null : p.caixa_id, caixa_oculto: hide }; });
@@ -854,7 +893,7 @@ if (!MOCK && !CONFIGURED) {
       return { grupos: [...grupos.values()].sort((a, b) => a.fornecedor.localeCompare(b.fornecedor, "pt-BR")), pagas: rows.filter(r => r.restante <= 0).sort((a, b) => b.id - a.id).slice(0, 40) };
     },
     async compraPagar(cid, valor, caixa) {
-      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      await ready; if (role !== "admin") throw new Error("Somente admin");
       const c = COMP.find(x => x.id === +cid);
       if (!c || (c.pagamento !== "agora" && c.pagamento !== "depois")) throw new Error("Compra antiga sem controle de pagamento");
       valor = Math.round(Number(valor) * 100) / 100;
@@ -999,7 +1038,7 @@ function navMark(v) {
   });
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", cpend: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", cpend: "admin", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
   if (!need[v] && v !== "seguranca" && v !== "ponto") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
   navMark(v);
@@ -1762,18 +1801,27 @@ function estornarMovBox(m, after) { if (!m) return; const nota = m.tipo === "ven
     catch (e) { w.textContent = e.message; y.disabled = false; } }; }
 async function viewCaixa(d = today()) {
   if (!can("caixa") || me.role === "vendedor") return go("nota"); /* vendedor: sem caixa (o banco também recusa) */
+  const adm = me.role === "admin";
+  let JAN = { ilimitado: adm, mostra_saldo: adm, hoje: today(), desde: adm ? null : spAdd(today(), -2), rotulo: adm ? "tudo" : "últimos 3 dias" };
+  try { JAN = Object.assign(JAN, await api.caixaFinJanela() || {}); } catch (e) { /* janela padrão de 3 dias */ }
+  if (!adm && JAN.desde && d < JAN.desde) d = JAN.desde;
+  if (!adm && JAN.hoje && d > JAN.hoje) d = JAN.hoje;
   const [SA, EX, SE] = await Promise.all([api.caixaSaldos(), api.caixaExtrato(d), api.caixaSessoes(d)]), hoje = d === today();
+  let LIB = []; if (adm) { try { LIB = await api.caixaFinLista() || []; } catch (e) { LIB = []; } }
   const TZ = "America/Sao_Paulo", hm = t => new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" };
   const ses = c => SE.find(x => x.caixa_id === c.caixa_id);
-  const fin = me.role === "admin" || me.role === "financeiro", adm = me.role === "admin";
-  const isHX = c => /HX/.test(c.nome || ""), hxN = c => isHX(c) ? `<small class="muted">Diário (hoje)${adm ? ' · <a href="#hxdia" class="hxl">HX por dia</a>' : " · dias anteriores só admin"}</small>` : "";
-  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small>${isHX(c) ? `<b>${brl(c.movimento_hoje)}</b><small>Total de hoje</small>` : `<b>${caixaSaldoHtml(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>`}
+  const fin = me.role === "admin" || me.role === "financeiro";
+  const isHX = c => /HX/.test(c.nome || ""), hxN = c => isHX(c) ? `<small class="muted">${adm ? 'Diário (hoje) · <a href="#hxdia" class="hxl">HX por dia</a>' : "HX · só hoje, salvo liberação"}</small>` : "";
+  const valorCard = c => adm ? (isHX(c) ? `<b>${brl(c.movimento_hoje)}</b><small>Total de hoje</small>` : `<b>${caixaSaldoHtml(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>`) : `<b>${brl(c.movimento_visivel)}</b><small>Movimento visível · sem saldo acumulado</small>`;
+  const card = c => { const x = ses(c); return `<div class="kpi cxk"><small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small>${valorCard(c)}${hxN(c)}
     <small>${x ? (x.fechado_em ? `Fechado: contado ${brl(x.fechamento_contado)} · diferença <b class="${+x.diferenca ? "warn" : ""}">${brl(x.diferenca)}</b>` : `Aberto ${hm(x.aberto_em)} com ${brl(x.abertura_valor)}`) : "Não aberto hoje"}</small>
     ${hoje ? `<div class="noprint cxa">${!x ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="va"><button class="btn ghost ab" data-c="${c.caixa_id}">Abrir</button>` : !x.fechado_em ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="vf"><button class="btn ghost fe" data-c="${c.caixa_id}">Fechar</button>` : ""}</div>` : ""}</div>`; };
   const tot = EX.reduce((a, m) => a + Number(m.valor_assinado), 0);
+  const finNota = !adm ? `<p class="muted" id="fin-janela">Financeiro vê os caixas permitidos só nos ${esc(JAN.rotulo || "últimos 3 dias")} (America/Sao_Paulo${JAN.desde ? ", a partir de " + esc(String(JAN.desde).split("-").reverse().join("/")) : ""}). Movimento mais antigo fica oculto. O saldo acumulado não aparece: ele incluiria esse período.</p>` : "";
   app.innerHTML = `<div class="card"><h2>Caixa <button class="btn noprint" id="pe" style="float:right;margin:0">Imprimir extrato (A4)</button></h2>
-  <label class="noprint">Data</label><input id="d" class="noprint" type="date" value="${d}" style="max-width:200px">
+  <label class="noprint">Data</label><input id="d" class="noprint" type="date" value="${d}" style="max-width:200px" ${adm ? "" : `min="${esc(JAN.desde || "")}" max="${esc(JAN.hoje || today())}"`}>
+  ${finNota}
   <div class="grid" style="margin-top:14px">${SA.map(card).join("")}</div></div>
   ${hoje ? `<div class="grid noprint" style="align-items:start">
     <div class="card noprint"><h2>Lançamento manual</h2><form id="lf"><div class="grid">
@@ -1787,13 +1835,28 @@ async function viewCaixa(d = today()) {
     <div><label>Valor (R$)</label><input id="tv" type="number" min="0.01" step="0.01" required></div></div>
     <label>Motivo (obrigatório)</label><input id="tm" minlength="3" maxlength="300" required placeholder="Ex.: abater dívida de COMPRA PRODUTOS">${adm ? `<p class="muted">Como admin, <b>Para</b> inclui os caixas só admin (COMPRA PRODUTOS, PAGAMENTO PRODUTOS). Transferir de Caixa Dinheiro, CAIXA S2 ou PRESTIGE ROSA para COMPRA PRODUTOS abate a dívida. O financeiro não vê esses caixas. A Caixa Especial (ledger separado) continua só aqui para admin.</p>` : ""}<button class="btn">Transferir</button></form></div>
   </div>` : ""}
-  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2>${!adm && !hoje && SA.some(c => /HX/.test(c.nome || "")) ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin.</p>' : ""}<div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Cliente</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
+  ${adm ? `<div class="card noprint" id="fin-lib"><h2>Liberar histórico para Financeiro</h2>
+  <p class="muted">Padrão: últimos 3 dias, só nos caixas que o financeiro já pode ver. A liberação alarga essa janela (data inicial ou número de dias, um caixa ou todos, validade opcional). Revogar volta ao padrão na hora. O saldo acumulado continua só com o admin.</p>
+  <form id="flf"><div class="grid">
+  <div><label>Caixa</label><select id="fl-caixa"><option value="">Todos os caixas do financeiro</option>${SA.filter(c => !c.somente_admin).map(c => `<option value="${c.caixa_id}">${esc(c.nome)}</option>`).join("")}</select></div>
+  <div><label>Como</label><select id="fl-modo"><option value="dias">Últimos N dias</option><option value="desde">A partir de uma data</option></select></div>
+  <div id="fl-dias-box"><label>Dias</label><input id="fl-dias" type="number" min="3" step="1" value="30"></div>
+  <div id="fl-desde-box" hidden><label>A partir de</label><input id="fl-desde" type="date"></div>
+  <div><label>Validade (opcional)</label><input id="fl-expira" type="date"></div></div>
+  <button class="btn" id="fl-ok">Liberar</button></form>
+  <table class="stk" id="fl-tab"><tr><th>Caixa</th><th>Janela</th><th>Validade</th><th></th></tr>
+  ${LIB.filter(g => g.ativo !== false).map(g => `<tr><td>${esc(g.caixa || "Todos os caixas do financeiro")}</td><td>${g.desde ? "desde " + esc(String(g.desde).split("-").reverse().join("/")) : "últimos " + esc(g.dias) + " dias"}</td><td>${g.expira_em ? esc(String(g.expira_em).slice(0, 10).split("-").reverse().join("/")) : "até revogar"}</td><td><button type="button" class="btn ghost fl-rev" data-i="${g.id}">Revogar</button></td></tr>`).join("") || '<tr><td colspan="4" class="muted">Nenhuma liberação ativa. Revogar aparece em cada linha depois de liberar.</td></tr>'}</table></div>` : ""}
+  <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2>${!adm && !hoje && SA.some(c => /HX/.test(c.nome || "")) ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin, salvo liberação.</p>' : ""}${!adm ? '<p class="muted">Linhas anteriores à janela não entram neste extrato.</p>' : ""}<div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Cliente</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
   ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Sem movimentos.</td></tr>'}
-  ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="6">${esc(c.nome)} — movimento do dia${Number(c.saldo) < -0.001 ? ` · saldo ${caixaSaldoHtml(c.saldo)}` : ""}</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
+  ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="6">${esc(c.nome)} — movimento do dia${adm && Number(c.saldo) < -0.001 ? ` · saldo ${caixaSaldoHtml(c.saldo)}` : ""}</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
   <tr class="tot"><th colspan="6">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div></div>`;
   document.querySelectorAll(".hxl").forEach(a => a.onclick = ev => { ev.preventDefault(); go("hxdia"); });
   document.querySelectorAll(".emv").forEach(b => b.onclick = () => estornarMovBox(EX.find(m => m.id === +b.dataset.m), () => viewCaixa(d)));
-  $("#d").onchange = e => viewCaixa(e.target.value); $("#pe").onclick = () => window.print();
+  $("#d").onchange = e => { const v = e.target.value; if (!adm && JAN.desde && v && v < JAN.desde) { toast("Fora da janela do financeiro"); viewCaixa(JAN.desde); return; } if (!adm && JAN.hoje && v > JAN.hoje) { viewCaixa(JAN.hoje); return; } viewCaixa(v); }; $("#pe").onclick = () => window.print();
+  if ($("#fl-modo")) $("#fl-modo").onchange = () => { const dias = $("#fl-modo").value === "dias"; $("#fl-dias-box").hidden = !dias; $("#fl-desde-box").hidden = dias; };
+  if ($("#flf")) $("#flf").onsubmit = async ev => { ev.preventDefault(); const modo = $("#fl-modo").value, caixa = $("#fl-caixa").value ? +$("#fl-caixa").value : null, dias = modo === "dias" ? +$("#fl-dias").value : null, desde = modo === "desde" ? $("#fl-desde").value : null, exp = $("#fl-expira").value ? $("#fl-expira").value + "T23:59:59-03:00" : null;
+    try { await api.caixaFinLiberar(caixa, desde, dias, exp); toast("Histórico liberado para o financeiro"); viewCaixa(d); } catch (e) { toast(e.message); } };
+  document.querySelectorAll(".fl-rev").forEach(b => b.onclick = async () => { try { await api.caixaFinRevogar(+b.dataset.i); toast("Liberação revogada"); viewCaixa(d); } catch (e) { toast(e.message); } });
   document.querySelectorAll(".so").forEach(b => b.onclick = () => viewResumo(d, +b.dataset.c, true));
   document.querySelectorAll(".ab").forEach(b => b.onclick = async () => { const v = document.querySelector(`.va[data-c="${b.dataset.c}"]`).value; if (v === "") return toast("Informe o valor contado");
     try { await api.caixaAbrir(+b.dataset.c, +v); toast("Caixa aberto ✓"); viewCaixa(d); } catch (e) { toast(e.message); } });
@@ -1879,7 +1942,7 @@ async function viewFornecedores() {
     try { await api.salvarFornecedor(ed, f); toast("Fornecedor salvo ✓"); viewFornecedores(); } catch (e) { toast(e.message); } };
 }
 async function viewComprasPendentes() {
-  if (!can("financas")) return viewSeguranca();
+  if (!can("admin")) return viewSeguranca();
   let D, CX = [], err = "";
   try { [D, CX] = await Promise.all([api.comprasPendentes(), api.comprasCaixas()]); }
   catch (e) { if (/migration-compras-pagamento|PGRST202|schema cache|does not exist/i.test(e.message || "")) { app.innerHTML = `<div class="card"><h2>Compras pendentes</h2><p class="warn">${esc(e.message)}</p></div>`; return; } err = e.message; D = { grupos: [], pagas: [] }; }
@@ -1914,7 +1977,7 @@ async function viewPagar() {
   const [K, F, CX] = await Promise.all([api.contas(), api.fornecedores(), api.caixasLista()]);
   const ord = { vencida: 0, aberta: 1, parcial: 1, paga: 2 }; K.sort((a, b) => (ord[a.status] - ord[b.status]) || String(a.vencimento).localeCompare(String(b.vencimento)));
   const aberto = K.filter(k => k.status !== "paga").reduce((a, k) => a + Number(k.restante), 0), venc = K.filter(k => k.status === "vencida").reduce((a, k) => a + Number(k.restante), 0);
-  app.innerHTML = `<div class="card"><h2>Contas a pagar — dívidas com fornecedores</h2><p class="muted">Contas lançadas à mão. Compras da loja que ficaram a pagar estão em <button type="button" class="btn ghost" id="go-cpend">Compras pendentes</button>.</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div></div>
+  app.innerHTML = `<div class="card"><h2>Contas a pagar — dívidas com fornecedores</h2><p class="muted">Contas lançadas à mão.${me.role === "admin" ? ' Compras da loja que ficaram a pagar estão em <button type="button" class="btn ghost" id="go-cpend">Compras pendentes</button>.' : " Compras pendentes da loja ficam só com o admin."}</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div></div>
   <div class="card"><h2>Nova conta</h2><form id="f"><div class="grid"><div><label>Fornecedor</label><select id="fo" required>${F.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select></div>
   <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Vencimento</label><input id="ve" type="date" required></div></div>
   <label>Descrição</label><input id="ds" maxlength="300"><button class="btn">Salvar conta</button>${F.length ? "" : ' <span class="warn">Cadastre um fornecedor primeiro.</span>'}</form></div>
@@ -2030,34 +2093,40 @@ async function exportCSV() {
 const FORMAL = { dinheiro: "Dinheiro", pix: "PIX", cartao: "Cartão", transferencia: "Transferência", boleto: "Boleto", prazo: "Paga Depois" };
 async function viewResumo(d = today(), c = null, back = false) {
   if (me.role !== "admin" && me.role !== "financeiro") { app.innerHTML = '<div class="card"><h2>Sem acesso</h2><p class="muted">Somente admin e financeiro.</p></div>'; return; }
+  let JAN = null; if (me.role !== "admin" && api.caixaFinJanela) { try { JAN = await api.caixaFinJanela(); } catch (e) { JAN = null; } }
+  if (JAN && JAN.desde && d < JAN.desde) d = JAN.desde;
+  if (JAN && JAN.hoje && d > JAN.hoje) d = JAN.hoje;
+  const dlim = JAN && JAN.desde ? ` min="${esc(JAN.desde)}" max="${esc(JAN.hoje || today())}"` : "";
   const L = await api.caixasLista(); c = c || (L.find(x => x.metodo === "pix") || L[0]).caixa_id;
-  let R; try { R = await api.caixaResumo(c, d); } catch (e) { app.innerHTML = `<div class="card"><h2>Resumo do dia</h2><p class="warn">${esc(e.message)}</p><div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div><div><label>Data</label><input id="rd" type="date" value="${d}"></div></div></div>`;
+  let R; try { R = await api.caixaResumo(c, d); } catch (e) { app.innerHTML = `<div class="card"><h2>Resumo do dia</h2><p class="warn">${esc(e.message)}</p><div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div><div><label>Data</label><input id="rd" type="date" value="${d}"${dlim}></div></div></div>`;
     $("#rd").onchange = ev => viewResumo(ev.target.value, c, back); $("#rc").onchange = ev => viewResumo(d, +ev.target.value, back); return; }
   const TL = { venda: "Venda", entrada: "Entrada", saida: "Saída", estorno: "Estorno" }, s = R.sessao, dd = d.split("-").reverse().join("/");
   const VD = {}; if (R.movimentos.some(m => m.nota)) (await (api.notasLancar ? api.notasLancar() : Promise.resolve([])).catch(() => [])).forEach(n => VD[String(n.nota_id).padStart(6, "0")] = n.handle);
   const vend = m => m.nota ? VD[m.nota] || "" : "";
   const FD = api.freteDia ? await api.freteDia(d).catch(() => null) : null;
   const CD = api.caxinhaDia ? await api.caxinhaDia(d).catch(() => null) : null;
-  const hxNote = me.role !== "admin" && /HX/.test(R.caixa || "") ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin. Saldo inicial não inclui dias anteriores.</p>' : "";
+  const admR = me.role === "admin", iniR = admR ? R.saldo_inicial : null, fimR = admR ? R.saldo_final : null;
+  const saldoTxt = v => v == null || v === "" ? "—" : caixaSaldoHtml(v);
+  const hxNote = !admR ? '<p class="muted">Saldo inicial e saldo final ficam só com o admin. Eles incluem movimento anterior à janela do financeiro (últimos 3 dias, ou o período liberado).</p>' : (/HX/.test(R.caixa || "") ? "" : "");
   app.innerHTML = `<div class="card"><h2>Resumo do dia — ${esc(R.caixa)} · ${esc(dd)}
     <span class="noprint" style="float:right">${back ? '<button class="btn ghost" id="bk" style="margin:0">← Caixa (todos)</button> ' : ""}<button class="btn ghost" id="csv" style="margin:0">CSV</button> <button class="btn" id="pr" style="margin:0">Imprimir / PDF (A4)</button></span></h2>
   <div class="grid noprint"><div><label>Caixa</label><select id="rc">${L.map(x => `<option value="${x.caixa_id}" ${x.caixa_id === c ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
-  <div><label>Data (horário de São Paulo)</label><input id="rd" type="date" value="${d}"></div></div>${FD && FD.frete > 0 ? `<p><b>Frete (motoboy) do dia — todas as notas ativas:</b> ${brl(FD.frete)} em ${FD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}${CD && CD.caxinha > 0 ? `<p><b>Caxinha d Natal do dia — todas as notas ativas:</b> ${brl(CD.caxinha)} em ${CD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}
+  <div><label>Data (horário de São Paulo)</label><input id="rd" type="date" value="${d}"${dlim}></div></div>${FD && FD.frete > 0 ? `<p><b>Frete (motoboy) do dia — todas as notas ativas:</b> ${brl(FD.frete)} em ${FD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}${CD && CD.caxinha > 0 ? `<p><b>Caxinha d Natal do dia — todas as notas ativas:</b> ${brl(CD.caxinha)} em ${CD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}
   <div class="grid" style="margin-top:12px">
     <div class="kpi"><small>Abertura</small><b>${s ? brl(s.abertura_valor) : "—"}</b><small>${s ? `${esc(s.aberto_por || "")} ${esc(s.aberto_em || "")}` : "Não aberto"}</small></div>
-    <div class="kpi"><small>Saldo inicial (sistema)</small><b>${caixaSaldoHtml(R.saldo_inicial)}</b></div>
+    <div class="kpi"><small>Saldo inicial (sistema)</small><b>${saldoTxt(iniR)}</b></div>
     <div class="kpi"><small>Entradas</small><b>${brl(R.entradas)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(R.saidas)}</b></div>
     <div class="kpi"><small>Fechamento</small><b>${s && s.fechamento_contado != null ? brl(s.fechamento_contado) : "—"}</b><small>${s && s.diferenca != null ? "Diferença " + brl(s.diferenca) : "Não fechado"}</small></div>
-    <div class="kpi"><small>Saldo final</small><b>${caixaSaldoHtml(R.saldo_final)}</b></div></div>${hxNote}</div>
+    <div class="kpi"><small>Saldo final</small><b>${saldoTxt(fimR)}</b></div></div>${hxNote}</div>
   <div class="card"><h2>Movimentos</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Nota nº</th><th>Cliente</th><th>Vendedor</th><th>Lançada por</th><th>Forma</th><th class="n">Valor</th></tr>
   ${R.movimentos.map(m => `<tr><td>${esc(m.hora)}</td><td>${TL[m.tipo] || esc(m.tipo)}</td><td>${esc(m.nota || "—")}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(vend(m))}</td><td>${esc(m.usuario || "")}</td><td>${esc(FORMAL[m.forma] || m.forma || "")}</td><td class="n">${brl(m.assinado)}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Sem movimentos.</td></tr>'}
   ${Object.entries(R.por_forma).map(([f, v]) => `<tr class="sep"><th colspan="7">Total ${esc(FORMAL[f] || f)}</th><th class="n">${brl(v)}</th></tr>`).join("")}
-  <tr class="tot"><th colspan="7">SALDO FINAL</th><th class="n">${caixaSaldoHtml(R.saldo_final)}</th></tr></table></div>`;
+  <tr class="tot"><th colspan="7">${admR ? "SALDO FINAL" : "MOVIMENTO DO DIA"}</th><th class="n">${admR ? saldoTxt(fimR) : brl((R.movimentos || []).reduce((a, m) => a + Number(m.assinado), 0))}</th></tr></table></div>`;
   $("#rd").onchange = e => viewResumo(e.target.value, c, back); $("#rc").onchange = e => viewResumo(d, +e.target.value, back); if ($("#bk")) $("#bk").onclick = () => go("caixa"); $("#pr").onclick = () => window.print();
   $("#csv").onclick = () => { const q = v => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; }, n = v => Number(v).toFixed(2).replace(".", ",");
-    const rows = [["Caixa", R.caixa], ["Data", dd], ["Abertura", s ? n(s.abertura_valor) : ""], ["Saldo inicial", n(R.saldo_inicial)], [], ["Data/hora", "Tipo", "Nota", "Cliente", "Vendedor", "Lançada por", "Forma", "Valor", "Motivo"],
+    const rows = [["Caixa", R.caixa], ["Data", dd], ["Abertura", s ? n(s.abertura_valor) : ""], ["Saldo inicial", admR && iniR != null ? n(iniR) : ""], [], ["Data/hora", "Tipo", "Nota", "Cliente", "Vendedor", "Lançada por", "Forma", "Valor", "Motivo"],
       ...R.movimentos.map(m => [m.hora, TL[m.tipo] || m.tipo, m.nota || "", m.cliente || "", vend(m), m.usuario || "", FORMAL[m.forma] || m.forma || "", n(m.assinado), m.motivo || ""]), [],
-      ...Object.entries(R.por_forma).map(([f, v]) => ["Total " + (FORMAL[f] || f), n(v)]), ["Fechamento contado", s && s.fechamento_contado != null ? n(s.fechamento_contado) : ""], ["Saldo final", n(R.saldo_final)]];
+      ...Object.entries(R.por_forma).map(([f, v]) => ["Total " + (FORMAL[f] || f), n(v)]), ["Fechamento contado", s && s.fechamento_contado != null ? n(s.fechamento_contado) : ""], ["Saldo final", admR && fimR != null ? n(fimR) : ""]];
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `resumo-${R.caixa.replace(/[^\w]+/g, "-").toLowerCase()}-${d}.csv`; a.click(); };
 }
