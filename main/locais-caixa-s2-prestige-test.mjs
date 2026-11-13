@@ -12,7 +12,7 @@ const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else cons
 
 ok(app.includes('const LOCAIS = ["MAQUINA", "HX", "DINHEIRO", "CAIXA GERAL", "CAIXA S2", "PRESTIGE ROSA"]'), "LOCAIS lists CAIXA S2 and PRESTIGE AURA after the existing locals");
 ok(app.includes('LOCAIS.concat(me.role === "admin" ? LOCAIS_ADMIN : [])'), "sale screen still appends Caixa Especial only for admin");
-ok(html.includes("app.js?v=20261113f"), "cache tag bumped so the loja reloads app.js");
+ok(html.includes("app.js?v=20261113i"), "cache tag bumped so the loja reloads app.js");
 ok(sql.includes("'CAIXA S2'") && sql.includes("'PRESTIGE AURA'") && sql.includes("notas_local_pag_chk"), "migration extends the local_pagamento check");
 ok(sql.includes("'MAQUINA','HX','DINHEIRO','CAIXA GERAL','CAIXA ESPECIAL','CAIXA S2','PRESTIGE AURA'"), "criar_nota_local allowlist includes the two new locais");
 ok(!/insert into public\.caixa_movimentos/.test(sql), "creating the nota still does not auto-post to caixa_movimentos");
