@@ -111,7 +111,32 @@
       return Object.assign({}, p, { preco_venda: calc.preco });
     });
   }
-  /* Cotação geral: Importado com custo_usd ganha custo R$ = custo_usd × cotação (sem ,99).
+  /* Média das unidades importadas. Lote travado usa a taxa gravada.
+     Lote aberto (travado false) usa a cotação do dia. Sem lotes, cai no custo_usd × cotação. */
+  function custoMedioLotes(lotes, cotacao) {
+    if (!Array.isArray(lotes) || !lotes.length) return { value: null };
+    let sumCents = 0;
+    let den = 0;
+    for (const l of lotes) {
+      const q = Number(l.qtd);
+      if (!Number.isInteger(q) || q <= 0) return { error: "Quantidade do lote inválida." };
+      const rate = l.travado ? l.taxa : cotacao;
+      const conv = custoReaisDeUsd(l.custo_usd, rate);
+      if (conv.error) return conv;
+      const unitCents = unitsOf(conv.value, 2);
+      if (unitCents == null || unitCents < 0) return { error: "Custo em R$ inválido." };
+      sumCents += q * unitCents;
+      den += q;
+    }
+    if (!den) return { value: null };
+    const raw = sumCents / den;
+    let avg = Math.trunc(raw);
+    const frac = raw - avg;
+    if (frac > 0.5 || Math.abs(frac - 0.5) < 1e-9) avg += 1;
+    return { value: fromUnits(avg, 2) };
+  }
+  /* Cotação geral: sem lotes, Importado com custo_usd ganha custo R$ = custo_usd × cotação (sem ,99).
+     Com lotes, a média ponderada mistura o que já está travado com o que ainda segue a cotação.
      O preço de gôndola usa esse custo novo no piso. Nacional não muda. */
   function aplicarCotacao(products, costs, cotacao) {
     const nextCosts = {};
@@ -119,7 +144,11 @@
       const c = Object.assign({ custo: null, custo_usd: null }, costs ? costs[p.sku] : null);
       if (p.origem !== "Importado") { nextCosts[p.sku] = c; return Object.assign({}, p); }
       let custo = c.custo;
-      if (c.custo_usd != null && c.custo_usd !== "") {
+      if (Array.isArray(c.lotes) && c.lotes.length) {
+        const medio = custoMedioLotes(c.lotes, cotacao);
+        if (medio.error) { nextCosts[p.sku] = c; return Object.assign({}, p, { error: medio.error }); }
+        if (medio.value != null) custo = medio.value;
+      } else if (c.custo_usd != null && c.custo_usd !== "") {
         const conv = custoReaisDeUsd(c.custo_usd, cotacao);
         if (conv.error) { nextCosts[p.sku] = c; return Object.assign({}, p, { error: conv.error }); }
         custo = conv.value;
@@ -139,7 +168,7 @@
     return "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
   root.BAGDA_ORIGEM = {
-    parseUsd, parseCustoUsd, parseCotacao, precoReaisImportado, custoReaisDeUsd,
+    parseUsd, parseCustoUsd, parseCotacao, precoReaisImportado, custoReaisDeUsd, custoMedioLotes,
     aplicarLinha, recalcularImportados, aplicarCotacao, formatUsd, formatCotacao, unitsOf
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
