@@ -51,10 +51,23 @@ ok(JSON.stringify(notas) === antes && JSON.stringify(produtos[1].preco_venda) ==
 const piso = O.recalcularImportados([{ sku: "APL-001", origem: "Importado", preco_usd: 100, preco_venda: 99.99 }], { "APL-001": 100 }, 1);
 ok(cents(piso[0].preco_venda) === 10000, "rate recalc keeps the round value when ,99 would drop under cost");
 
+const ex = O.aplicarCotacao(
+  [{ sku: "IMP", origem: "Importado", preco_usd: 100, preco_venda: 1 }, { sku: "NAC", origem: "Nacional", preco_venda: 799 }],
+  { IMP: { custo: 100, custo_usd: 80 }, NAC: { custo: 480, custo_usd: null } },
+  5.4
+);
+ok(cents(ex.costs.IMP.custo) === 43200 && cents(ex.products[0].preco_venda) === 53999, "US$ 80 at 5.40 becomes R$ 432.00 and the shelf is 539.99");
+ok(ex.costs.NAC.custo === 480 && ex.products[1].preco_venda === 799, "a Nacional cost and price are not touched by the rate");
+const acima = O.aplicarCotacao([{ sku: "IMP", origem: "Importado", preco_usd: 100, preco_venda: 1 }], { IMP: { custo: 1, custo_usd: 100 } }, 5.4);
+ok(cents(acima.costs.IMP.custo) === 54000 && cents(acima.products[0].preco_venda) === 54000, "when the new R$ cost is 540 the ,99 price is kept at the round 540");
+const compra = O.custoReaisDeUsd(80, 5.8);
+ok(cents(compra.value) === 46400 && cents(ex.costs.IMP.custo) === 43200, "the compra rate prices that purchase; the live cost stays on the global rate");
+
 const app = read("app.js");
 const html = read("index.html");
-ok(html.includes("origem-preco.js?v=20261113d") && html.includes("app.js?v=20261113d") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script, app, and css");
+ok(html.includes("origem-preco.js?v=20261113e") && html.includes("app.js?v=20261113e") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
 ok(app.includes('class="lo"') && app.includes(">Nacional<") && app.includes(">Importado<") && app.includes("preco_usd") && app.includes("custo_usd"), "compra lines choose Nacional or Importado and send the US$ price");
+ok(app.includes('id="taxa"') && app.includes("Taxa do dólar desta compra"), "an Importado compra has an editable dollar rate");
 ok(app.includes('id="cotacao"') && app.includes("Cotação do dólar") && app.includes("cotacaoSalvar") && app.includes("última atualização"), "admin can edit the rate and sees when it last changed");
 ok(app.includes("usd-b") && app.includes(">US$<"), "importado rows get a US$ badge");
 const nota = app.slice(app.indexOf("async function viewNota"), app.indexOf("async function viewRecibo"));
@@ -73,7 +86,9 @@ ok(sql.includes("alterado_por") && sql.includes("alterado_em") && sql.includes("
 ok(!/update\s+public\.(sales|notas|sale_costs)\b/i.test(sql), "saved notas and their prices are not rewritten");
 ok(sql.includes("where origem = 'Importado'") && sql.includes("bagda.recalc_dolar"), "saving the rate recalculates Importado shelf prices immediately");
 ok(sql.includes("origem_ok") && sql.includes("registrar_compra_origem") && sql.includes("new.origem is null then return null"), "compra sets origin only when the line sends it");
-ok(sql.includes("custo_usd") && sql.includes("product_costs"), "optional US$ cost stays on the admin cost table");
+ok(sql.includes("custo_usd") && sql.includes("product_costs") && sql.includes("round(c.custo_usd * round(p_valor, 4), 2)") && sql.includes("p.origem = 'Importado' and c.custo_usd is not null"), "saving the global rate recomputes Importado R$ cost from custo_usd");
+ok(sql.includes("new.custo_usd * new.taxa_dolar") && sql.includes("new.taxa_dolar := null") && sql.includes("new.custo_usd * v_global"), "the compra rate prices that purchase line; the live cost uses the global rate; Nacional stores no rate");
+ok(sql.includes("compras add column if not exists taxa_dolar") && sql.includes("purchases add column if not exists taxa_dolar"), "the rate used is stored on the compra and on the purchase line");
 const sellerView = sql.slice(sql.indexOf("view public.estoque_vendedor"), sql.indexOf("view public.v_admin_products"));
 ok(sellerView.includes("p.origem") && !sellerView.includes("preco_usd"), "seller stock view gains origin and not the US$ price");
 const kiosk = readFileSync(join(dir, "../kiosk/app.js"), "utf8");

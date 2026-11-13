@@ -14,9 +14,19 @@
 --   se o ,99 ficaria abaixo do custo em R$ (estrito), fica o redondo.
 --   Ex.: 100,00 → 99,99. Custo 100,00 → fica 100,00.
 --
--- Cotação: o admin grava quando quiser (não há job diário). Cada gravação entra no
--- histórico (valor, quem, quando) e recalcula na hora o preco_venda dos Importados.
--- Custo continua só admin (product_costs). custo_usd, se informado, também fica lá.
+-- Cotação geral: o admin grava quando quiser (não há job diário). Cada gravação entra no
+-- histórico (valor, quem, quando) e, nos Importados:
+--   custo R$ (product_costs.custo) = custo_usd × cotação   — só quem tem custo_usd
+--   preco_venda = preco_usd × cotação, com a regra ,99, usando esse custo R$ novo
+-- Nacional não entra nessa conta.
+--
+-- Taxa da compra: na tela de Compras, se alguma linha é Importado, o admin vê
+-- "Taxa do dólar" preenchida com a cotação geral e pode mudar. Essa taxa converte
+-- o US$ daquela compra para o custo em R$ gravado na linha (purchases.custo_unit)
+-- e fica no cabeçalho (compras.taxa_dolar) e na linha importada. O preço de
+-- gôndola e o custo atual do produto usam a cotação GERAL, não a taxa da compra.
+-- Não existe tabela de histórico de custo: product_costs.custo é o valor atual
+-- (updated_at muda). A linha da compra guarda o R$ daquela compra. sale_costs não muda.
 
 alter table public.products add column if not exists origem text;
 update public.products set origem = 'Nacional' where origem is null;
@@ -47,6 +57,13 @@ alter table public.purchases drop constraint if exists purchases_custo_usd_check
 alter table public.purchases add constraint purchases_custo_usd_check check (custo_usd is null or (custo_usd >= 0 and custo_usd <= 999999.99));
 alter table public.purchases drop constraint if exists purchases_importado_usd_check;
 alter table public.purchases add constraint purchases_importado_usd_check check (origem is distinct from 'Importado' or preco_usd is not null);
+alter table public.purchases add column if not exists taxa_dolar numeric(7,4);
+alter table public.purchases drop constraint if exists purchases_taxa_dolar_check;
+alter table public.purchases add constraint purchases_taxa_dolar_check check (taxa_dolar is null or (taxa_dolar > 0 and taxa_dolar <= 999));
+
+alter table public.compras add column if not exists taxa_dolar numeric(7,4);
+alter table public.compras drop constraint if exists compras_taxa_dolar_check;
+alter table public.compras add constraint compras_taxa_dolar_check check (taxa_dolar is null or (taxa_dolar > 0 and taxa_dolar <= 999));
 
 -- Histórico da cotação. Sem grant: só as RPCs (security definer) leem e gravam.
 create table if not exists public.cotacao_dolar (
@@ -132,18 +149,53 @@ drop trigger if exists products_biu_origem on public.products;
 create trigger products_biu_origem before insert or update on public.products
   for each row execute function public.tg_products_origem();
 
--- Compra: estoque e custo em R$ como hoje. Se a linha traz origem, grava no produto.
--- origem null = cliente antigo: não muda a origem nem o preço de venda.
-create or replace function public.tg_purchase_insert()
+-- Antes de gravar a linha: taxa da compra só no Importado. O custo em R$ da LINHA
+-- (histórico da compra) = custo_usd × taxa da compra. Nacional não leva taxa.
+create or replace function public.tg_purchase_taxa_bi()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
+  if new.origem is distinct from 'Importado' then
+    new.taxa_dolar := null;
+    return new;
+  end if;
+  if new.taxa_dolar is null or new.taxa_dolar <= 0 or new.taxa_dolar > 999 or new.taxa_dolar <> round(new.taxa_dolar, 4) then
+    raise exception 'Item importado precisa da taxa do dólar desta compra' using errcode = 'P0001';
+  end if;
+  new.taxa_dolar := round(new.taxa_dolar, 4);
+  if new.custo_usd is not null then
+    new.custo_unit := round(new.custo_usd * new.taxa_dolar, 2);
+  end if;
+  return new;
+end $$;
+revoke all on function public.tg_purchase_taxa_bi() from public, anon, authenticated;
+drop trigger if exists purchase_bi_taxa on public.purchases;
+create trigger purchase_bi_taxa before insert on public.purchases
+  for each row execute function public.tg_purchase_taxa_bi();
+
+-- Compra: estoque como hoje. Custo atual do produto Importado com custo_usd
+-- = custo_usd × cotação GERAL (não a taxa da compra). Sem custo_usd, o R$ digitado
+-- vira o custo atual, como hoje. origem null = cliente antigo: não muda origem nem preço.
+create or replace function public.tg_purchase_insert()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_custo numeric := new.custo_unit; v_global numeric;
+begin
   update public.products set estoque = estoque + new.qtd, updated_at = now() where sku = new.sku;
+  if new.origem = 'Importado' and new.custo_usd is not null then
+    v_global := public.cotacao_dolar_valor();
+    if v_global is null then
+      raise exception 'Defina a cotação do dólar antes de lançar produto importado' using errcode = 'P0001';
+    end if;
+    v_custo := round(new.custo_usd * v_global, 2);
+  end if;
   insert into public.product_costs(sku, custo, custo_usd)
-  values (new.sku, new.custo_unit, new.custo_usd)
+  values (new.sku, v_custo, new.custo_usd)
   on conflict (sku) do update set
     custo = excluded.custo,
     custo_usd = coalesce(excluded.custo_usd, public.product_costs.custo_usd),
     updated_at = now();
+  if new.taxa_dolar is not null and new.compra_id is not null then
+    update public.compras set taxa_dolar = new.taxa_dolar where id = new.compra_id;
+  end if;
   if new.origem is null then return null; end if;
   if new.origem = 'Importado' then
     if new.preco_usd is null or new.preco_usd <= 0 then
@@ -190,6 +242,10 @@ begin
     raise exception 'Cotação inválida' using errcode = 'P0001';
   end if;
   insert into public.cotacao_dolar(valor, alterado_por) values (round(p_valor, 4), auth.uid());
+  update public.product_costs c
+     set custo = round(c.custo_usd * round(p_valor, 4), 2), updated_at = now()
+    from public.products p
+   where p.sku = c.sku and p.origem = 'Importado' and c.custo_usd is not null;
   perform set_config('bagda.recalc_dolar', '1', true);
   update public.products set updated_at = now() where origem = 'Importado';
   return public.cotacao_dolar_ler();
@@ -215,13 +271,15 @@ declare v_lote uuid := gen_random_uuid(); it jsonb; n int := 0; v_tot numeric :=
   v_forn text := nullif(btrim(regexp_replace(coalesce(p_header->>'fornecedor', ''), '\s+', ' ', 'g')), '');
   v_obs text := nullif(btrim(coalesce(p_header->>'observacao', '')), '');
   v_data date := coalesce(nullif(p_header->>'data', '')::date, (now() at time zone 'America/Sao_Paulo')::date);
-  v_origem text; v_usd numeric; v_cusd numeric;
+  v_taxa numeric := nullif(p_header->>'taxa_dolar', '')::numeric;
+  v_origem text; v_usd numeric; v_cusd numeric; v_custo numeric;
 begin
   if not (public.can('admin')) then raise exception 'Só admin registra compra' using errcode = '42501'; end if;
   if jsonb_typeof(p_itens) <> 'array' or jsonb_array_length(p_itens) = 0 then raise exception 'Nenhum item' using errcode = 'P0001'; end if;
   if jsonb_array_length(p_itens) > 200 then raise exception 'Máximo 200 itens por compra' using errcode = 'P0001'; end if;
   if v_data > (now() at time zone 'America/Sao_Paulo')::date then raise exception 'Data no futuro' using errcode = 'P0001'; end if;
   if length(v_forn) > 120 or length(v_obs) > 500 then raise exception 'Fornecedor/observação longos demais' using errcode = 'P0001'; end if;
+  if v_taxa is not null and (v_taxa <= 0 or v_taxa > 999 or v_taxa <> round(v_taxa, 4)) then raise exception 'Taxa do dólar inválida' using errcode = 'P0001'; end if;
   for it in select * from jsonb_array_elements(p_itens) loop
     n := n + 1;
     v_origem := nullif(btrim(coalesce(it->>'origem', '')), '');
@@ -232,11 +290,16 @@ begin
     if coalesce((it->>'custo_unit')::numeric, -1) < 0 then raise exception 'Item %: custo inválido', n using errcode = 'P0001'; end if;
     if v_origem is not null and v_origem not in ('Nacional', 'Importado') then raise exception 'Item %: origem inválida', n using errcode = 'P0001'; end if;
     if v_origem = 'Importado' and (v_usd is null or v_usd <= 0) then raise exception 'Item %: informe o preço em US$', n using errcode = 'P0001'; end if;
+    if v_origem = 'Importado' and v_taxa is null then raise exception 'Item %: informe a taxa do dólar desta compra', n using errcode = 'P0001'; end if;
     if v_cusd is not null and v_cusd < 0 then raise exception 'Item %: custo em US$ inválido', n using errcode = 'P0001'; end if;
-    insert into public.purchases (data, sku, fornecedor, qtd, custo_unit, observacao, compra_lote, origem, preco_usd, custo_usd)
-    values (v_data, it->>'sku', v_forn, (it->>'qtd')::int, round((it->>'custo_unit')::numeric, 2), v_obs, v_lote,
-            v_origem, case when v_origem = 'Importado' then round(v_usd, 2) end, case when v_cusd is not null then round(v_cusd, 2) end);
-    v_tot := v_tot + (it->>'qtd')::int * round((it->>'custo_unit')::numeric, 2);
+    v_custo := round((it->>'custo_unit')::numeric, 2);
+    if v_origem = 'Importado' and v_cusd is not null then v_custo := round(v_cusd * v_taxa, 2); end if;
+    insert into public.purchases (data, sku, fornecedor, qtd, custo_unit, observacao, compra_lote, origem, preco_usd, custo_usd, taxa_dolar)
+    values (v_data, it->>'sku', v_forn, (it->>'qtd')::int, v_custo, v_obs, v_lote,
+            v_origem, case when v_origem = 'Importado' then round(v_usd, 2) end,
+            case when v_cusd is not null then round(v_cusd, 2) end,
+            case when v_origem = 'Importado' then round(v_taxa, 4) end);
+    v_tot := v_tot + (it->>'qtd')::int * v_custo;
   end loop;
   if v_forn is not null and length(v_forn) >= 2 and not exists (select 1 from public.fornecedores f where lower(btrim(f.nome)) = lower(v_forn)) then
     insert into public.fornecedores (nome) values (v_forn);

@@ -111,6 +111,26 @@
       return Object.assign({}, p, { preco_venda: calc.preco });
     });
   }
+  /* Cotação geral: Importado com custo_usd ganha custo R$ = custo_usd × cotação (sem ,99).
+     O preço de gôndola usa esse custo novo no piso. Nacional não muda. */
+  function aplicarCotacao(products, costs, cotacao) {
+    const nextCosts = {};
+    const nextProducts = products.map(p => {
+      const c = Object.assign({ custo: null, custo_usd: null }, costs ? costs[p.sku] : null);
+      if (p.origem !== "Importado") { nextCosts[p.sku] = c; return Object.assign({}, p); }
+      let custo = c.custo;
+      if (c.custo_usd != null && c.custo_usd !== "") {
+        const conv = custoReaisDeUsd(c.custo_usd, cotacao);
+        if (conv.error) { nextCosts[p.sku] = c; return Object.assign({}, p, { error: conv.error }); }
+        custo = conv.value;
+      }
+      nextCosts[p.sku] = Object.assign({}, c, { custo: custo });
+      const calc = precoReaisImportado(p.preco_usd, cotacao, custo != null && custo !== "" ? custo : null);
+      if (calc.error) return Object.assign({}, p, { error: calc.error });
+      return Object.assign({}, p, { preco_venda: calc.preco });
+    });
+    return { products: nextProducts, costs: nextCosts };
+  }
   function formatUsd(v) {
     return "US$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
@@ -119,6 +139,6 @@
   }
   root.BAGDA_ORIGEM = {
     parseUsd, parseCustoUsd, parseCotacao, precoReaisImportado, custoReaisDeUsd,
-    aplicarLinha, recalcularImportados, formatUsd, formatCotacao, unitsOf
+    aplicarLinha, recalcularImportados, aplicarCotacao, formatUsd, formatCotacao, unitsOf
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
