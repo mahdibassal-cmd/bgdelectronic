@@ -28,7 +28,11 @@ const MOCK = qs.has("mock");
 if (MOCK) window.__demo = { get api() { return api; }, viewComprovante: (...a) => viewComprovante(...a), viewImei: (...a) => viewImei(...a), get me() { return me; } };
 const PAY = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["cartao", "Cartão"], ["prazo", "Paga Depois"]];
 const PAYL = { ...Object.fromEntries(PAY), credito: "Caixa Geral (crédito)" };
-const LOCAIS = ["MAQUINA", "HX", "DINHEIRO", "CAIXA GERAL", "CAIXA S2", "PRESTIGE AURA"];
+const LOCAIS = ["MAQUINA", "HX", "DINHEIRO", "CAIXA GERAL", "CAIXA S2", "PRESTIGE ROSA"];
+// Only admins see/use these in Nova nota (criar_nota_local also rejects them for non-admins).
+const LOCAIS_ADMIN = ["BITLOG CONTAINER", "CAIXA ESPECIAL"];
+// PRESTIGE AURA was renamed PRESTIGE ROSA (caixa 15); old notas keep the old stored value.
+const localLbl = l => l === "PRESTIGE AURA" ? "PRESTIGE ROSA" : l;
 const ROLEL = { admin: "Admin", vendedor: "Vendedor(a)", financeiro: "Financeiro", estoque: "Estoque" };
 /* permissões por papel (espelha public.role_perms no banco; o banco é quem garante) */
 const PERMS = { admin: ["admin", "vendas", "caixa", "financas", "estoque"], vendedor: ["vendas"], financeiro: ["caixa", "financas"], estoque: ["estoque"] };
@@ -81,7 +85,7 @@ const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.rou
     "Codigo Descricao", rc3("Qtd", "Preco", "Total"), D,
     ...R.flatMap(r => [rcWrap([r.sku, r.marca, r.produto, r.tamanho].filter(Boolean).join(" ").toUpperCase()), rc3(r.qtd + " Un", rnum(r.preco_vendido), rnum(r.total))]), D,
     rcL("Total: " + qt, "Itens: " + R.length), D, rcL("Subtotal:", rnum(legado ? 0 : tot)), ...(legado ? [rcDot("DIVIDA ANTERIOR", rnum(fr || tot))] : [...(fr > 0 ? [rcDot("FRETE", rnum(fr))] : []), ...(cx > 0 ? [rcDot("CAXINHA D NATAL", rnum(cx))] : [])]), rcL("Desc.:", "0,00"), rcL("TOTAL:", "R$ " + rnum(legado ? (fr || tot) : tot + fr + cx)), D,
-    ...pays.map(p => rcWrap("Pago: " + p)), ...(h.prazo_dias ? [rcWrap("Paga em: " + h.prazo_dias + (Number(h.prazo_dias) === 1 ? " dia" : " dias") + (h.vencimento ? " (vence " + String(h.vencimento).slice(0, 10).split("-").reverse().join("/") + ")" : ""))] : []), ...(h.local_pagamento ? [rcWrap("Local pagto: " + h.local_pagamento)] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
+    ...pays.map(p => rcWrap("Pago: " + p)), ...(h.prazo_dias ? [rcWrap("Paga em: " + h.prazo_dias + (Number(h.prazo_dias) === 1 ? " dia" : " dias") + (h.vencimento ? " (vence " + String(h.vencimento).slice(0, 10).split("-").reverse().join("/") + ")" : ""))] : []), ...(h.local_pagamento ? [rcWrap("Local pagto: " + localLbl(h.local_pagamento))] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -536,6 +540,7 @@ if (!MOCK && !CONFIGURED) {
       if (pags.some(g => g.metodo === "prazo") && (prazoDias == null || prazoDias === "" || !(+prazoDias >= 1 && +prazoDias <= 30))) throw new Error("Informe o prazo (1 a 30 dias) para Paga Depois");
       if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + (+frete || 0) + (+caxinha || 0)) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
         const nid = mkNota(items, [{ metodo: "credito", valor: t }], cliente, meU, null, clienteId, local, obs, frete, caxinha, null); CR.push({ id: id++, cliente_id: clienteId, tipo: "uso", valor: t, obs: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, handle: meU.handle, created_at: new Date().toISOString() }); return nid; }
+      if (local === "BITLOG CONTAINER" && meU.role !== "admin") throw new Error("Somente admin");
       if (local === "CAIXA ESPECIAL") { if (meU.role !== "admin") throw new Error("Somente admin"); const pago = Math.round(pags.filter(g => g.metodo !== "prazo" && g.metodo !== "credito").reduce((a, g) => a + Number(g.valor), 0) * 100) / 100; if (!(pago > 0)) throw new Error("Nota sem valor para a Caixa Especial"); const antes = MV.length; const nid = mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha, prazoDias); if (MV.length !== antes) throw new Error("CAIXA ESPECIAL não entra nos caixas do dia"); const mid = id++; CXE.push({ id: mid, tipo: "entrada", valor: pago, motivo: "Nota " + String(nid).padStart(6, "0"), nota_id: nid, created_at: new Date().toISOString() }); const n = N.find(x => x.nota_id === nid); n.cxesp_mov = mid; n.caixa_lancada_id = null; n.lancada_em = n.created_at; return nid; }
       if (+caxinha > 0 && qs.has("nocaxinha")) throw new Error("Caxinha d Natal depende de atualização do banco — avise o admin.");
       if (+frete > 0 && qs.has("nofrete")) throw new Error("Frete depende de atualização do banco — avise o admin."); return mkNota(items, pags, cliente, meU, null, clienteId, local, obs, frete, caxinha, prazoDias); },
@@ -1294,7 +1299,7 @@ async function viewNota() {
   <div class="grid"><div><label>Frete (motoboy) R$ — opcional</label><input id="fre" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div><div id="cxbox"></div></div>
   <p class="muted">Frete e Caxinha entram no total. Sem estoque/custo. Nota só de frete/caxinha é permitida.</p>
   <h3>Pagamento</h3><div id="pgs"></div><button class="btn ghost" id="addpg" type="button">+ Dividir pagamento</button> <span id="pgok" class="muted"></span>
-  <div class="grid" id="lpbox"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.concat(me.role === "admin" ? ["CAIXA ESPECIAL"] : []).map(l => `<option>${l}</option>`).join("")}</select></div>
+  <div class="grid" id="lpbox"><div><label>Local do pagamento *</label><select id="lp" required><option value="">— selecione —</option>${LOCAIS.concat(me.role === "admin" ? LOCAIS_ADMIN : []).map(l => `<option>${l}</option>`).join("")}</select></div>
   <div><label>Observação (opcional)</label><input id="obp" maxlength="200" placeholder="Ex.: maquininha 2, pago pelo marido…"></div></div><p class="muted" id="lpinfo"></p>
   <div id="prazobox" hidden><label for="pagaem">Paga em *</label><select id="pagaem">${(globalThis.BAGDA_PRAZO ? BAGDA_PRAZO.optionsHtml(7) : "")}</select><p class="muted" id="pagavenc"></p></div>
   <label>Nome do cliente (referência, sem cadastro)</label><input id="cref" maxlength="120" placeholder="Opcional — sai no cupom como Cliente:">
@@ -1822,7 +1827,7 @@ async function viewLancar(todas) {
   <p class="muted">A nota do vendedor fica pendente até você escolher o caixa. A parte Paga Depois vai para a <b>Caixa Geral como débito do cliente</b> (não entra dinheiro em caixa); depois, em Contas a receber, os pagamentos abatem a dívida e o que passar vira crédito. Errou o caixa? Mostre as lançadas e lance de novo no caixa certo (estorna o antigo).</p>
   <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="tod" ${todas ? "checked" : ""} style="width:auto"> Mostrar também as já lançadas e as "Não lançar"</label></div>
   <div class="card"><table class="stk lanc"><tr><th>Nº</th><th>Data</th><th>Vendedor</th><th>Cliente</th><th>Pagamento</th><th>Local</th><th class="n">Valor p/ caixa</th><th>Situação</th><th>Caixa</th></tr>
-  ${show.map(n => `<tr><td>${nn(n.nota_id)}</td><td>${esc(dh(n.created_at))}</td><td>${esc(n.handle || "")}</td>${cliCell(n)}<td>${esc(pgs(n))}</td><td>${esc(n.local_pagamento || "")}</td><td class="n"><b>${brl(n.valor_caixa)}</b></td>${cxCells(n)}</tr>${pzCells(n)}`).join("") || `<tr><td colspan="9" class="muted">${todas ? "Nenhuma nota." : "Nenhuma nota pendente ✓"}</td></tr>`}</table></div>`;
+  ${show.map(n => `<tr><td>${nn(n.nota_id)}</td><td>${esc(dh(n.created_at))}</td><td>${esc(n.handle || "")}</td>${cliCell(n)}<td>${esc(pgs(n))}</td><td>${esc(localLbl(n.local_pagamento) || "")}</td><td class="n"><b>${brl(n.valor_caixa)}</b></td>${cxCells(n)}</tr>${pzCells(n)}`).join("") || `<tr><td colspan="9" class="muted">${todas ? "Nenhuma nota." : "Nenhuma nota pendente ✓"}</td></tr>`}</table></div>`;
   $("#tod").onchange = e => viewLancar(e.target.checked);
   document.querySelectorAll(".lok").forEach(b => b.onclick = async () => { const n = show.find(x => x.nota_id === +b.dataset.n), sel = document.querySelector(`.lcx[data-n="${b.dataset.n}"]`), raw = sel.value; if (!raw) return toast("Escolha o caixa");
     const nm = sel.selectedOptions[0].textContent, mv = n.caixa_lancada_id || n.tem_movimento || cxEsp(n), special = raw === "cxesp";

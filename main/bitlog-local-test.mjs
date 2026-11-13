@@ -1,0 +1,23 @@
+/* Nova nota: BITLOG CONTAINER only for admin, PRESTIGE AURA label renamed PRESTIGE ROSA. Sem banco. */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+const dir = dirname(fileURLToPath(import.meta.url));
+const app = readFileSync(join(dir, "app.js"), "utf8");
+const html = readFileSync(join(dir, "index.html"), "utf8");
+const sql = readFileSync(join(dir, "../supabase-loja/migration-bitlog-local-rosa.sql"), "utf8");
+let failed = 0;
+const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
+const locais = app.match(/const LOCAIS = \[[^\]]*\]/)[0];
+ok(locais.includes('"PRESTIGE ROSA"') && !locais.includes("AURA"), "LOCAIS shows PRESTIGE ROSA, not PRESTIGE AURA");
+ok(!locais.includes("BITLOG"), "BITLOG CONTAINER is not in the list everyone sees");
+ok(app.includes('const LOCAIS_ADMIN = ["BITLOG CONTAINER", "CAIXA ESPECIAL"]') && app.includes('LOCAIS.concat(me.role === "admin" ? LOCAIS_ADMIN : [])'), "BITLOG CONTAINER only appended for admin");
+ok(app.includes('const localLbl = l => l === "PRESTIGE AURA" ? "PRESTIGE ROSA" : l;') && app.includes("localLbl(h.local_pagamento)") && app.includes("localLbl(n.local_pagamento)"), "old notas with PRESTIGE AURA display as PRESTIGE ROSA");
+ok(app.includes('if (local === "BITLOG CONTAINER" && meU.role !== "admin") throw new Error("Somente admin");'), "demo mock also rejects BITLOG for non-admin");
+ok(html.includes("app.js?v=20261113c"), "cache tag 20261113c");
+ok(sql.includes("if p_local in ('CAIXA ESPECIAL', 'BITLOG CONTAINER') then") && sql.includes("raise exception 'Somente admin'"), "server rejects BITLOG CONTAINER for non-admin");
+ok(sql.includes("if p_local = 'PRESTIGE AURA' then p_local := 'PRESTIGE ROSA'; end if;"), "old label from cached apps is saved as PRESTIGE ROSA");
+ok(sql.includes("'PRESTIGE AURA','PRESTIGE ROSA','BITLOG CONTAINER'") && sql.includes("notas_local_pag_chk"), "check keeps old value valid and allows the new ones");
+ok(sql.includes("if v_dias is not null and (v_dias < 1 or v_dias > 30) then"), "prazo-opcional hotfix kept");
+ok(!/insert into public\.caixa_movimentos/.test(sql), "creating the nota still does not auto-post to caixa_movimentos");
+if (failed) { console.error(failed + " failed"); process.exit(1); } else console.log("bitlog local ok");
