@@ -346,10 +346,25 @@ if (!MOCK && !CONFIGURED) {
       if (r.error && /PGRST202|42883|compras_pendentes|schema cache|does not exist/i.test(em)) throw new Error("Compras pendentes ainda dependem da atualização do banco (supabase-loja/migration-compras-pagamento.sql).");
       return ok(r);
     },
-    async compraPagar(id, valor, caixa) {
-      const r = await sb.rpc("compra_pagar", { p_compra: id, p_valor: valor, p_caixa: caixa });
+    async compraPagar(id, valor, caixa, cambio, data) {
+      const args = { p_compra: id, p_valor: valor, p_caixa: caixa };
+      if (cambio != null && cambio !== "") args.p_cambio = cambio;
+      if (data) args.p_data = data;
+      const r = await sb.rpc("compra_pagar", args);
       const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
-      if (r.error && /PGRST202|42883|compra_pagar|schema cache|does not exist/i.test(em)) throw new Error("Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi lançado.");
+      if (r.error && /PGRST202|42883|compra_pagar|schema cache|does not exist/i.test(em)) throw new Error(cambio != null ? "Câmbio do pagamento ainda depende da atualização do banco (supabase-loja/migration-cambio-pago.sql). Nada foi lançado." : "Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi lançado.");
+      return ok(r);
+    },
+    async compraAgendar(id, quando) {
+      const r = await sb.rpc("compra_agendar", { p_compra: id, p_quando: quando || null });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|compra_agendar|schema cache|does not exist/i.test(em)) throw new Error("Agenda da compra ainda depende da atualização do banco (supabase-loja/migration-cambio-pago.sql). Nada foi salvo.");
+      return ok(r);
+    },
+    async custosLoja() {
+      const r = await sb.rpc("custos_loja");
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|custos_loja|schema cache|does not exist/i.test(em)) return null;
       return ok(r);
     },
     async cotacaoLer() {
@@ -426,6 +441,8 @@ if (!MOCK && !CONFIGURED) {
   const COMP = [], CPAGTO = [];
   const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   if (qs.has("origemfix")) { P.push({ sku: "FX-ORG-1", marca: "Apple", produto: "iPhone 18 Pro Max FIXTURE", tamanho: "Preto", preco_venda: 9999, estoque: 2, estoque_minimo: 2, ativo: true, notas: null, fornecedor: null }); DE.push({ sku: "FX-ORG-1", qtd: 5, custo: 7000 }); K["FX-ORG-1"] = 6000; }
+  P.push({ sku: "IPH-IMP", marca: "Apple", produto: "iPhone Importado", tamanho: "128GB", preco_venda: 539.99, notas: null, fornecedor: "Miami Supply", estoque: 2, estoque_minimo: 2, ativo: true, origem: "Importado", preco_usd: 100, custo_usd: 80 });
+  K["IPH-IMP"] = 432;
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
   const sv = a => ["venda", "entrada"].includes(a.tipo) ? a.valor : -a.valor;
   const mov = (caixa_id, tipo, valor, motivo, nota_id, user, at) => MV.push({ id: id++, caixa_id, caixa: CX.find(c => c.caixa_id === caixa_id).nome, tipo, valor, valor_assinado: 0, motivo, nota_id, handle: user.handle, nome: user.nome, created_at: at || new Date().toISOString(), data: new Date(at || Date.now()).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) });
@@ -496,6 +513,9 @@ if (!MOCK && !CONFIGURED) {
     mov(1, "entrada", 9000, "ENTRADA ANTIGA oculta do financeiro", null, U[0], new Date(Date.now() - 10 * 864e5).toISOString());
     COMP.push({ id: 9001, numero: "C-009001", data: "2026-11-01", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-11-10", total: 1800 }, { id: 9002, numero: "C-009002", data: "2026-11-12", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-12-01", total: 640 }, { id: 9003, numero: "C-009003", data: "2026-11-08", fornecedor: "Apple SP", pagamento: "depois", vencimento: null, total: 960 });
     CPAGTO.push({ id: id++, compra_id: 9002, valor: 200, data: "2026-11-12", caixa_id: 1, caixa: "Caixa Dinheiro", somente_admin: false });
+    PU.unshift({ id: id++, data: "2026-11-12", sku: "IPH-IMP", fornecedor: "Miami Supply", qtd: 2, custo_unit: 432, custo_usd: 80, taxa_dolar: 5.4, origem: "Importado", compra_id: 9004, total: 864, compra_lote: "seed-imp" });
+    COMP.push({ id: 9004, numero: "C-009004", data: "2026-11-12", fornecedor: "Miami Supply", pagamento: "depois", vencimento: null, pagar_em: "2026-11-20", taxa_dolar: 5.4, total: 864 });
+    recalcImportados();
   });
   const vec = (seed) => Array.from({ length: 128 }, (_, i) => Number(((i + 1) * 0.001 + seed).toFixed(6)));
   const PONTOfaces = [];
@@ -550,6 +570,43 @@ if (!MOCK && !CONFIGURED) {
   const needCx = () => { if (role === "vendedor") throw new Error("Sem permissão de caixa"); };
   const grp = (rows, key, f) => Object.values(rows.reduce((a, r) => { const k = r[key]; a[k] ||= { [key]: k, nome: r.nome, vendas: 0, itens: 0, faturamento: 0, custo: 0 }; f(a[k], r); return a; }, {}));
   const DIVK = {};
+  const loteTravado = (c, linha) => {
+    if (!c) return true;
+    if (c.cambio_pago != null) return true;
+    return !(c.pagamento === "depois" || c.pagamento === "divida");
+  };
+  const lotesSku = sku => PU.filter(p => p.sku === sku && p.origem === "Importado" && p.custo_usd != null).map(p => {
+    const c = COMP.find(x => x.id === p.compra_id);
+    const travado = loteTravado(c, p);
+    return { qtd: p.qtd, custo_usd: p.custo_usd, taxa: c && c.cambio_pago != null ? c.cambio_pago : p.taxa_dolar, travado };
+  });
+  function situacaoSku(sku) {
+    const p = P.find(x => x.sku === sku);
+    if (!p || p.origem !== "Importado") return { situacao: "nacional", cambio: null };
+    const lots = lotesSku(sku);
+    if (!lots.length) return { situacao: p.custo_usd != null ? "cotacao" : "nacional", cambio: null };
+    const aberto = lots.some(l => !l.travado);
+    const fechado = lots.some(l => l.travado);
+    if (aberto && fechado) return { situacao: "misto", cambio: null };
+    if (aberto) return { situacao: "cotacao", cambio: null };
+    const taxas = [...new Set(lots.map(l => Number(l.taxa)))];
+    return { situacao: "travado", cambio: taxas.length === 1 ? taxas[0] : null };
+  }
+  function recalcImportados() {
+    const cot = (COT[0] || {}).valor;
+    const skus = new Set(PU.filter(p => p.origem === "Importado").map(p => p.sku));
+    skus.forEach(sku => {
+      const p = P.find(x => x.sku === sku);
+      if (!p || p.origem !== "Importado") return;
+      const medio = globalThis.BAGDA_ORIGEM.custoMedioLotes(lotesSku(sku), cot);
+      if (!medio || medio.error || medio.value == null) return;
+      K[sku] = medio.value;
+      p.custo_usd = lotesSku(sku).length ? lotesSku(sku)[lotesSku(sku).length - 1].custo_usd : p.custo_usd;
+      if (!(Number(p.preco_usd) > 0)) return;
+      const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, cot, medio.value);
+      if (!calc.error) p.preco_venda = calc.preco;
+    });
+  }
   api = {
     async login(e, pw) { if (!e || !pw) throw new Error("Preencha nome e senha"); logged = true; },
     async logout() { logged = false; }, async consumeUrl() { if (AUTH.access_token || AUTH.code || AUTH.token_hash) logged = true; }, async setPassword() {}, async session() { await ready; return logged ? {} : null; },
@@ -840,6 +897,7 @@ if (!MOCK && !CONFIGURED) {
       if (pag !== "agora" && pag !== "depois" && pag !== "divida") throw new Error("Escolha a forma de pagamento");
       if (pag === "divida" && role !== "admin") throw new Error("Só admin lança dívida no caixa especial");
       if (pag === "depois" && h.vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(h.vencimento)) throw new Error("Vencimento inválido");
+      if ((pag === "depois" || pag === "divida") && h.pagar_em && !/^\d{4}-\d{2}-\d{2}$/.test(h.pagar_em)) throw new Error("Data de pagar em inválida");
       const OPX = globalThis.BAGDA_ORIGEM;
       let total = 0;
       for (const p of itens) {
@@ -865,11 +923,14 @@ if (!MOCK && !CONFIGURED) {
       for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote, ...(h.data ? { data: h.data } : {}) });
       const c = PU[0].compra_id, numero = cnum(c);
       const tot = Math.round(PU.filter(p => p.compra_id === c).reduce((a, p) => a + Number(p.total), 0) * 100) / 100;
-      COMP.push({ id: c, numero, data: h.data || today(), fornecedor: h.fornecedor || null, pagamento: pag, vencimento: pag === "depois" ? (h.vencimento || null) : null, total: tot });
+      const temImp = itens.some(x => x.origem === "Importado");
+      const taxa = temImp ? Number(itens.find(x => x.origem === "Importado").taxa_dolar) : null;
+      COMP.push({ id: c, numero, data: h.data || today(), fornecedor: h.fornecedor || null, pagamento: pag, vencimento: pag === "depois" ? (h.vencimento || null) : null, pagar_em: pag === "agora" ? null : (h.pagar_em || null), taxa_dolar: taxa, cambio_pago: pag === "agora" && temImp ? taxa : null, data_pagamento: pag === "agora" && temImp ? (h.data || today()) : null, total: tot });
       if ((pag === "agora" || pag === "divida") && tot > 0) {
         mov(cx.caixa_id, "saida", tot, (pag === "divida" ? "Dívida " : "") + "Compra " + numero + " — " + (h.fornecedor || "fornecedor"), null, meU);
         CPAGTO.push({ id: id++, compra_id: c, valor: tot, data: today(), caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
       }
+      recalcImportados();
       return { lote, itens: itens.length, compra_id: c, numero, total: tot, origem_ok: true, pagamento_ok: true, pagamento: pag };
     },
     async comprasCaixas() {
@@ -878,24 +939,70 @@ if (!MOCK && !CONFIGURED) {
     },
     async comprasPendentes() {
       await ready; if (role !== "admin") throw new Error("Somente admin");
-      const hj = today();
+      const hj = today(), cot = (COT[0] || {}).valor || null;
       const rows = COMP.filter(c => c.pagamento === "agora" || c.pagamento === "depois" || c.pagamento === "divida").map(c => {
+        const lines = PU.filter(p => p.compra_id === c.id);
+        const usd = Math.round(lines.filter(p => p.origem === "Importado" && p.custo_usd != null).reduce((a, p) => a + p.qtd * Number(p.custo_usd), 0) * 100) / 100;
+        const nac = Math.round(lines.filter(p => p.origem !== "Importado").reduce((a, p) => a + p.qtd * Number(p.custo_unit), 0) * 100) / 100;
+        const flutuante = usd > 0 && c.cambio_pago == null && (c.pagamento === "depois" || c.pagamento === "divida");
+        const rate = c.cambio_pago != null ? Number(c.cambio_pago) : (flutuante ? cot : null);
+        const total = usd > 0 && rate ? Math.round((nac + Math.round(usd * rate * 100) / 100) * 100) / 100 : (lines.length ? Math.round((nac + lines.filter(p => p.origem === "Importado").reduce((a, p) => a + Number(p.total), 0)) * 100) / 100 : Number(c.total));
         const pags = CPAGTO.filter(p => p.compra_id === c.id).map(p => { const hide = !!(p.somente_admin && role !== "admin"); return { id: p.id, valor: p.valor, data: p.data, caixa: hide ? null : p.caixa, caixa_id: hide ? null : p.caixa_id, caixa_oculto: hide }; });
         const pago = Math.round(pags.reduce((a, p) => a + Number(p.valor), 0) * 100) / 100;
-        const restante = Math.round((Number(c.total) - pago) * 100) / 100;
-        return { ...c, fornecedor: c.fornecedor || "Sem fornecedor", pago, restante, atrasada: !!(c.vencimento && c.vencimento < hj && restante > 0), pagamentos: pags };
+        const restante = Math.round((total - pago) * 100) / 100;
+        const aberta = (c.pagamento === "depois" && restante > 0.009) || (c.pagamento === "divida" && flutuante);
+        return { ...c, fornecedor: c.fornecedor || "Sem fornecedor", total_usd: usd || null, total_nacional: nac, flutuante, total, pago, restante, atrasada: !!(c.vencimento && c.vencimento < hj && aberta), aberta, devido: c.pagamento === "divida" && flutuante ? total : restante, pagamentos: pags };
       });
       const grupos = new Map();
-      rows.filter(r => r.restante > 0).sort((a, b) => (b.atrasada - a.atrasada) || String(a.vencimento || "9999").localeCompare(String(b.vencimento || "9999"))).forEach(r => {
+      rows.filter(r => r.aberta).sort((a, b) => (b.atrasada - a.atrasada) || String(a.pagar_em || "9999-99-99").localeCompare(String(b.pagar_em || "9999-99-99")) || String(a.vencimento || "9999").localeCompare(String(b.vencimento || "9999"))).forEach(r => {
         const g = grupos.get(r.fornecedor) || { fornecedor: r.fornecedor, total_devido: 0, compras: [] };
-        g.compras.push(r); g.total_devido = Math.round((g.total_devido + r.restante) * 100) / 100; grupos.set(r.fornecedor, g);
+        g.compras.push(r); g.total_devido = Math.round((g.total_devido + r.devido) * 100) / 100; grupos.set(r.fornecedor, g);
       });
-      return { grupos: [...grupos.values()].sort((a, b) => a.fornecedor.localeCompare(b.fornecedor, "pt-BR")), pagas: rows.filter(r => r.restante <= 0).sort((a, b) => b.id - a.id).slice(0, 40) };
+      return { grupos: [...grupos.values()].sort((a, b) => a.fornecedor.localeCompare(b.fornecedor, "pt-BR")), pagas: rows.filter(r => !r.aberta).sort((a, b) => b.id - a.id).slice(0, 40), cotacao: cot };
     },
-    async compraPagar(cid, valor, caixa) {
+    async compraPagar(cid, valor, caixa, cambio, data) {
       await ready; if (role !== "admin") throw new Error("Somente admin");
       const c = COMP.find(x => x.id === +cid);
-      if (!c || (c.pagamento !== "agora" && c.pagamento !== "depois")) throw new Error("Compra antiga sem controle de pagamento");
+      if (!c || (c.pagamento !== "agora" && c.pagamento !== "depois" && c.pagamento !== "divida")) throw new Error("Compra antiga sem controle de pagamento");
+      const lines = PU.filter(p => p.compra_id === c.id);
+      const usd = Math.round(lines.filter(p => p.origem === "Importado" && p.custo_usd != null).reduce((a, p) => a + p.qtd * Number(p.custo_usd), 0) * 100) / 100;
+      const flutuante = usd > 0 && c.cambio_pago == null && (c.pagamento === "depois" || c.pagamento === "divida");
+      if (flutuante) {
+        const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(cambio);
+        if (parsed.error) throw new Error("Câmbio pago inválido");
+        const quando = data || today();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(quando) || quando > today()) throw new Error("Data do pagamento inválida");
+        const nac = Math.round(lines.filter(p => p.origem !== "Importado").reduce((a, p) => a + p.qtd * Number(p.custo_unit), 0) * 100) / 100;
+        const total = Math.round((nac + Math.round(usd * parsed.value * 100) / 100) * 100) / 100;
+        const pago = CPAGTO.filter(p => p.compra_id === c.id).reduce((a, p) => a + Number(p.valor), 0);
+        lines.filter(p => p.origem === "Importado").forEach(p => { const u = BAGDA_ORIGEM.custoReaisDeUsd(p.custo_usd, parsed.value); if (u.error) throw new Error(u.error); p.custo_unit = u.value; p.total = Math.round(p.qtd * u.value * 100) / 100; });
+        c.cambio_pago = parsed.value; c.data_pagamento = quando; c.total = total;
+        if (c.pagamento === "divida") {
+          const row = CPAGTO.filter(p => p.compra_id === c.id);
+          if (row.length !== 1) throw new Error("Dívida sem um único lançamento no caixa");
+          const delta = Math.round((total - pago) * 100) / 100;
+          const cx = CX.find(x => x.caixa_id === row[0].caixa_id);
+          if (!cx || !cx.somente_admin) throw new Error("Dívida só no caixa especial");
+          if (delta > 0.001) { mov(cx.caixa_id, "saida", delta, "Ajuste câmbio Compra " + c.numero + " — " + (c.fornecedor || "fornecedor"), null, meU); MV[MV.length - 1].data = quando; }
+          else if (delta < -0.001) { mov(cx.caixa_id, "entrada", -delta, "Ajuste câmbio Compra " + c.numero + " — " + (c.fornecedor || "fornecedor"), null, meU); MV[MV.length - 1].data = quando; }
+          row[0].valor = total; row[0].data = quando;
+        } else {
+          const debito = Math.round((total - pago) * 100) / 100;
+          if (debito < -0.009) throw new Error("O câmbio deixa o total menor do que já foi pago");
+          if (debito > 0.001) {
+            const cx = CX.find(x => x.caixa_id === +caixa && x.ativo !== false && (!x.somente_admin || role === "admin"));
+            if (!cx) throw new Error("Caixa inválido");
+            const s = Math.round(saldo(cx.caixa_id) * 100) / 100;
+            if (debito > s + 0.001) throw new Error("Saldo insuficiente no caixa (R$ " + s.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
+            mov(cx.caixa_id, "saida", debito, "Compra " + c.numero + " — " + (c.fornecedor || "fornecedor"), null, meU);
+            if (quando) MV[MV.length - 1].data = quando;
+            CPAGTO.push({ id: id++, compra_id: c.id, valor: debito, data: quando, caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
+          }
+        }
+        recalcImportados();
+        return { valor: Math.round((total - pago) * 100) / 100, total, cambio_pago: parsed.value, data_pagamento: quando, restante: 0, travado: true };
+      }
+      if (c.pagamento === "divida") throw new Error("Compra antiga sem controle de pagamento");
       valor = Math.round(Number(valor) * 100) / 100;
       if (!(valor > 0)) throw new Error("Valor inválido");
       const pago = CPAGTO.filter(p => p.compra_id === c.id).reduce((a, p) => a + Number(p.valor), 0);
@@ -909,8 +1016,17 @@ if (!MOCK && !CONFIGURED) {
       CPAGTO.push({ id: id++, compra_id: c.id, valor, data: today(), caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
       return { pagamento_id: CPAGTO[CPAGTO.length - 1].id, valor, restante: Math.round((rest - valor) * 100) / 100, saldo_caixa: Math.round(saldo(cx.caixa_id) * 100) / 100, caixa: cx.nome };
     },
+    async compraAgendar(cid, quando) {
+      await ready; if (role !== "admin") throw new Error("Somente admin");
+      const c = COMP.find(x => x.id === +cid);
+      if (!c || (c.pagamento !== "depois" && c.pagamento !== "divida") || c.cambio_pago != null) throw new Error("Só dá para agendar uma compra ainda não paga");
+      if (quando && !/^\d{4}-\d{2}-\d{2}$/.test(quando)) throw new Error("Data de pagar em inválida");
+      c.pagar_em = quando || null;
+      return { id: c.id, pagar_em: c.pagar_em };
+    },
+    async custosLoja() { await ready; if (role !== "admin") throw new Error("Somente admin"); return Object.keys(K).map(sku => ({ sku, custo: K[sku], ...situacaoSku(sku) })); },
     async cotacaoLer() { if (role !== "admin") throw new Error("Sem permissão"); const c = COT[0]; return { valor: c ? c.valor : null, alterado_em: c ? c.alterado_em : null, handle: c ? c.handle : null, nome: c ? c.nome : null, historico: COT.map(x => ({ ...x })) }; },
-    async cotacaoSalvar(valor) { if (role !== "admin") throw new Error("Só admin altera a cotação"); const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(valor); if (parsed.error) throw new Error(parsed.error); COT.unshift({ valor: parsed.value, alterado_em: new Date().toISOString(), handle: meU.handle, nome: meU.nome }); const costs = {}; P.forEach(p => { costs[p.sku] = { custo: K[p.sku], custo_usd: p.custo_usd }; }); const r = BAGDA_ORIGEM.aplicarCotacao(P, costs, parsed.value); r.products.forEach((p, i) => { if (p.error) throw new Error(p.error); P[i].preco_venda = p.preco_venda; if (P[i].origem === "Importado" && P[i].custo_usd != null && r.costs[p.sku]) K[p.sku] = r.costs[p.sku].custo; }); return api.cotacaoLer(); },
+    async cotacaoSalvar(valor) { if (role !== "admin") throw new Error("Só admin altera a cotação"); const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(valor); if (parsed.error) throw new Error(parsed.error); COT.unshift({ valor: parsed.value, alterado_em: new Date().toISOString(), handle: meU.handle, nome: meU.nome }); recalcImportados(); const costs = {}; P.forEach(p => { const lots = lotesSku(p.sku); costs[p.sku] = { custo: K[p.sku], custo_usd: p.custo_usd, lotes: lots.length ? lots : undefined }; }); const r = BAGDA_ORIGEM.aplicarCotacao(P, costs, parsed.value); r.products.forEach((p, i) => { if (p.error) throw new Error(p.error); if (!lotesSku(p.sku).length) { P[i].preco_venda = p.preco_venda; if (P[i].origem === "Importado" && P[i].custo_usd != null && r.costs[p.sku]) K[p.sku] = r.costs[p.sku].custo; } }); return api.cotacaoLer(); },
     async recalcularImportado(sku) { if (role !== "admin") throw new Error("Só admin altera origem ou preço em US$"); const p = P.find(x => x.sku === sku); if (!p || p.origem !== "Importado" || !(Number(p.preco_usd) > 0)) return; const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, (COT[0] || {}).valor, K[sku] != null ? K[sku] : null); if (calc.error) throw new Error(calc.error); p.preco_venda = calc.preco; },
     async comprasListar(q) { if (role === "vendedor") throw new Error("Sem permissão"); const A = role === "admin"; const G = new Map(); [...PU].reverse().forEach(p => { const g = G.get(p.compra_id) || { id: p.compra_id, numero: cnum(p.compra_id), data: p.data, fornecedor: p.fornecedor, observacao: p.observacao, itens: 0, unidades: 0, total: 0, imeis: 0, recebidos: 0, _h: "" }; g.itens++; g.unidades += p.qtd; g.total += p.total; g.imeis += IM.filter(i => i.purchase_id === p.id).length; g.recebidos += recb(p); const x = P.find(y => y.sku === p.sku); g._h += ` ${p.sku} ${x.marca} ${x.produto}`; G.set(p.compra_id, g); });
       q = norm(q || ""); return [...G.values()].filter(g => !q || norm(`${g.numero} ${g.fornecedor} ${g._h}`).includes(q)).map(g => ({ ...g, total: A ? g.total : null, status: g.recebidos >= g.unidades ? "completo" : "pendente" })).sort((a, b) => b.id - a.id); },
@@ -1295,7 +1411,7 @@ async function mountCotacao(el, onSaved) {
     <form id="cotf"><div class="grid"><div><label for="cotv">Nova cotação (R$ por US$ 1)</label><input id="cotv" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42" required></div></div>
     <button class="btn" type="submit">Salvar cotação e recalcular importados</button></form>
     ${hist.length ? `<h3>Histórico</h3><table><tr><th>Quando</th><th>Quem</th><th class="n">Valor</th></tr>${hist.map(h => `<tr><td>${esc(quandoSP(h.alterado_em))}</td><td>${esc(h.handle || h.nome || "—")}</td><td class="n">${OP.formatCotacao(h.valor)}</td></tr>`).join("")}</table>` : ""}
-    <p class="muted">Só admin. Pode mudar quantas vezes quiser. Ao salvar, o preço em R$ de cada produto Importado é recalculado na hora. Notas já emitidas não mudam.</p></div>`;
+    <p class="muted">Só admin. Pode mudar quantas vezes quiser. Ao salvar, o preço em R$ de cada produto Importado é recalculado na hora. O custo em R$ segue a cotação só nas unidades de compras importadas que ainda não foram pagas; compra já paga fica travada. Notas já emitidas não mudam.</p></div>`;
   el.querySelector("#cotf").onsubmit = async ev => {
     ev.preventDefault();
     const parsed = OP.parseCotacao(el.querySelector("#cotv").value);
@@ -1326,12 +1442,13 @@ async function viewCompras(o = {}) {
   <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
   <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
-  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. O custo em R$ de cada linha importada é o US$ × esta taxa.</p></div>
+  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. Pagar agora trava o custo em R$ nesta taxa. Pagar depois ou dívida segue a cotação do dia até o pagamento.</p></div>
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p>
   ${emb ? "" : `<div id="fpbox"><h3>Forma de pagamento</h3>${pagSql ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-agora" value="agora" checked style="width:auto"> Pagar agora de um caixa</label>
   <div id="fp-agora-box"><label for="fpcx">Caixa</label><select id="fpcx">${CXS.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === prefCx ? "selected" : ""}>${esc(c.nome)}${c.somente_admin ? " (só admin)" : ""}</option>`).join("")}</select><p id="fpsaldo"></p></div>
   <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-depois" value="depois" style="width:auto"> Pagar depois (a pagar ao fornecedor)</label>
   <div id="fp-depois-box" hidden><label for="fpven">Vencimento (opcional)</label><input id="fpven" type="date"></div>
+  <div id="fp-quando-box" hidden><label for="fpquando">Pagar em (opcional)</label><input id="fpquando" type="date"><p class="muted">Aparece em Compras pendentes e ordena a lista. Não paga sozinho. O admin confirma o pagamento.</p></div>
   ${adm ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-divida" value="divida" style="width:auto"> Lançar como dívida no caixa especial</label>
   <div id="fp-divida-box" hidden><label for="fpdx">Caixa especial (só admin)</label><select id="fpdx">${CXS.filter(c => c.somente_admin).map(c => `<option value="${c.caixa_id}" ${c.caixa_id === 18 ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select><p id="fpdsaldo"></p><p class="muted">Padrão: COMPRA PRODUTOS. Não confere o saldo. Se não houver dinheiro, o caixa fica negativo e a dívida aparece em vermelho no caixa e no extrato. O financeiro não vê este caixa. Depois, Transferir entre caixas para abater a dívida.</p></div>` : ""}` : `<p class="warn">Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada será salvo até lá.</p>`}</div>`}
   <p class="warn" id="pw"></p>
@@ -1361,7 +1478,7 @@ async function viewCompras(o = {}) {
   const linhaConta = l => !!(l.sku || (loja() && l.origem === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
   const totalAgora = () => Math.round(L.filter(linhaConta).reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0) * 100) / 100;
   const modoPag = () => ((document.querySelector('input[name="fp"]:checked') || {}).value) || "agora";
-  const syncPag = () => { const box = $("#fpbox"); if (!box) return; box.hidden = !loja(); const modo = modoPag(); const a = $("#fp-agora-box"), d = $("#fp-depois-box"), z = $("#fp-divida-box"); if (a) a.hidden = modo !== "agora"; if (d) d.hidden = modo !== "depois"; if (z) z.hidden = modo !== "divida";
+  const syncPag = () => { const box = $("#fpbox"); if (!box) return; box.hidden = !loja(); const modo = modoPag(); const a = $("#fp-agora-box"), d = $("#fp-depois-box"), z = $("#fp-divida-box"), q = $("#fp-quando-box"); if (a) a.hidden = modo !== "agora"; if (d) d.hidden = modo !== "depois"; if (z) z.hidden = modo !== "divida"; if (q) q.hidden = modo === "agora";
     const total = totalAgora();
     const paint = (el, cx, divida) => { if (!el) return; if (!cx) { el.innerHTML = '<span class="warn">Nenhum caixa disponível.</span>'; return; }
       if (divida) { const depois = Math.round((Number(cx.saldo) - total) * 100) / 100; el.innerHTML = `Saldo deste caixa: ${caixaSaldoHtml(cx.saldo)}${total > 0 ? `. Depois desta compra: ${caixaSaldoHtml(depois)}` : ""}. <span class="muted">Sem trava de saldo.</span>`; return; }
@@ -1419,10 +1536,10 @@ async function viewCompras(o = {}) {
     const totalCompra = Math.round(itens.reduce((a, l) => a + l.qtd * l.custo_unit, 0) * 100) / 100;
     if (!pagSql) { busy = false; $("#sv").disabled = false; w.textContent = "Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi salvo."; return; }
     const modo = modoPag();
-    if (modo === "depois") { hd.pagamento = "depois"; if ($("#fpven") && $("#fpven").value) hd.vencimento = $("#fpven").value; }
+    if (modo === "depois") { hd.pagamento = "depois"; if ($("#fpven") && $("#fpven").value) hd.vencimento = $("#fpven").value; if ($("#fpquando") && $("#fpquando").value) hd.pagar_em = $("#fpquando").value; }
     else if (modo === "divida") { if (me.role !== "admin") { busy = false; $("#sv").disabled = false; w.textContent = "Só admin lança dívida no caixa especial. Nada foi salvo."; return; }
       const cx = CXS.find(c => c.somente_admin && String(c.caixa_id) === String(($("#fpdx") || {}).value || "")); if (!cx) { busy = false; $("#sv").disabled = false; w.textContent = "Escolha o caixa especial. Nada foi salvo."; return; }
-      hd.pagamento = "divida"; hd.caixa_id = cx.caixa_id; }
+      hd.pagamento = "divida"; hd.caixa_id = cx.caixa_id; if ($("#fpquando") && $("#fpquando").value) hd.pagar_em = $("#fpquando").value; }
     else { const cx = CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")); if (!cx) { busy = false; $("#sv").disabled = false; w.textContent = "Escolha o caixa. Nada foi salvo."; return; }
       if (totalCompra > Number(cx.saldo) + 0.001) { busy = false; $("#sv").disabled = false; w.textContent = "Saldo insuficiente no caixa (R$ " + Number(cx.saldo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "). Nada foi salvo."; return; }
       hd.pagamento = "agora"; hd.caixa_id = cx.caixa_id; }
@@ -1544,13 +1661,15 @@ async function viewDepEsp(o = {}) {
     try { await api.depEspTransf(sku, q, dir, $("#to").value.trim()); toast("Transferência feita ✓"); viewDepEsp(); } catch (e) { toast(e.message); } };
 }
 async function viewProdutos() {
-  const [P, K] = await Promise.all([api.products(), api.costs()]); const cm = Object.fromEntries(K.map(k => [k.sku, k.custo]));
+  const [P, K, modo] = await Promise.all([api.products(), api.costs(), api.custosLoja ? api.custosLoja().catch(() => null) : null]); const cm = Object.fromEntries(K.map(k => [k.sku, k.custo]));
+  const sit = Object.fromEntries((modo || []).map(x => [x.sku, x]));
   const OP = globalThis.BAGDA_ORIGEM;
   app.innerHTML = `<div id="cotacao"></div><div class="card"><h2>Produtos e custos (admin) <button class="btn" id="csv" style="float:right;margin:0">Exportar CSV</button></h2><input id="b" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…"><table id="pt"></table></div>
   <div class="card"><h2>Adicionar / editar produto</h2><p class="muted">Nacional: o preço em R$ é o que você digitar e a cotação não mexe nele. Importado: o preço em R$ é o US$ × cotação, com a regra ,99.</p><form id="f"><div class="grid"><div><label>SKU</label><input id="sku" required pattern="[A-Z0-9-]{3,20}"></div><div><label>Marca</label><input id="ma" required></div><div><label>Produto</label><input id="pr" required></div><div><label>Tamanho</label><input id="ta"></div><div><label for="og">Origem</label><select id="og"><option value="Nacional">Nacional</option><option value="Importado">Importado</option></select></div><div id="usdbox" hidden><label for="pu">Preço (US$)</label><input id="pu" inputmode="decimal" autocomplete="off" placeholder="Ex.: 199,00"><p class="muted" id="puprev"></p></div><div><label for="pv">Preço de venda (R$)</label><input id="pv" inputmode="decimal"></div><div><label>Custo (R$, só admin vê)</label><input id="cu" inputmode="decimal" autocomplete="off"></div><div><label>Estoque mínimo</label><input id="em" type="number" value="2"></div></div><button class="btn">Salvar</button></form></div>`;
   const cot = await mountCotacao($("#cotacao"), () => viewProdutos());
   const head = `<tr><th>SKU</th><th>Produto</th><th class="n">Custo</th><th class="n">Venda</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>`;
-  const drawP = () => { $("#pt").innerHTML = head + P.filter(p => match(p, $("#b").value)).map(p => { const c = cm[p.sku]; return `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${usdBadge(p)}</td><td class="n">${c != null ? brl(c) : "—"}</td><td class="n">${brl(p.preco_venda)}${p.origem === "Importado" && p.preco_usd != null ? `<br><small>${OP.formatUsd(p.preco_usd)}</small>` : ""}</td><td class="n">${c ? ((p.preco_venda - c) / p.preco_venda * 100).toFixed(0) + "%" : "—"}</td><td class="n">${p.estoque}</td><td><button type="button" class="btn ghost epd" data-sku="${esc(p.sku)}" style="margin:0">Editar</button></td></tr>`; }).join(""); };
+  const custoTag = p => { const s = sit[p.sku]; if (!s || p.origem !== "Importado") return ""; if (s.situacao === "cotacao") return `<br><small class="muted">segue a cotação</small>`; if (s.situacao === "travado") return `<br><small class="muted">travado${s.cambio ? " em " + OP.formatCotacao(s.cambio) : ""}</small>`; if (s.situacao === "misto") return `<br><small class="muted">média travado + cotação</small>`; return ""; };
+  const drawP = () => { $("#pt").innerHTML = head + P.filter(p => match(p, $("#b").value)).map(p => { const c = cm[p.sku]; return `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${usdBadge(p)}</td><td class="n">${c != null ? brl(c) : "—"}${custoTag(p)}</td><td class="n">${brl(p.preco_venda)}${p.origem === "Importado" && p.preco_usd != null ? `<br><small>${OP.formatUsd(p.preco_usd)}</small>` : ""}</td><td class="n">${c ? ((p.preco_venda - c) / p.preco_venda * 100).toFixed(0) + "%" : "—"}</td><td class="n">${p.estoque}</td><td><button type="button" class="btn ghost epd" data-sku="${esc(p.sku)}" style="margin:0">Editar</button></td></tr>`; }).join(""); };
   const custoAtual = () => { const raw = $("#cu").value.trim(); if (!raw) return cm[$("#sku").value] != null ? cm[$("#sku").value] : null; const c = globalThis.BAGDA_CUSTO.parseCusto(raw); return c.error ? null : c.value; };
   const sync = () => { const imp = $("#og").value === "Importado"; $("#usdbox").hidden = !imp; $("#pv").readOnly = imp; $("#puprev").textContent = ""; if (!imp) return;
     const u = OP.parseUsd($("#pu").value); if (!$("#pu").value.trim()) { $("#pv").value = ""; $("#puprev").textContent = "Informe o preço em US$."; return; } if (u.error) { $("#pv").value = ""; $("#puprev").textContent = u.error; return; }
@@ -1945,25 +2064,65 @@ async function viewComprasPendentes() {
   if (!can("admin")) return viewSeguranca();
   let D, CX = [], err = "";
   try { [D, CX] = await Promise.all([api.comprasPendentes(), api.comprasCaixas()]); }
-  catch (e) { if (/migration-compras-pagamento|PGRST202|schema cache|does not exist/i.test(e.message || "")) { app.innerHTML = `<div class="card"><h2>Compras pendentes</h2><p class="warn">${esc(e.message)}</p></div>`; return; } err = e.message; D = { grupos: [], pagas: [] }; }
+  catch (e) { if (/migration-compras-pagamento|migration-cambio-pago|PGRST202|schema cache|does not exist/i.test(e.message || "")) { app.innerHTML = `<div class="card"><h2>Compras pendentes</h2><p class="warn">${esc(e.message)}</p></div>`; return; } err = e.message; D = { grupos: [], pagas: [] }; }
   D = D || { grupos: [], pagas: [] };
-  const grupos = D.grupos || [], pagas = D.pagas || [];
+  const OP = globalThis.BAGDA_ORIGEM;
+  const grupos = D.grupos || [], pagas = D.pagas || [], cot = D.cotacao;
   const aberto = grupos.reduce((a, g) => a + Number(g.total_devido || 0), 0);
-  const venc = grupos.reduce((a, g) => a + g.compras.filter(c => c.atrasada).reduce((s, c) => s + Number(c.restante || 0), 0), 0);
+  const venc = grupos.reduce((a, g) => a + g.compras.filter(c => c.atrasada).reduce((s, c) => s + Number(c.flutuante ? c.total : c.restante || 0), 0), 0);
   const hist = pagsList => (pagsList || []).length ? `<div class="muted">Pagamentos: ${(pagsList || []).map(p => `${esc(dBR(p.data))} ${brl(p.valor)} · ${p.caixa_oculto ? "caixa só admin" : esc(p.caixa || "—")}`).join(" · ")}</div>` : "";
-  const linha = (c, pagar) => `<tr class="${c.atrasada ? "low" : ""}"><td><b>${esc(c.numero)}</b></td><td>${esc(dBR(c.data))}</td><td class="${c.atrasada ? "low" : ""}">${c.vencimento ? esc(dBR(c.vencimento)) : "—"}${c.atrasada ? " · atrasada" : ""}</td><td class="n">${brl(c.total)}</td><td class="n">${brl(c.pago)}</td><td class="n">${brl(c.restante)}</td><td>${pagar && Number(c.restante) > 0 ? `<button type="button" class="btn ghost pgcp" data-i="${c.id}">Pagar</button>` : ""}</td></tr>
-    ${(c.pagamentos || []).length ? `<tr><td colspan="7">${hist(c.pagamentos)}</td></tr>` : ""}
-    <tr class="pgf" id="pc${c.id}" hidden><td colspan="7"><div class="grid pgrow"><div><label>Valor</label><input class="pv" type="number" min="0.01" step="0.01" value="${Number(c.restante).toFixed(2)}"></div>
-    <div><label>Sai do caixa</label><select class="pcx">${CX.map(x => `<option value="${x.caixa_id}">${esc(x.nome)}${x.somente_admin ? " (só admin)" : ""} · saldo ${brl(x.saldo)}</option>`).join("")}</select></div>
-    <div><label>&nbsp;</label><button type="button" class="btn pok" data-i="${c.id}" data-rest="${c.restante}">Confirmar pagamento</button></div></div><p class="warn pcw"></p></td></tr>`;
-  app.innerHTML = `<div class="card"><h2>Contas a pagar — compras pendentes</h2><p class="muted">Compras novas que ficaram a pagar ao fornecedor. Compras antigas, sem forma de pagamento, não entram aqui. O custo por produto continua só no admin.</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div>${err ? `<p class="warn">${esc(err)}</p>` : ""}</div>
-  ${grupos.map(g => `<div class="card"><h2>${esc(g.fornecedor)} <span class="muted">· deve ${brl(g.total_devido)}</span></h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Vencimento</th><th class="n">Total</th><th class="n">Pago</th><th class="n">Restante</th><th></th></tr>
-  ${g.compras.map(c => linha(c, true)).join("") || '<tr><td colspan="7" class="muted">Nenhuma.</td></tr>'}</table></div>`).join("") || '<div class="card"><p class="muted">Nenhuma compra pendente.</p></div>'}
-  <div class="card"><h2>Compras pagas</h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Vencimento</th><th class="n">Total</th><th class="n">Pago</th><th class="n">Restante</th><th></th></tr>
-  ${pagas.map(c => `<tr><td><b>${esc(c.numero)}</b></td><td>${esc(dBR(c.data))}</td><td>${c.vencimento ? esc(dBR(c.vencimento)) : "—"}</td><td class="n">${brl(c.total)}</td><td class="n">${brl(c.pago)}</td><td class="n">${brl(c.restante)}</td><td>${esc(c.fornecedor || "")}</td></tr><tr><td colspan="7">${hist(c.pagamentos)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra paga por aqui ainda.</td></tr>'}</table></div>`;
+  const totalCell = c => {
+    if (!(Number(c.total_usd) > 0)) return `${brl(c.total)}${Number(c.pago) > 0 ? `<br><small class="muted">pago ${brl(c.pago)} · resta ${brl(c.restante)}</small>` : ""}`;
+    const taxaTxt = c.flutuante && cot ? `cotação ${OP.formatCotacao(cot)}` : (c.cambio_pago ? `câmbio pago ${OP.formatCotacao(c.cambio_pago)}` : "");
+    return `${OP.formatUsd(c.total_usd)}<br><b>${brl(c.total)}</b>${c.flutuante ? " estimativa" : ""}<br><small class="muted">${taxaTxt}${c.pagamento === "divida" ? `${taxaTxt ? " · " : ""}dívida lançada ${brl(c.pago)}` : ""}</small>`;
+  };
+  const agenda = c => `<input type="date" class="pqem" data-i="${c.id}" value="${esc(c.pagar_em || "")}" aria-label="Pagar em">`;
+  const linha = (c, pagar) => `<tr class="${c.atrasada ? "low" : ""}"><td><b>${esc(c.numero)}</b>${c.pagamento === "divida" ? `<br><small>Dívida</small>` : ""}</td><td>${esc(dBR(c.data))}</td><td>${c.flutuante || c.pagamento === "depois" ? agenda(c) : (c.pagar_em ? esc(dBR(c.pagar_em)) : "—")}</td><td class="${c.atrasada ? "low" : ""}">${c.vencimento ? esc(dBR(c.vencimento)) : "—"}${c.atrasada ? " · atrasada" : ""}</td><td class="n">${totalCell(c)}</td><td>${pagar ? `<button type="button" class="btn ghost pgcp" data-i="${c.id}">Pagar</button>` : ""}</td></tr>
+    ${(c.pagamentos || []).length ? `<tr><td colspan="6">${hist(c.pagamentos)}</td></tr>` : ""}
+    <tr class="pgf" id="pc${c.id}" hidden><td colspan="6">${c.flutuante ? `<p>Importado ainda sem câmbio travado.${cot ? ` A estimativa de hoje usa a cotação ${OP.formatCotacao(cot)}.` : ""}</p><div class="grid pgrow"><div><label>Data do pagamento</label><input class="pdata" type="date" value="${today()}" max="${today()}"></div><div><label>Câmbio pago (R$ por US$ 1)</label><input class="pcambio" inputmode="decimal" autocomplete="off" value="${cot != null ? String(cot).replace(".", ",") : ""}"></div>${c.pagamento === "divida" ? "" : `<div><label>Sai do caixa</label><select class="pcx">${CX.map(x => `<option value="${x.caixa_id}">${esc(x.nome)}${x.somente_admin ? " (só admin)" : ""} · saldo ${brl(x.saldo)}</option>`).join("")}</select></div>`}<div><label>&nbsp;</label><button type="button" class="btn pok" data-i="${c.id}" data-usd="${c.total_usd || 0}" data-nac="${c.total_nacional || 0}" data-pago="${c.pago || 0}" data-divida="${c.pagamento === "divida" ? "1" : ""}">Confirmar pagamento</button></div></div><p class="pcprev"></p><p class="muted">${c.pagamento === "divida" ? "Este valor ajusta a dívida em COMPRA PRODUTOS. Não confere saldo." : "O valor sai do caixa escolhido. O saldo tem de cobrir o total."} O custo em R$ das unidades fica travado neste câmbio.</p>` : `<div class="grid pgrow"><div><label>Valor</label><input class="pv" type="number" min="0.01" step="0.01" value="${Number(c.restante).toFixed(2)}"></div><div><label>Sai do caixa</label><select class="pcx">${CX.map(x => `<option value="${x.caixa_id}">${esc(x.nome)}${x.somente_admin ? " (só admin)" : ""} · saldo ${brl(x.saldo)}</option>`).join("")}</select></div><div><label>&nbsp;</label><button type="button" class="btn pok" data-i="${c.id}" data-rest="${c.restante}">Confirmar pagamento</button></div></div>`}<p class="warn pcw"></p></td></tr>`;
+  app.innerHTML = `<div class="card"><h2>Contas a pagar — compras pendentes</h2><p class="muted">Só admin. Compras novas que ficaram a pagar ao fornecedor. Importado ainda não pago mostra o total em US$ e a estimativa em R$ pela cotação de hoje. Compras antigas, sem forma de pagamento, não entram aqui. O custo por produto continua só no admin.</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div>${cot ? `<div class="kpi"><small>Cotação de hoje</small><b>${OP.formatCotacao(cot)}</b></div>` : ""}</div>${err ? `<p class="warn">${esc(err)}</p>` : ""}</div>
+  ${grupos.map(g => `<div class="card"><h2>${esc(g.fornecedor)} <span class="muted">· deve ${brl(g.total_devido)}</span></h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Pagar em</th><th>Vencimento</th><th class="n">Total</th><th></th></tr>
+  ${g.compras.map(c => linha(c, true)).join("") || '<tr><td colspan="6" class="muted">Nenhuma.</td></tr>'}</table></div>`).join("") || '<div class="card"><p class="muted">Nenhuma compra pendente.</p></div>'}
+  <div class="card"><h2>Compras pagas</h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Pagar em</th><th>Vencimento</th><th class="n">Total</th><th></th></tr>
+  ${pagas.map(c => `<tr><td><b>${esc(c.numero)}</b></td><td>${esc(dBR(c.data))}</td><td>${c.pagar_em ? esc(dBR(c.pagar_em)) : "—"}</td><td>${c.vencimento ? esc(dBR(c.vencimento)) : "—"}</td><td class="n">${totalCell(c)}</td><td>${esc(c.fornecedor || "")}</td></tr><tr><td colspan="6">${hist(c.pagamentos)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma compra paga por aqui ainda.</td></tr>'}</table></div>`;
+  const dinheiro = (usd, nac, rate) => Math.round((Number(nac) + Math.round(Number(usd) * rate * 100) / 100) * 100) / 100;
   document.querySelectorAll(".pgcp").forEach(b => b.onclick = () => { const r = $("#pc" + b.dataset.i); if (r) r.hidden = !r.hidden; });
+  document.querySelectorAll(".pcambio").forEach(inp => inp.oninput = () => {
+    const r = inp.closest("tr"), b = r.querySelector(".pok"), prev = r.querySelector(".pcprev");
+    const parsed = OP.parseCotacao(inp.value);
+    if (parsed.error || !prev) { if (prev) prev.textContent = parsed.error || ""; return; }
+    const total = dinheiro(b.dataset.usd, b.dataset.nac, parsed.value);
+    const pago = Number(b.dataset.pago) || 0;
+    prev.innerHTML = b.dataset.divida === "1"
+      ? `Total em R$: <b>${brl(total)}</b> (${OP.formatUsd(b.dataset.usd)} × ${OP.formatCotacao(parsed.value)}). A dívida passa de ${brl(pago)} para ${brl(total)}.`
+      : `Sai do caixa: <b>${brl(Math.round((total - pago) * 100) / 100)}</b> (${OP.formatUsd(b.dataset.usd)} × ${OP.formatCotacao(parsed.value)}${Number(b.dataset.nac) > 0 ? " + nacional " + brl(b.dataset.nac) : ""}).`;
+  });
+  document.querySelectorAll(".pcambio").forEach(inp => inp.dispatchEvent(new Event("input")));
+  document.querySelectorAll(".pqem").forEach(inp => inp.onchange = async () => {
+    try { await api.compraAgendar(+inp.dataset.i, inp.value || null); toast(inp.value ? "Pagar em atualizado" : "Pagar em removido"); viewComprasPendentes(); }
+    catch (e) { toast(e.message); }
+  });
   document.querySelectorAll(".pok").forEach(b => b.onclick = async () => {
-    const r = $("#pc" + b.dataset.i), w = r.querySelector(".pcw"), v = Math.round(+r.querySelector(".pv").value * 100) / 100, cx = CX.find(x => String(x.caixa_id) === r.querySelector(".pcx").value);
+    const r = $("#pc" + b.dataset.i), w = r.querySelector(".pcw");
+    if (b.dataset.usd) {
+      const parsed = OP.parseCotacao(r.querySelector(".pcambio").value);
+      if (parsed.error) { w.textContent = parsed.error; return; }
+      const quando = (r.querySelector(".pdata") || {}).value || today();
+      if (quando > today()) { w.textContent = "Data do pagamento inválida"; return; }
+      const total = dinheiro(b.dataset.usd, b.dataset.nac, parsed.value);
+      const debito = Math.round((total - (Number(b.dataset.pago) || 0)) * 100) / 100;
+      const cxEl = r.querySelector(".pcx");
+      const cx = cxEl ? CX.find(x => String(x.caixa_id) === cxEl.value) : null;
+      if (b.dataset.divida !== "1") {
+        if (!cx) { w.textContent = "Escolha o caixa"; return; }
+        if (debito > Number(cx.saldo) + 0.001) { w.textContent = "Saldo insuficiente no caixa (R$ " + Number(cx.saldo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")"; return; }
+      }
+      b.disabled = true;
+      try { await api.compraPagar(+b.dataset.i, debito, cx ? cx.caixa_id : null, parsed.value, quando); toast("Pagamento registrado ✓ custo travado no câmbio pago"); viewComprasPendentes(); }
+      catch (e) { w.textContent = e.message; b.disabled = false; }
+      return;
+    }
+    const v = Math.round(+r.querySelector(".pv").value * 100) / 100, cx = CX.find(x => String(x.caixa_id) === r.querySelector(".pcx").value);
     if (!(v > 0)) { w.textContent = "Informe o valor"; return; }
     if (v > Number(b.dataset.rest) + 0.001) { w.textContent = "Pagamento maior que o saldo da compra"; return; }
     if (!cx) { w.textContent = "Escolha o caixa"; return; }

@@ -10,7 +10,7 @@ const sql = readFileSync(join(dir, "../supabase-loja/migration-compras-pagamento
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261113k") && html.includes('data-v="cpend" data-p="admin"') && html.includes("Compras pendentes"), "nav and cache keep Compras pendentes for admin only");
+ok(html.includes("app.js?v=20261113l") && html.includes('data-v="cpend" data-p="admin"') && html.includes("Compras pendentes"), "nav and cache keep Compras pendentes for admin only");
 ok(html.includes('data-v="pagar" data-p="financas"'), "the manual Contas a pagar button stays");
 
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));

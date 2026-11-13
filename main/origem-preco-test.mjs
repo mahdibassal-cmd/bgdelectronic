@@ -66,10 +66,14 @@ const compra = O.custoReaisDeUsd(80, 5.8);
 ok(cents(compra.value) === 46400 && cents(ex.costs.IMP.custo) === 43200, "the compra rate prices that purchase; the live cost stays on the global rate");
 const semPreco = O.aplicarCotacao([{ sku: "IMP", origem: "Importado", preco_venda: 799, preco_usd: null }], { IMP: { custo: 10, custo_usd: 80 } }, 5.4);
 ok(cents(semPreco.costs.IMP.custo) === 43200 && semPreco.products[0].preco_venda === 799, "rate save updates the R$ cost and leaves the shelf price when there is no US$ price");
+const medio = O.custoMedioLotes([{ qtd: 2, custo_usd: 100, taxa: 5, travado: true }, { qtd: 2, custo_usd: 100, taxa: 5.1, travado: false }], 6);
+ok(medio && cents(medio.value) === 55000, "locked US$ 100 at 5 plus a floating lot at 6 averages to 550");
+const soAberto = O.aplicarCotacao([{ sku: "IMP", origem: "Importado", preco_usd: 100, preco_venda: 1 }], { IMP: { custo: 1, custo_usd: 80, lotes: [{ qtd: 2, custo_usd: 80, taxa: 5, travado: false }] } }, 5.4);
+ok(cents(soAberto.costs.IMP.custo) === 43200, "an open lot follows the daily rate, not the quote stored on the line");
 
 const app = read("app.js");
 const html = read("index.html");
-ok(html.includes("origem-preco.js?v=20261113f") && html.includes("app.js?v=20261113k") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
+ok(html.includes("origem-preco.js?v=20261113g") && html.includes("app.js?v=20261113l") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
 ok(compras.includes('class="lo"') && compras.includes(">Nacional<") && compras.includes(">Importado<") && compras.includes("Custo (US$)") && compras.includes("Custo un. (R$)"), "compra lines ask only for cost, in R$ or US$");
 ok(!compras.includes("Preço venda") && !compras.includes('class="lu"') && !compras.includes("Preço (US$)"), "Compras has no selling-price input");
