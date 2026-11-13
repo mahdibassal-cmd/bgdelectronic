@@ -88,6 +88,7 @@ const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.rou
     ...pays.map(p => rcWrap("Pago: " + p)), ...(h.prazo_dias ? [rcWrap("Paga em: " + h.prazo_dias + (Number(h.prazo_dias) === 1 ? " dia" : " dias") + (h.vencimento ? " (vence " + String(h.vencimento).slice(0, 10).split("-").reverse().join("/") + ")" : ""))] : []), ...(h.local_pagamento ? [rcWrap("Local pagto: " + localLbl(h.local_pagamento))] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const caixaSaldoHtml = n => { const v = Number(n) || 0; return v < -0.001 ? `<span class="low">${brl(v)} · dívida</span>` : brl(v); };
 const usdBadge = p => p && p.origem === "Importado" ? ' <span class="badge usd-b" title="Importado">US$</span>' : "";
 const quandoSP = iso => iso ? new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "";
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -796,7 +797,8 @@ if (!MOCK && !CONFIGURED) {
     async compraPagamento(h, itens) {
       if (role !== "admin") throw new Error("Só admin registra compra");
       const pag = String(h.pagamento || "").toLowerCase();
-      if (pag !== "agora" && pag !== "depois") throw new Error("Escolha a forma de pagamento");
+      if (pag !== "agora" && pag !== "depois" && pag !== "divida") throw new Error("Escolha a forma de pagamento");
+      if (pag === "divida" && role !== "admin") throw new Error("Só admin lança dívida no caixa especial");
       if (pag === "depois" && h.vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(h.vencimento)) throw new Error("Vencimento inválido");
       const OPX = globalThis.BAGDA_ORIGEM;
       let total = 0;
@@ -812,19 +814,20 @@ if (!MOCK && !CONFIGURED) {
       }
       total = Math.round(total * 100) / 100;
       let cx = null;
-      if (pag === "agora" && total > 0) {
+      if ((pag === "agora" || pag === "divida") && total > 0) {
         cx = CX.find(c => c.caixa_id === +h.caixa_id && c.ativo !== false && (!c.somente_admin || role === "admin"));
         if (!cx) throw new Error("Caixa inválido");
+        if (pag === "divida" && !cx.somente_admin) throw new Error("Dívida só no caixa especial");
         const s = Math.round(saldo(cx.caixa_id) * 100) / 100;
-        if (total > s + 0.001) throw new Error("Saldo insuficiente no caixa (R$ " + s.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
+        if (pag === "agora" && total > s + 0.001) throw new Error("Saldo insuficiente no caixa (R$ " + s.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
       }
       const lote = "demo-" + Date.now();
       for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote, ...(h.data ? { data: h.data } : {}) });
       const c = PU[0].compra_id, numero = cnum(c);
       const tot = Math.round(PU.filter(p => p.compra_id === c).reduce((a, p) => a + Number(p.total), 0) * 100) / 100;
       COMP.push({ id: c, numero, data: h.data || today(), fornecedor: h.fornecedor || null, pagamento: pag, vencimento: pag === "depois" ? (h.vencimento || null) : null, total: tot });
-      if (pag === "agora" && tot > 0) {
-        mov(cx.caixa_id, "saida", tot, "Compra " + numero + " — " + (h.fornecedor || "fornecedor"), null, meU);
+      if ((pag === "agora" || pag === "divida") && tot > 0) {
+        mov(cx.caixa_id, "saida", tot, (pag === "divida" ? "Dívida " : "") + "Compra " + numero + " — " + (h.fornecedor || "fornecedor"), null, meU);
         CPAGTO.push({ id: id++, compra_id: c, valor: tot, data: today(), caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
       }
       return { lote, itens: itens.length, compra_id: c, numero, total: tot, origem_ok: true, pagamento_ok: true, pagamento: pag };
@@ -836,7 +839,7 @@ if (!MOCK && !CONFIGURED) {
     async comprasPendentes() {
       await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
       const hj = today();
-      const rows = COMP.filter(c => c.pagamento === "agora" || c.pagamento === "depois").map(c => {
+      const rows = COMP.filter(c => c.pagamento === "agora" || c.pagamento === "depois" || c.pagamento === "divida").map(c => {
         const pags = CPAGTO.filter(p => p.compra_id === c.id).map(p => { const hide = !!(p.somente_admin && role !== "admin"); return { id: p.id, valor: p.valor, data: p.data, caixa: hide ? null : p.caixa, caixa_id: hide ? null : p.caixa_id, caixa_oculto: hide }; });
         const pago = Math.round(pags.reduce((a, p) => a + Number(p.valor), 0) * 100) / 100;
         const restante = Math.round((Number(c.total) - pago) * 100) / 100;
@@ -1288,7 +1291,9 @@ async function viewCompras(o = {}) {
   ${emb ? "" : `<div id="fpbox"><h3>Forma de pagamento</h3>${pagSql ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-agora" value="agora" checked style="width:auto"> Pagar agora de um caixa</label>
   <div id="fp-agora-box"><label for="fpcx">Caixa</label><select id="fpcx">${CXS.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === prefCx ? "selected" : ""}>${esc(c.nome)}${c.somente_admin ? " (só admin)" : ""}</option>`).join("")}</select><p id="fpsaldo"></p></div>
   <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-depois" value="depois" style="width:auto"> Pagar depois (a pagar ao fornecedor)</label>
-  <div id="fp-depois-box" hidden><label for="fpven">Vencimento (opcional)</label><input id="fpven" type="date"></div>` : `<p class="warn">Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada será salvo até lá.</p>`}</div>`}
+  <div id="fp-depois-box" hidden><label for="fpven">Vencimento (opcional)</label><input id="fpven" type="date"></div>
+  ${adm ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-divida" value="divida" style="width:auto"> Lançar como dívida no caixa especial</label>
+  <div id="fp-divida-box" hidden><label for="fpdx">Caixa especial (só admin)</label><select id="fpdx">${CXS.filter(c => c.somente_admin).map(c => `<option value="${c.caixa_id}">${esc(c.nome)}</option>`).join("")}</select><p id="fpdsaldo"></p><p class="muted">Não confere o saldo. Se não houver dinheiro, o caixa fica negativo e a dívida aparece em vermelho no caixa e no extrato. O financeiro não vê este caixa.</p></div>` : ""}` : `<p class="warn">Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada será salvo até lá.</p>`}</div>`}
   <p class="warn" id="pw"></p>
   <button class="btn" id="sv">Salvar</button></div>
   ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Compra</th><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
@@ -1315,9 +1320,14 @@ async function viewCompras(o = {}) {
   const syncTaxa = () => { const box = $("#taxabox"); if (!box) return; const show = loja() && L.some(l => l.origem === "Importado"); box.hidden = !show; const inp = $("#taxa"); if (show && inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } };
   const linhaConta = l => !!(l.sku || (loja() && l.origem === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
   const totalAgora = () => Math.round(L.filter(linhaConta).reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0) * 100) / 100;
-  const syncPag = () => { const box = $("#fpbox"); if (!box) return; const show = loja(); box.hidden = !show; const depois = !!($("#fp-depois") || {}).checked; const a = $("#fp-agora-box"), d = $("#fp-depois-box"); if (a) a.hidden = depois; if (d) d.hidden = !depois;
-    const el = $("#fpsaldo"); if (!el) return; const cx = CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")); if (!cx) { el.innerHTML = CXS.length ? "" : '<span class="warn">Nenhum caixa disponível.</span>'; return; }
-    const total = totalAgora(), falta = !depois && total > Number(cx.saldo) + 0.001; el.innerHTML = `Saldo deste caixa: <b>${brl(cx.saldo)}</b>${falta ? ` <span class="warn">Saldo insuficiente para o total ${brl(total)}.</span>` : ""}`; };
+  const modoPag = () => ((document.querySelector('input[name="fp"]:checked') || {}).value) || "agora";
+  const syncPag = () => { const box = $("#fpbox"); if (!box) return; box.hidden = !loja(); const modo = modoPag(); const a = $("#fp-agora-box"), d = $("#fp-depois-box"), z = $("#fp-divida-box"); if (a) a.hidden = modo !== "agora"; if (d) d.hidden = modo !== "depois"; if (z) z.hidden = modo !== "divida";
+    const total = totalAgora();
+    const paint = (el, cx, divida) => { if (!el) return; if (!cx) { el.innerHTML = '<span class="warn">Nenhum caixa disponível.</span>'; return; }
+      if (divida) { const depois = Math.round((Number(cx.saldo) - total) * 100) / 100; el.innerHTML = `Saldo deste caixa: ${caixaSaldoHtml(cx.saldo)}${total > 0 ? `. Depois desta compra: ${caixaSaldoHtml(depois)}` : ""}. <span class="muted">Sem trava de saldo.</span>`; return; }
+      const falta = total > Number(cx.saldo) + 0.001; el.innerHTML = `Saldo deste caixa: ${caixaSaldoHtml(cx.saldo)}${falta ? ` <span class="warn">Saldo insuficiente para o total ${brl(total)}.</span>` : ""}`; };
+    if (modo === "divida") paint($("#fpdsaldo"), CXS.find(c => c.somente_admin && String(c.caixa_id) === String(($("#fpdx") || {}).value || "")), true);
+    else if (modo === "agora") paint($("#fpsaldo"), CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")), false); };
   const tot = () => { const okL = L.filter(linhaConta); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
     document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * custoReaisLinha(l)); }); syncPag(); };
   const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && l.origem === "Importado"; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>
@@ -1336,7 +1346,7 @@ async function viewCompras(o = {}) {
       r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
     tot(); syncTaxa(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
   if ($("#dst")) $("#dst").onchange = () => { sb0(); drawL(); }; sb0();
-  document.querySelectorAll('input[name="fp"]').forEach(r => r.onchange = syncPag); if ($("#fpcx")) $("#fpcx").onchange = syncPag;
+  document.querySelectorAll('input[name="fp"]').forEach(r => r.onchange = syncPag); if ($("#fpcx")) $("#fpcx").onchange = syncPag; if ($("#fpdx")) $("#fpdx").onchange = syncPag;
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
   $("#add").onclick = () => { L.push(blank()); drawL(true); };
@@ -1368,8 +1378,11 @@ async function viewCompras(o = {}) {
     const okCompra = rs => { toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); };
     const totalCompra = Math.round(itens.reduce((a, l) => a + l.qtd * l.custo_unit, 0) * 100) / 100;
     if (!pagSql) { busy = false; $("#sv").disabled = false; w.textContent = "Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi salvo."; return; }
-    const depois = !!($("#fp-depois") || {}).checked;
-    if (depois) { hd.pagamento = "depois"; if ($("#fpven") && $("#fpven").value) hd.vencimento = $("#fpven").value; }
+    const modo = modoPag();
+    if (modo === "depois") { hd.pagamento = "depois"; if ($("#fpven") && $("#fpven").value) hd.vencimento = $("#fpven").value; }
+    else if (modo === "divida") { if (me.role !== "admin") { busy = false; $("#sv").disabled = false; w.textContent = "Só admin lança dívida no caixa especial. Nada foi salvo."; return; }
+      const cx = CXS.find(c => c.somente_admin && String(c.caixa_id) === String(($("#fpdx") || {}).value || "")); if (!cx) { busy = false; $("#sv").disabled = false; w.textContent = "Escolha o caixa especial. Nada foi salvo."; return; }
+      hd.pagamento = "divida"; hd.caixa_id = cx.caixa_id; }
     else { const cx = CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")); if (!cx) { busy = false; $("#sv").disabled = false; w.textContent = "Escolha o caixa. Nada foi salvo."; return; }
       if (totalCompra > Number(cx.saldo) + 0.001) { busy = false; $("#sv").disabled = false; w.textContent = "Saldo insuficiente no caixa (R$ " + Number(cx.saldo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "). Nada foi salvo."; return; }
       hd.pagamento = "agora"; hd.caixa_id = cx.caixa_id; }
@@ -1754,7 +1767,7 @@ async function viewCaixa(d = today()) {
   const ses = c => SE.find(x => x.caixa_id === c.caixa_id);
   const fin = me.role === "admin" || me.role === "financeiro", adm = me.role === "admin";
   const isHX = c => /HX/.test(c.nome || ""), hxN = c => isHX(c) ? `<small class="muted">Diário (hoje)${adm ? ' · <a href="#hxdia" class="hxl">HX por dia</a>' : " · dias anteriores só admin"}</small>` : "";
-  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small>${isHX(c) ? `<b>${brl(c.movimento_hoje)}</b><small>Total de hoje</small>` : `<b>${brl(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>`}
+  const card = c => { const x = ses(c); return `<div class="kpi cxk">${hxN(c)}<small>${esc(c.nome)}${fin ? ` <button class="btn ghost so noprint" data-c="${c.caixa_id}" style="margin:0 0 0 6px;padding:2px 10px;font-size:.85em">Ver só este caixa</button>` : ""}</small>${isHX(c) ? `<b>${brl(c.movimento_hoje)}</b><small>Total de hoje</small>` : `<b>${caixaSaldoHtml(c.saldo)}</b><small>Hoje: ${brl(c.movimento_hoje)}</small>`}
     <small>${x ? (x.fechado_em ? `Fechado: contado ${brl(x.fechamento_contado)} · diferença <b class="${+x.diferenca ? "warn" : ""}">${brl(x.diferenca)}</b>` : `Aberto ${hm(x.aberto_em)} com ${brl(x.abertura_valor)}`) : "Não aberto hoje"}</small>
     ${hoje ? `<div class="noprint cxa">${!x ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="va"><button class="btn ghost ab" data-c="${c.caixa_id}">Abrir</button>` : !x.fechado_em ? `<input type="number" step="0.01" min="0" placeholder="Valor contado" data-c="${c.caixa_id}" class="vf"><button class="btn ghost fe" data-c="${c.caixa_id}">Fechar</button>` : ""}</div>` : ""}</div>`; };
   const tot = EX.reduce((a, m) => a + Number(m.valor_assinado), 0);
@@ -1775,7 +1788,7 @@ async function viewCaixa(d = today()) {
   </div>` : ""}
   <div class="card"><h2>Extrato do dia ${esc(d.split("-").reverse().join("/"))}</h2>${!adm && !hoje && SA.some(c => /HX/.test(c.nome || "")) ? '<p class="muted">Caixa HX: dias anteriores visíveis só para admin.</p>' : ""}<div style="overflow-x:auto"><table class="stk"><tr><th>Hora</th><th>Caixa</th><th>Tipo</th><th>Cliente</th><th>Motivo / nota</th><th>Usuário</th><th class="n">Valor</th></tr>
   ${EX.map(m => `<tr${m.estornado ? ' style="text-decoration:line-through;opacity:.6"' : ""}><td>${hm(m.created_at)}</td><td>${esc(m.caixa)}</td><td>${TL[m.tipo] || m.tipo}${m.estorno_de ? ` <small class="muted">(estorno #${m.estorno_de})</small>` : ""}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.handle || "")}</td><td class="n">${brl(m.valor_assinado)}${adm ? (m.estornado ? '<br><small class="muted noprint">Estornado</small>' : m.tipo !== "estorno" && !m.estorno_de ? `<br><button class="btn ghost emv noprint" data-m="${m.id}" style="margin:2px 0 0;padding:1px 8px;font-size:12px;color:#b91c1c">Estornar</button>` : "") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Sem movimentos.</td></tr>'}
-  ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="6">${esc(c.nome)} — movimento do dia</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
+  ${SA.map(c => { const v = EX.filter(m => m.caixa_id === c.caixa_id).reduce((a, m) => a + Number(m.valor_assinado), 0); return `<tr class="sep"><th colspan="6">${esc(c.nome)} — movimento do dia${Number(c.saldo) < -0.001 ? ` · saldo ${caixaSaldoHtml(c.saldo)}` : ""}</th><th class="n">${brl(v)}</th></tr>`; }).join("")}
   <tr class="tot"><th colspan="6">TOTAL DO DIA</th><th class="n">${brl(tot)}</th></tr></table></div></div>`;
   document.querySelectorAll(".hxl").forEach(a => a.onclick = ev => { ev.preventDefault(); go("hxdia"); });
   document.querySelectorAll(".emv").forEach(b => b.onclick = () => estornarMovBox(EX.find(m => m.id === +b.dataset.m), () => viewCaixa(d)));
@@ -2031,14 +2044,14 @@ async function viewResumo(d = today(), c = null, back = false) {
   <div><label>Data (horário de São Paulo)</label><input id="rd" type="date" value="${d}"></div></div>${FD && FD.frete > 0 ? `<p><b>Frete (motoboy) do dia — todas as notas ativas:</b> ${brl(FD.frete)} em ${FD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}${CD && CD.caxinha > 0 ? `<p><b>Caxinha d Natal do dia — todas as notas ativas:</b> ${brl(CD.caxinha)} em ${CD.notas} nota(s) <small class="muted">(já incluído nos pagamentos/caixas; não é produto)</small></p>` : ""}
   <div class="grid" style="margin-top:12px">
     <div class="kpi"><small>Abertura</small><b>${s ? brl(s.abertura_valor) : "—"}</b><small>${s ? `${esc(s.aberto_por || "")} ${esc(s.aberto_em || "")}` : "Não aberto"}</small></div>
-    <div class="kpi"><small>Saldo inicial (sistema)</small><b>${brl(R.saldo_inicial)}</b></div>
+    <div class="kpi"><small>Saldo inicial (sistema)</small><b>${caixaSaldoHtml(R.saldo_inicial)}</b></div>
     <div class="kpi"><small>Entradas</small><b>${brl(R.entradas)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(R.saidas)}</b></div>
     <div class="kpi"><small>Fechamento</small><b>${s && s.fechamento_contado != null ? brl(s.fechamento_contado) : "—"}</b><small>${s && s.diferenca != null ? "Diferença " + brl(s.diferenca) : "Não fechado"}</small></div>
-    <div class="kpi"><small>Saldo final</small><b>${brl(R.saldo_final)}</b></div></div>${hxNote}</div>
+    <div class="kpi"><small>Saldo final</small><b>${caixaSaldoHtml(R.saldo_final)}</b></div></div>${hxNote}</div>
   <div class="card"><h2>Movimentos</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Nota nº</th><th>Cliente</th><th>Vendedor</th><th>Lançada por</th><th>Forma</th><th class="n">Valor</th></tr>
   ${R.movimentos.map(m => `<tr><td>${esc(m.hora)}</td><td>${TL[m.tipo] || esc(m.tipo)}</td><td>${esc(m.nota || "—")}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(vend(m))}</td><td>${esc(m.usuario || "")}</td><td>${esc(FORMAL[m.forma] || m.forma || "")}</td><td class="n">${brl(m.assinado)}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Sem movimentos.</td></tr>'}
   ${Object.entries(R.por_forma).map(([f, v]) => `<tr class="sep"><th colspan="7">Total ${esc(FORMAL[f] || f)}</th><th class="n">${brl(v)}</th></tr>`).join("")}
-  <tr class="tot"><th colspan="7">SALDO FINAL</th><th class="n">${brl(R.saldo_final)}</th></tr></table></div>`;
+  <tr class="tot"><th colspan="7">SALDO FINAL</th><th class="n">${caixaSaldoHtml(R.saldo_final)}</th></tr></table></div>`;
   $("#rd").onchange = e => viewResumo(e.target.value, c, back); $("#rc").onchange = e => viewResumo(d, +e.target.value, back); if ($("#bk")) $("#bk").onclick = () => go("caixa"); $("#pr").onclick = () => window.print();
   $("#csv").onclick = () => { const q = v => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; }, n = v => Number(v).toFixed(2).replace(".", ",");
     const rows = [["Caixa", R.caixa], ["Data", dd], ["Abertura", s ? n(s.abertura_valor) : ""], ["Saldo inicial", n(R.saldo_inicial)], [], ["Data/hora", "Tipo", "Nota", "Cliente", "Vendedor", "Lançada por", "Forma", "Valor", "Motivo"],
@@ -2056,7 +2069,7 @@ async function viewHxDia(d = today()) {
   <label class="noprint">Data (horário de São Paulo)</label><input id="hd" class="noprint" type="date" value="${d}" style="max-width:200px">
   <div class="grid" style="margin-top:12px"><div class="kpi"><small>Total do dia</small><b>${brl(R.total_dia)}</b></div>
     <div class="kpi"><small>Entradas</small><b>${brl(R.entradas)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(R.saidas)}</b></div>
-    <div class="kpi"><small>Saldo final (acumulado)</small><b>${brl(R.saldo_final)}</b></div></div></div>
+    <div class="kpi"><small>Saldo final (acumulado)</small><b>${caixaSaldoHtml(R.saldo_final)}</b></div></div></div>
   <div class="card"><h2>Movimentos</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Nota nº</th><th>Cliente</th><th>Motivo</th><th>Lançada por</th><th class="n">Valor</th></tr>
   ${R.movimentos.map(m => `<tr><td>${esc(m.hora)}</td><td>${TL[m.tipo] || esc(m.tipo)}</td><td>${esc(m.nota || "—")}</td><td>${esc((m.cliente || "").trim() || "—")}</td><td>${esc(m.motivo || "")}</td><td>${esc(m.usuario || "")}</td><td class="n">${brl(m.assinado)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Sem movimentos.</td></tr>'}
   <tr class="tot"><th colspan="6">TOTAL DO DIA</th><th class="n">${brl(R.total_dia)}</th></tr></table></div>
@@ -2072,7 +2085,7 @@ async function viewCxEsp() {
   catch (e) { app.innerHTML = `<div class="card"><h2>Caixa Especial</h2><p class="warn">${esc(/v_caixa_especial|PGRST20[25]|42P01|schema cache|does not exist/i.test(e.message) ? "Falta rodar a atualização do banco (m10-caixa-especial.sql)." : e.message)}</p></div>`; return; }
   const saldo = M.length ? Number(M[0].saldo_apos) : 0, cred = S.filter(c => +c.saldo > 0), dh = t => new Date(t).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   const ent = M.filter(m => m.tipo === "entrada").reduce((a, m) => a + Number(m.valor), 0), sai = M.filter(m => m.tipo === "saida").reduce((a, m) => a + Number(m.valor), 0);
-  app.innerHTML = `<div class="card"><h2>Caixa Especial <small class="muted">(só admin)</small></h2><div class="grid"><div class="kpi"><small>Saldo atual</small><b>${brl(saldo)}</b></div><div class="kpi"><small>Entradas</small><b>${brl(ent)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(sai)}</b></div></div>
+  app.innerHTML = `<div class="card"><h2>Caixa Especial <small class="muted">(só admin)</small></h2><div class="grid"><div class="kpi"><small>Saldo atual</small><b>${caixaSaldoHtml(saldo)}</b></div><div class="kpi"><small>Entradas</small><b>${brl(ent)}</b></div><div class="kpi"><small>Saídas</small><b>${brl(sai)}</b></div></div>
   <p class="muted">Separada dos caixas do dia: não aparece em Caixa, Resumo nem relatórios. Quem lançou e a hora ficam gravados automaticamente.</p></div>
   <div class="card"><h2>Novo lançamento</h2><form id="f"><div class="grid"><div><label>Tipo</label><select id="tp"><option value="saida">Saída (tirar dinheiro)</option><option value="entrada">Entrada (colocar dinheiro)</option></select></div>
   <div><label>Valor (R$) *</label><input id="v" type="number" min="0.01" step="0.01" required></div>
@@ -2080,7 +2093,7 @@ async function viewCxEsp() {
   <label id="lm">Motivo / para onde vai o dinheiro *</label><input id="m" maxlength="300" placeholder="Ex.: devolução excedente nota 000035 — negolu">
   <p class="muted" id="hc" hidden>A saída também baixa o crédito do cliente na Caixa Geral (mesmo valor).</p><button class="btn gold">Salvar</button></form></div>
   <div class="card"><h2>Extrato</h2><table class="stk"><tr><th>Data/hora</th><th>Tipo</th><th>Motivo / destino</th><th>Cliente</th><th>Por</th><th class="n">Valor</th><th class="n">Saldo</th><th></th></tr>
-  ${M.map(m => `<tr class="${m.estornado ? "exc" : ""}"><td>${esc(dh(m.created_at))}</td><td>${m.tipo === "entrada" ? "Entrada" : "Saída"}</td><td>${esc(m.motivo)}</td><td>${esc(m.cliente || "")}${m.credito_id ? ' <small class="muted">devolução de crédito</small>' : ""}</td><td>${esc(m.handle || "")}</td><td class="n ${m.tipo === "saida" ? "low" : ""}">${m.tipo === "saida" ? "−" : "+"}${brl(m.valor)}</td><td class="n">${brl(m.saldo_apos)}</td>
+  ${M.map(m => `<tr class="${m.estornado ? "exc" : ""}"><td>${esc(dh(m.created_at))}</td><td>${m.tipo === "entrada" ? "Entrada" : "Saída"}</td><td>${esc(m.motivo)}</td><td>${esc(m.cliente || "")}${m.credito_id ? ' <small class="muted">devolução de crédito</small>' : ""}</td><td>${esc(m.handle || "")}</td><td class="n ${m.tipo === "saida" ? "low" : ""}">${m.tipo === "saida" ? "−" : "+"}${brl(m.valor)}</td><td class="n">${caixaSaldoHtml(m.saldo_apos)}</td>
   <td>${m.estornado ? '<small class="muted">estornado</small>' : m.estorno_de ? '<small class="muted">estorno</small>' : `<button class="btn ghost estx" style="margin:0" data-i="${m.id}">Estornar</button>`}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Sem lançamentos. Comece com uma Entrada (saldo inicial).</td></tr>'}</table></div>`;
   const sync = () => { const s = $("#tp").value === "saida"; $("#dv").hidden = !s; if (!s) $("#c").value = ""; $("#hc").hidden = !$("#c").value; $("#lm").textContent = s ? "Motivo / para onde vai o dinheiro *" : "Observação"; };
   $("#tp").onchange = sync; $("#c").onchange = () => { const o = $("#c").selectedOptions[0]; if (o.value && !$("#v").value) $("#v").value = (+o.dataset.s).toFixed(2); sync(); }; sync();

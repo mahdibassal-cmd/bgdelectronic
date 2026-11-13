@@ -69,7 +69,7 @@ ok(cents(semPreco.costs.IMP.custo) === 43200 && semPreco.products[0].preco_venda
 
 const app = read("app.js");
 const html = read("index.html");
-ok(html.includes("origem-preco.js?v=20261113f") && html.includes("app.js?v=20261113g") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
+ok(html.includes("origem-preco.js?v=20261113f") && html.includes("app.js?v=20261113h") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
 ok(compras.includes('class="lo"') && compras.includes(">Nacional<") && compras.includes(">Importado<") && compras.includes("Custo (US$)") && compras.includes("Custo un. (R$)"), "compra lines ask only for cost, in R$ or US$");
 ok(!compras.includes("Preço venda") && !compras.includes('class="lu"') && !compras.includes("Preço (US$)"), "Compras has no selling-price input");

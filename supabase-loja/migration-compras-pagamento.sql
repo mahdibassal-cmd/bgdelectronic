@@ -6,6 +6,8 @@
 --   agora  = sai o total de um caixa (saída em caixa_movimentos, motivo com o número
 --            da compra e o fornecedor). Saldo insuficiente desfaz a compra inteira.
 --   depois = fica a pagar. Vencimento é opcional. Nenhum movimento de caixa.
+--   divida = só admin. Saída no caixa somente_admin (ex.: PAGAMENTO PRODUTOS),
+--            sem conferir saldo: o saldo pode ficar negativo e é a dívida.
 -- Compras já gravadas ficam com pagamento NULL: legado, não entram em contas a pagar
 -- e não aceitam baixa por aqui.
 -- Custo unitário continua só para admin nas RPCs de compras/IMEI. Esta lista devolve
@@ -19,7 +21,7 @@ alter table public.caixas add column if not exists somente_admin boolean not nul
 alter table public.compras add column if not exists pagamento text;
 alter table public.compras drop constraint if exists compras_pagamento_check;
 alter table public.compras add constraint compras_pagamento_check
-  check (pagamento is null or pagamento in ('agora', 'depois'));
+  check (pagamento is null or pagamento in ('agora', 'depois', 'divida'));
 alter table public.compras add column if not exists vencimento date;
 create index if not exists compras_pagamento_idx on public.compras (pagamento) where pagamento is not null;
 
@@ -90,7 +92,7 @@ do $$ begin
 end $$;
 
 -- Saída no caixa + linha de pagamento. Trava o mesmo advisory lock de transferir_caixa.
-create or replace function public.compra_lancar_saida(p_compra bigint, p_caixa smallint, p_valor numeric)
+create or replace function public.compra_lancar_saida(p_compra bigint, p_caixa smallint, p_valor numeric, p_divida boolean default false)
 returns jsonb
 language plpgsql security definer set search_path = '' as $fn$
 declare
@@ -107,6 +109,7 @@ declare
   v_num text;
   v_forn text;
   v_forma text;
+  v_so boolean := false;
 begin
   if not (public.can('financas') and public.caixa_acesso()) then
     raise exception 'Sem permissão (financeiro/admin)' using errcode = '42501';
@@ -118,7 +121,7 @@ begin
     raise exception 'Valor inválido' using errcode = 'P0001';
   end if;
   select * into c from public.compras where id = p_compra for update;
-  if not found or c.pagamento is null or c.pagamento not in ('agora', 'depois') then
+  if not found or c.pagamento is null or c.pagamento not in ('agora', 'depois', 'divida') then
     raise exception 'Compra antiga sem controle de pagamento' using errcode = 'P0001';
   end if;
   select round(coalesce(sum(p.qtd * p.custo_unit), 0), 2) into v_tot
@@ -134,21 +137,28 @@ begin
     raise exception 'Escolha o caixa' using errcode = 'P0001';
   end if;
   perform pg_advisory_xact_lock(892341, p_caixa::int);
-  select id, nome, metodo::text into v_cx, v_nome, v_forma
+  select id, nome, metodo::text, somente_admin into v_cx, v_nome, v_forma, v_so
     from public.caixas
     where id = p_caixa and ativo and public.caixa_permitido(p_caixa);
   if v_cx is null then
     raise exception 'Caixa inválido' using errcode = 'P0001';
   end if;
   v_saldo := round(public.caixa_saldo_calc(v_cx), 2);
-  if v_val > v_saldo then
+  if coalesce(p_divida, false) then
+    if not public.has_perm('admin') then
+      raise exception 'Só admin lança dívida no caixa especial' using errcode = '42501';
+    end if;
+    if not coalesce(v_so, false) then
+      raise exception 'Dívida só no caixa especial' using errcode = 'P0001';
+    end if;
+  elsif v_val > v_saldo then
     raise exception 'Saldo insuficiente no caixa (R$ %)',
       replace(to_char(v_saldo, 'FM999999990.00'), '.', ',') using errcode = 'P0001';
   end if;
   v_num := public.compra_numero(c.id);
   v_forn := coalesce(nullif(btrim(c.fornecedor), ''), 'fornecedor');
   insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo, user_id, forma)
-  values (v_cx, 'saida', v_val, left('Compra ' || v_num || ' — ' || v_forn, 300), auth.uid(), v_forma)
+  values (v_cx, 'saida', v_val, left((case when coalesce(p_divida, false) then 'Dívida ' else '' end) || 'Compra ' || v_num || ' — ' || v_forn, 300), auth.uid(), v_forma)
   returning id into v_mov;
   insert into public.compra_pagamentos(compra_id, valor, data, caixa_id, mov_id, user_id)
   values (c.id, v_val, (now() at time zone 'America/Sao_Paulo')::date, v_cx, v_mov, auth.uid())
@@ -168,7 +178,7 @@ begin
     'caixa', v_nome);
 end
 $fn$;
-revoke all on function public.compra_lancar_saida(bigint, smallint, numeric) from public, anon, authenticated;
+revoke all on function public.compra_lancar_saida(bigint, smallint, numeric, boolean) from public, anon, authenticated;
 
 -- Mesmo corpo de migration-origem-dolar.sql, mais a forma de pagamento no cabeçalho.
 -- Sem o campo pagamento, a compra fica legado (clientes antigos e chamadas sem a tela nova).
@@ -213,8 +223,11 @@ begin
   if v_cid is null then raise exception 'Compra não numerada' using errcode = 'P0001'; end if;
   v_pag := nullif(lower(btrim(coalesce(p_header->>'pagamento', ''))), '');
   if v_pag is not null then
-    if v_pag not in ('agora', 'depois') then
+    if v_pag not in ('agora', 'depois', 'divida') then
       raise exception 'Escolha a forma de pagamento' using errcode = 'P0001';
+    end if;
+    if v_pag = 'divida' and not public.has_perm('admin') then
+      raise exception 'Só admin lança dívida no caixa especial' using errcode = '42501';
     end if;
     v_venc := null;
     if v_pag = 'depois' and nullif(btrim(coalesce(p_header->>'vencimento', '')), '') is not null then
@@ -228,14 +241,14 @@ begin
        set pagamento = v_pag,
            vencimento = case when v_pag = 'depois' then v_venc end
      where id = v_cid;
-    if v_pag = 'agora' and round(v_tot, 2) > 0 then
+    if v_pag in ('agora', 'divida') and round(v_tot, 2) > 0 then
       begin
         v_cx := nullif(btrim(coalesce(p_header->>'caixa_id', '')), '')::smallint;
       exception when others then
         raise exception 'Caixa inválido' using errcode = 'P0001';
       end;
       if v_cx is null then raise exception 'Escolha o caixa' using errcode = 'P0001'; end if;
-      perform public.compra_lancar_saida(v_cid, v_cx, round(v_tot, 2));
+      perform public.compra_lancar_saida(v_cid, v_cx, round(v_tot, 2), v_pag = 'divida');
     end if;
   end if;
   return jsonb_build_object(
@@ -308,7 +321,7 @@ begin
            round(coalesce((select sum(p.qtd * p.custo_unit) from public.purchases p where p.compra_id = c.id), 0), 2) as total,
            round(coalesce((select sum(pg.valor) from public.compra_pagamentos pg where pg.compra_id = c.id), 0), 2) as pago
       from public.compras c
-     where c.pagamento in ('agora', 'depois')
+     where c.pagamento in ('agora', 'depois', 'divida')
   ),
   calc as (
     select l.*,

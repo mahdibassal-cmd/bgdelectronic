@@ -202,5 +202,26 @@ const visAdm = await db.query("select caixa_id from public.compra_pagamentos whe
 ok(visAdm.rows.length >= 1, "admin can read the admin-caixa payment rows");
 await db.exec("reset role");
 
+await db.exec("reset role");
+await as(mike);
+const antesDiv = await num("select caixa_saldo_calc(17::smallint)");
+const nPurch = await num("select count(*) from purchases");
+e = await err(`select public.registrar_compra_pagamento('${hdr({ pagamento: "divida", caixa_id: 1 })}'::jsonb, '${item()}'::jsonb)`);
+ok(/Dívida só no caixa especial/.test(e), "debt on a normal caixa is refused: " + e);
+ok(await num("select count(*) from purchases") === nPurch, "refused debt writes no purchase");
+const big = JSON.stringify([{ sku: "JBL-001", qtd: 1, custo_unit: 10000, origem: "Nacional" }]).replace(/'/g, "''");
+const dv = await one(`select public.registrar_compra_pagamento('${hdr({ pagamento: "divida", caixa_id: 17 })}'::jsonb, '${big}'::jsonb) as r`);
+ok(dv.r.pagamento === "divida" && dv.r.pagamento_ok === true, "admin debt option returns divida");
+const saldoDiv = await num("select caixa_saldo_calc(17::smallint)");
+ok(saldoDiv === antesDiv - 10000 && saldoDiv < 0, "admin caixa goes negative without a saldo block (" + antesDiv + " -> " + saldoDiv + ")");
+const mot = await one(`select motivo from caixa_movimentos where caixa_id = 17 and motivo like 'Dívida%' order by id desc limit 1`);
+ok(mot.motivo.includes(dv.r.numero) && mot.motivo.includes("Distribuidora Tech SP"), "debt saida names the compra and the fornecedor: " + mot.motivo);
+const listaDiv = await one(`select public.compras_pendentes() as r`);
+ok(!listaDiv.r.grupos.some(g => g.compras.some(c => c.numero === dv.r.numero)), "a debt compra is not left as payable to the supplier");
+ok(await num("select count(*) from purchases") === nPurch + 1, "the debt compra itself was saved");
+await as(pam);
+e = await err(`select public.registrar_compra_pagamento('${hdr({ pagamento: "divida", caixa_id: 17 })}'::jsonb, '${item()}'::jsonb)`);
+ok(/Só admin registra compra/.test(e), "financeiro cannot launch a debt compra: " + e);
+
 if (failed) { console.error(failed + " failed"); process.exit(1); }
 console.log("compras pagamento ok");
