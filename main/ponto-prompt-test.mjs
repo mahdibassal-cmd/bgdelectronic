@@ -61,7 +61,7 @@ ok(P.isWorkDay({ dias_semana: [3] }, "2026-11-11") === true, "custom jornada can
 
 ok(P.skipKey("u1", day, "saida_almoco") === "bagda-ponto-skip:u1:2026-11-11:saida_almoco", "skip key is user+day+type in this browser session");
 
-ok(html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261113c") && html.includes("ponto.css?v=20261111d"), "cache ponto 20261111d, app 20261113c");
+ok(html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261113d") && html.includes("ponto.css?v=20261111d"), "cache ponto 20261111d, app 20261113d");
 ok(app.includes("BAGDA_PONTO.maybePrompt") && app.includes("BAGDA_PONTO.maybePromptLogout") && app.includes('qs.get("ponto_hoje")') && app.includes('qs.get("ponto_logout")'), "boot + Sair hook + demo seed wired");
 ok(app.includes("$(\"#sair\").onclick") && app.includes("maybePromptLogout") && js.includes("Antes de sair do sistema") && js.includes('dataset.mode'), "Sair shows the leaving punch modal, then logs out either way");
 ok(js.includes("registrarPonto") && js.includes("Rosto não confere") && js.includes("ppular"), "mismatch stays in the modal (retry or skip) and punch goes through registrar_ponto");

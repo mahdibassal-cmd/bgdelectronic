@@ -88,6 +88,8 @@ const reciboTxt = (store, nid, h, R, tot, pays, cancel) => { const fr = Math.rou
     ...pays.map(p => rcWrap("Pago: " + p)), ...(h.prazo_dias ? [rcWrap("Paga em: " + h.prazo_dias + (Number(h.prazo_dias) === 1 ? " dia" : " dias") + (h.vencimento ? " (vence " + String(h.vencimento).slice(0, 10).split("-").reverse().join("/") + ")" : ""))] : []), ...(h.local_pagamento ? [rcWrap("Local pagto: " + localLbl(h.local_pagamento))] : []), ...(h.obs_pagamento ? [rcWrap("Obs: " + h.obs_pagamento)] : []), ...(cancel ? [rcC("*** NOTA CANCELADA ***")] : []), E, rcC(">>> CONFIRA SUAS MERCADORIAS <<<"), rcC("Obrigado pela preferencia!"), "", "", "", "", "."];
   return `<div class="recibo"><pre class="rpre rh">${rcEsc(head)}</pre><pre class="rpre">${rcEsc(L.map(l => l.split("\n").map(x => x.slice(0, W)).join("\n")).join("\n"))}</pre></div>`; };
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const usdBadge = p => p && p.origem === "Importado" ? ' <span class="badge usd-b" title="Importado">US$</span>' : "";
+const quandoSP = iso => iso ? new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "";
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const match = (p, q) => { const h = norm(`${p.sku} ${p.marca} ${p.produto} ${p.tamanho || ""}`); return norm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
 const coll = new Intl.Collator("pt-BR", { sensitivity: "base" });
@@ -156,7 +158,17 @@ if (!MOCK && !CONFIGURED) {
     async dumpTable(t) { const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select("*").range(i, i + 999); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) return out; } },
     async email() { return (await sb.auth.getUser()).data.user?.email || ""; },
     async profile() { const u = (await sb.auth.getUser()).data.user; return ok(await sb.from("profiles").select("id,handle,nome,role,ativo").eq("id", u.id).single()); },
-    async products() { return allRows(() => sb.from("products").select("sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo").order("sku")); },
+    async products() {
+      const admin = me && me.role === "admin";
+      const base = "sku,marca,produto,tamanho,preco_venda,estoque,estoque_minimo,ativo";
+      const cols = admin ? base + ",origem,preco_usd" : base + ",origem";
+      const load = list => allRows(() => sb.from("products").select(list).order("sku"));
+      try { return await load(cols); }
+      catch (e) {
+        if (!/origem|preco_usd|42703/i.test(e.message || "")) throw e;
+        return load(base);
+      }
+    },
     async productsFull() { return allRows(() => sb.from("products").select("*").order("sku")); },
     async estoqueVendedor() { return ok(await sb.from("estoque_vendedor").select("sku,marca,produto,tamanho,estoque")); },
     async costs() { return ok(await sb.from("product_costs").select("sku,custo")); },
@@ -284,6 +296,30 @@ if (!MOCK && !CONFIGURED) {
     async purchases() { return ok(await sb.from("purchases").select("*").order("id", { ascending: false }).limit(100)); },
     async addPurchase(p) { ok(await sb.from("purchases").insert(p)); },
     async compraLote(header, itens) { return ok(await sb.rpc("registrar_compra_lote", { p_header: header, p_itens: itens })); },
+    async compraOrigem(header, itens) {
+      const r = await sb.rpc("registrar_compra_origem", { p_header: header, p_itens: itens });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|registrar_compra_origem|schema cache|does not exist/i.test(em)) { const err = new Error("registrar_compra_origem"); err.norpc = true; throw err; }
+      return ok(r);
+    },
+    async cotacaoLer() {
+      const r = await sb.rpc("cotacao_dolar_ler");
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|cotacao_dolar_ler|schema cache|does not exist/i.test(em)) return { valor: null, historico: [], pendente_sql: true };
+      return ok(r);
+    },
+    async cotacaoSalvar(valor) {
+      const r = await sb.rpc("cotacao_dolar_salvar", { p_valor: valor });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|cotacao_dolar_salvar|schema cache|does not exist/i.test(em)) throw new Error("Cotação do dólar ainda depende da atualização do banco (supabase-loja/migration-origem-dolar.sql). Nada foi salvo.");
+      return ok(r);
+    },
+    async recalcularImportado(sku) {
+      const r = await sb.rpc("recalcular_preco_importado", { p_sku: sku });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|recalcular_preco_importado|schema cache|does not exist/i.test(em)) throw new Error("Origem e preço em US$ ainda dependem da atualização do banco (supabase-loja/migration-origem-dolar.sql). Nada foi salvo.");
+      return ok(r);
+    },
     async comprasListar(q) { return ok(await sb.rpc("compras_listar", { p_q: q || null, p_limit: 200 })); },
     async compraDetalhe(n) { return ok(await sb.rpc("compra_detalhe", { p_numero: String(n) })); },
     async imeiSalvar(pid, slots) { return ok(await sb.rpc("compra_imei_salvar", { p_purchase_id: pid, p_slots: slots })); },
@@ -291,8 +327,16 @@ if (!MOCK && !CONFIGURED) {
     async itemReceber(pid, q) { return ok(await sb.rpc("compra_item_receber", { p_purchase_id: pid, p_qtd: q })); },
     async imeiBuscar(q) { return ok(await sb.rpc("imei_buscar", { p_q: q })); },
     async saveProduct(p, custo) {
-      ok(await sb.from("products").upsert(p));
+      const send = async body => ok(await sb.from("products").upsert(body));
+      try { await send(p); }
+      catch (e) {
+        if (p.origem === "Importado" || p.preco_usd != null) throw new Error("Origem e preço em US$ ainda dependem da atualização do banco (supabase-loja/migration-origem-dolar.sql). Nada foi salvo.");
+        if (/origem|preco_usd|PGRST204|42703/i.test(e.message || "")) {
+          const rest = { ...p }; delete rest.origem; delete rest.preco_usd; await send(rest);
+        } else throw e;
+      }
       if (custo !== "" && custo != null) ok(await sb.from("product_costs").upsert({ sku: p.sku, custo: Number(custo) }));
+      if (p.origem === "Importado") await api.recalcularImportado(p.sku);
     },
     async pontoMinhaFace() { const r = await sb.from("ponto_faces").select("user_id,foto_path,consentimento_em,cadastrado_em,descriptor").eq("user_id", me.id).maybeSingle(); if (r.error) throw new Error(r.error.message); return r.data; },
     async pontoMeusRegistros() { return ok(await sb.from("v_ponto_registros").select("*").eq("user_id", me.id).eq("excluido", false).order("registrado_em", { ascending: false }).limit(400)); },
@@ -324,8 +368,9 @@ if (!MOCK && !CONFIGURED) {
     ["ANK-001", "Anker", "Power Bank 10000mAh", null, 199], ["LEN-001", "Lenovo", "Fone LP40", null, 89.9], ["MUL-001", "Multilaser", "Mouse sem fio", null, 59.9], ["KAP-001", "Kapbom", "Suporte veicular", null, 39.9],
     ["BS-APL-270", "Apple", "iPhone 18 Duo (iPhone Duo)", "256GB", 9999, "Preto"], ["BS-APL-271", "Apple", "iPhone 18 Duo (iPhone Duo)", "256GB", 9999, "Azul-céu"], ["BS-APL-272", "Apple", "iPhone 18 Duo (iPhone Duo)", "512GB", 11999, "Branco"], ["BS-APL-273", "Apple", "iPhone 18 Duo (iPhone Duo)", null, 9999, null],
     ["BS-APL-280", "Apple", "MacBook Air M5", "13\" 16GB RAM 512GB", 12999, "Meia-noite"], ["BS-APL-281", "Apple", "MacBook Air M5", "15\" 24GB RAM 1TB", 16999, "Prateado"]]
-    .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true }));
+    .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true, origem: "Nacional", preco_usd: null }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
+  const COT = [{ valor: 5.4, alterado_em: "2026-11-13T12:00:00.000Z", handle: "@mike", nome: "Mike" }];
   const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }, { caixa_id: 12, nome: "GASTOS LOJA", metodo: null }, { caixa_id: 13, nome: "PRIME", metodo: null }];
   const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   if (qs.has("origemfix")) { P.push({ sku: "FX-ORG-1", marca: "Apple", produto: "iPhone 18 Pro Max FIXTURE", tamanho: "Preto", preco_venda: 9999, estoque: 2, estoque_minimo: 2, ativo: true, notas: null, fornecedor: null }); DE.push({ sku: "FX-ORG-1", qtd: 5, custo: 7000 }); K["FX-ORG-1"] = 6000; }
@@ -445,7 +490,9 @@ if (!MOCK && !CONFIGURED) {
     async events() { return [{ at: new Date().toISOString(), kind: "failed_login", email: "teste@loja.bgdstores.local", detail: {} }]; },
     async dumpTable(t) { return ({ clientes: CL, fornecedores: FO, contas_pagar: CP, conta_pagamentos: CPG, cliente_recebimentos: RC, products: P, notas: N, nota_pagamentos: PG, caixas: CX, caixa_movimentos: MV, caixa_sessoes: SE, purchases: PU })[t] || []; },
     async profile() { return meU; },
-    async products() { await ready; return role === "financeiro" ? [] : P; }, async productsFull() { await ready; return role === "financeiro" ? [] : P; }, async costs() { if (role !== "admin") throw new Error("Sem permissão"); return Object.entries(K).map(([sku, custo]) => ({ sku, custo })); },
+    async products() { await ready; if (role === "financeiro") return []; if (role === "admin") return P.map(p => ({ ...p })); return P.map(p => { const c = { ...p }; delete c.preco_usd; return c; }); },
+    async productsFull() { await ready; return role === "financeiro" ? [] : (role === "admin" ? P.map(p => ({ ...p })) : P.map(p => { const c = { ...p }; delete c.preco_usd; return c; })); },
+    async costs() { if (role !== "admin") throw new Error("Sem permissão"); return Object.entries(K).map(([sku, custo]) => ({ sku, custo })); },
     async custoSalvar(sku, custo) {
       if (role !== "admin") throw new Error("Sem permissão");
       if (qs.has("failcusto")) throw new Error("Falha simulada ao salvar o custo");
@@ -458,7 +505,7 @@ if (!MOCK && !CONFIGURED) {
       if (p.estoque !== est || p.preco_venda !== preco) throw new Error("Estoque ou preço não podem mudar com o custo");
       return { sku, custo: K[sku] };
     },
-    async estoqueVendedor() { await ready; return role === "financeiro" ? [] : P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque }) => ({ sku, marca, produto, tamanho, estoque })); },
+    async estoqueVendedor() { await ready; return role === "financeiro" ? [] : P.filter(p => p.ativo).map(({ sku, marca, produto, tamanho, estoque, origem }) => ({ sku, marca, produto, tamanho, estoque, origem })); },
     async repSeller(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(IT.filter(i => ids.includes(i.nota_id)).map(i => ({ ...i, ...N.find(n => n.nota_id === i.nota_id), total: i.total })), "handle", (g, r) => { g.itens += r.qtd; g.faturamento += r.total; g.custo += r.qtd * r.custo; g._n = (g._n || new Set()).add(r.nota_id); g.vendas = g._n.size; }); },
     async repPay(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(PG.filter(g => ids.includes(g.nota_id)), "metodo", (g, r) => { g.vendas++; g.faturamento += r.valor; }).map(g => ({ ...g, forma_pagamento: g.metodo })); },
     async repProfit(d) { const r = await this.repSeller(d); return r.map(x => ({ ...x, lucro: x.faturamento - x.custo })); },
@@ -711,6 +758,10 @@ if (!MOCK && !CONFIGURED) {
     async salvarUsuario(uid, u) { if (role !== "admin") throw new Error("Só admin"); Object.assign(U.find(x => x.id === uid), u); },
     async adminProducts() { return role === "admin" ? P.map(p => ({ ...p, custo: K[p.sku] })) : []; },
     async compraLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function public.registrar_compra_lote (demo sem ?lote=1)"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c) }; },
+    async compraOrigem(h, itens) { if (role !== "admin") throw new Error("Só admin registra compra"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c), origem_ok: true }; },
+    async cotacaoLer() { if (role !== "admin") throw new Error("Sem permissão"); const c = COT[0]; return { valor: c ? c.valor : null, alterado_em: c ? c.alterado_em : null, handle: c ? c.handle : null, nome: c ? c.nome : null, historico: COT.map(x => ({ ...x })) }; },
+    async cotacaoSalvar(valor) { if (role !== "admin") throw new Error("Só admin altera a cotação"); const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(valor); if (parsed.error) throw new Error(parsed.error); COT.unshift({ valor: parsed.value, alterado_em: new Date().toISOString(), handle: meU.handle, nome: meU.nome }); const custos = Object.fromEntries(Object.entries(K)); const next = BAGDA_ORIGEM.recalcularImportados(P, custos, parsed.value); next.forEach((p, i) => { if (p.error) throw new Error(p.error); P[i].preco_venda = p.preco_venda; }); return api.cotacaoLer(); },
+    async recalcularImportado(sku) { if (role !== "admin") throw new Error("Só admin altera origem ou preço em US$"); const p = P.find(x => x.sku === sku); if (!p || p.origem !== "Importado") return; const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, (COT[0] || {}).valor, K[sku] != null ? K[sku] : null); if (calc.error) throw new Error(calc.error); p.preco_venda = calc.preco; },
     async comprasListar(q) { if (role === "vendedor") throw new Error("Sem permissão"); const A = role === "admin"; const G = new Map(); [...PU].reverse().forEach(p => { const g = G.get(p.compra_id) || { id: p.compra_id, numero: cnum(p.compra_id), data: p.data, fornecedor: p.fornecedor, observacao: p.observacao, itens: 0, unidades: 0, total: 0, imeis: 0, recebidos: 0, _h: "" }; g.itens++; g.unidades += p.qtd; g.total += p.total; g.imeis += IM.filter(i => i.purchase_id === p.id).length; g.recebidos += recb(p); const x = P.find(y => y.sku === p.sku); g._h += ` ${p.sku} ${x.marca} ${x.produto}`; G.set(p.compra_id, g); });
       q = norm(q || ""); return [...G.values()].filter(g => !q || norm(`${g.numero} ${g.fornecedor} ${g._h}`).includes(q)).map(g => ({ ...g, total: A ? g.total : null, status: g.recebidos >= g.unidades ? "completo" : "pendente" })).sort((a, b) => b.id - a.id); },
     async compraDetalhe(n) { if (role === "vendedor") throw new Error("Sem permissão"); const A = role === "admin"; const cid = +String(n).replace(/\D/g, ""), L = PU.filter(p => p.compra_id === cid).sort((a, b) => a.id - b.id); if (!L.length) throw new Error(`Compra ${n} não encontrada`);
@@ -728,8 +779,37 @@ if (!MOCK && !CONFIGURED) {
       const d = IM.find(i => [i.imei1, i.imei2].some(v => v && (v === a || v === b))); if (d) throw new Error(`IMEI já cadastrado na compra ${cnum(PU.find(p => p.id === d.purchase_id).compra_id)} (unidade ${d.slot})`); if (recb(pu) >= pu.qtd) throw new Error(`Item já completo (${pu.qtd} de ${pu.qtd})`);
       let sl = 1; while (IM.some(i => i.purchase_id === pid && i.slot === sl)) sl++; IM.push({ purchase_id: pid, slot: sl, imei1: a, imei2: b }); return { purchase_id: pid, slot: sl, recebidos: recb(pu), qtd: pu.qtd, status: recb(pu) >= pu.qtd ? "completo" : "pendente" }; },
     async itemReceber(pid, q) { if (!["admin", "estoque"].includes(role)) throw new Error("Sem permissão"); const pu = PU.find(p => p.id === pid), ni = IM.filter(i => i.purchase_id === pid).length; if (!(q >= 0) || q + ni > pu.qtd) throw new Error(`Quantidade inválida (comprado ${pu.qtd}, já com IMEI ${ni})`); pu.rsi = q; return { purchase_id: pid, recebidos: recb(pu), qtd: pu.qtd }; },
-    async purchases() { return PU; }, async addPurchase(p) { if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)"); const ci = p.compra_lote && (PU.find(x => x.compra_lote === p.compra_lote) || {}).compra_id || ++CNO; PU.unshift({ id: id++, data: today(), ...p, compra_id: ci, total: p.qtd * p.custo_unit }); const x = P.find(y => y.sku === p.sku); x.estoque += p.qtd; K[p.sku] = p.custo_unit; },
-    async saveProduct(p, c) { const i = P.findIndex(x => x.sku === p.sku); i < 0 ? P.push({ ...p, estoque: 0 }) : Object.assign(P[i], p); if (c !== "") K[p.sku] = Number(c); }
+    async purchases() { return PU; },
+    async addPurchase(p) {
+      if (role !== "admin") throw new Error("Só admin registra compra");
+      if (qs.has("failsku") && p.sku === qs.get("failsku")) throw new Error("Falha simulada (demo ?failsku)");
+      const x = P.find(y => y.sku === p.sku); if (!x) throw new Error("SKU não existe");
+      const applied = globalThis.BAGDA_ORIGEM.aplicarLinha(x, { origem: p.origem || null, preco_usd: p.preco_usd, custo_reais: p.custo_unit }, (COT[0] || {}).valor);
+      if (applied.error) throw new Error(applied.error);
+      const ci = p.compra_lote && (PU.find(z => z.compra_lote === p.compra_lote) || {}).compra_id || ++CNO;
+      PU.unshift({ id: id++, data: today(), ...p, compra_id: ci, total: p.qtd * p.custo_unit });
+      x.estoque += p.qtd; K[p.sku] = p.custo_unit;
+      x.origem = applied.product.origem; x.preco_usd = applied.product.preco_usd; x.preco_venda = applied.product.preco_venda;
+    },
+    async saveProduct(p, c) {
+      if (role !== "admin") throw new Error("Sem permissão");
+      const i = P.findIndex(x => x.sku === p.sku);
+      const prev = i < 0 ? { sku: p.sku, estoque: 0, origem: "Nacional", preco_venda: p.preco_venda, preco_usd: null } : P[i];
+      const custo = c !== "" && c != null ? Number(c) : K[p.sku];
+      let next = { ...prev, ...p, origem: p.origem || "Nacional" };
+      if (next.origem === "Importado") {
+        const calc = BAGDA_ORIGEM.precoReaisImportado(next.preco_usd, (COT[0] || {}).valor, custo != null ? custo : null);
+        if (calc.error) throw new Error(calc.error);
+        next.preco_usd = BAGDA_ORIGEM.parseUsd(next.preco_usd).value;
+        next.preco_venda = calc.preco;
+      }
+      if (c !== "" && c != null) K[p.sku] = Number(c);
+      if (next.origem === "Importado" && K[p.sku] != null) {
+        const again = BAGDA_ORIGEM.precoReaisImportado(next.preco_usd, (COT[0] || {}).valor, K[p.sku]);
+        if (!again.error) next.preco_venda = again.preco;
+      }
+      i < 0 ? P.push(next) : Object.assign(P[i], next);
+    }
   };
   Object.assign(api, BGDUsers.mockApi(qs, U, meU.id));
 }
@@ -903,8 +983,8 @@ async function viewEstoque() {
   ${EC ? `<p id="est-sum" class="muted est-sum"></p>` : ""}<div class="stk-wrap"><table id="t" class="stk"></table></div></div>`;
   const ult = p => Number(p.estoque) === 1 ? ` <span class="ult">Última peça</span>` : "";
   const cols = adm ? 6 : 5;
-  const rowAdm = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${ult(p)}</td><td class="n">${brl(p.preco_venda)}</td><td class="n">${cm[p.sku] != null ? brl(cm[p.sku]) : "—"} <button type="button" class="btn ghost ecst noprint" data-sku="${esc(p.sku)}" style="margin:0;padding:4px 8px">Editar custo</button></td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>`;
-  const rowSeller = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}${ult(p)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
+  const rowAdm = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${usdBadge(p)}${ult(p)}</td><td class="n">${brl(p.preco_venda)}</td><td class="n">${cm[p.sku] != null ? brl(cm[p.sku]) : "—"} <button type="button" class="btn ghost ecst noprint" data-sku="${esc(p.sku)}" style="margin:0;padding:4px 8px">Editar custo</button></td><td class="n ${p.estoque <= p.estoque_minimo ? "low" : ""}">${p.estoque}${p.estoque <= p.estoque_minimo ? " · REPOR" : ""}</td><td class="n">${p.estoque_minimo}</td></tr>`;
+  const rowSeller = p => `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)}</td><td>${esc(p.produto)}${usdBadge(p)}${ult(p)}</td><td>${esc(p.tamanho || "")}</td><td class="n">${p.estoque}</td></tr>`;
   const row = adm ? rowAdm : rowSeller;
   const editarCusto = sku => {
     const p = P.find(x => x.sku === sku); if (!adm || !p) return;
@@ -1039,17 +1119,43 @@ const combo = (inp, ul, itens, onPick) => { let hi = 0, M = [];
   inp.onkeydown = e => { if (e.key === "ArrowDown") { e.preventDefault(); if (!M.length) draw(); hi = Math.min(hi + 1, M.length - 1); draw(); } else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, 0); draw(); }
     else if (e.key === "Enter") { e.preventDefault(); if (M.length) pick(hi); } else if (e.key === "Escape") { e.preventDefault(); if (ul.innerHTML) { ul.innerHTML = ""; M = []; } else { inp.value = ""; inp.dispatchEvent(new Event("typed")); } } };
   return { pick: () => M.length && pick(hi), open: draw }; };
+async function mountCotacao(el, onSaved) {
+  if (!el) return null;
+  if (me.role !== "admin" || !api.cotacaoLer) { el.innerHTML = ""; return null; }
+  const OP = globalThis.BAGDA_ORIGEM;
+  let C; try { C = await api.cotacaoLer(); }
+  catch (e) { el.innerHTML = `<div class="card"><h2>Cotação do dólar</h2><p class="warn">${esc(e.message)}</p></div>`; return null; }
+  const when = C && C.alterado_em ? quandoSP(C.alterado_em) : "";
+  const hist = (C && C.historico || []).slice(0, 8);
+  el.innerHTML = `<div class="card"><h2>Cotação do dólar</h2>
+    ${C && C.pendente_sql ? '<p class="warn">Ainda não instalado no banco (falta rodar migration-origem-dolar.sql). Nada foi salvo.</p>' : ""}
+    <p>${C && C.valor != null ? `Atual: <b>${OP.formatCotacao(C.valor)}</b>` : "<b>Sem cotação.</b> Defina uma antes de lançar produto importado."}${when ? ` · última atualização ${esc(when)}${C.handle ? " por " + esc(C.handle) : ""}` : ""}</p>
+    <form id="cotf"><div class="grid"><div><label for="cotv">Nova cotação (R$ por US$ 1)</label><input id="cotv" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42" required></div></div>
+    <button class="btn" type="submit">Salvar cotação e recalcular importados</button></form>
+    ${hist.length ? `<h3>Histórico</h3><table><tr><th>Quando</th><th>Quem</th><th class="n">Valor</th></tr>${hist.map(h => `<tr><td>${esc(quandoSP(h.alterado_em))}</td><td>${esc(h.handle || h.nome || "—")}</td><td class="n">${OP.formatCotacao(h.valor)}</td></tr>`).join("")}</table>` : ""}
+    <p class="muted">Só admin. Pode mudar quantas vezes quiser. Ao salvar, o preço em R$ de cada produto Importado é recalculado na hora. Notas já emitidas não mudam.</p></div>`;
+  el.querySelector("#cotf").onsubmit = async ev => {
+    ev.preventDefault();
+    const parsed = OP.parseCotacao(el.querySelector("#cotv").value);
+    if (parsed.error) return toast(parsed.error);
+    if (!await confirmBox(`Gravar a cotação <b>${OP.formatCotacao(parsed.value)}</b> e recalcular agora o preço em R$ de todos os produtos Importado?<br><small>Notas já emitidas não mudam.</small>`)) return;
+    const b = ev.submitter; b.disabled = true;
+    try { const saved = await api.cotacaoSalvar(parsed.value); toast("Cotação atualizada ✓ preços importados recalculados"); if (onSaved) await onSaved(saved); else await mountCotacao(el, onSaved); }
+    catch (e) { b.disabled = false; toast(e.message); }
+  };
+  return C;
+}
 async function viewCompras(o = {}) {
   const root = o.root || app, emb = !!o.root, again = x => o.onSaved ? o.onSaved(x) : viewCompras(o);
   const adm = me.role === "admin", [P, PU, K, FT] = await Promise.all([(api.productsFull ? api.productsFull() : api.products()).catch(() => api.products()), api.purchases(), adm ? api.costs().catch(() => []) : [], api.fornecedores ? api.fornecedores().catch(() => []) : []]);
   const cm = Object.fromEntries((K || []).map(k => [k.sku, k.custo])), V = Object.fromEntries(P.map(p => [p.sku, variante(p)])), PS = Object.fromEntries(P.map(p => [p.sku, p]));
   const hay = p => `${p.sku} ${p.marca} ${p.produto} ${V[p.sku].raw} ${V[p.sku].gb.join(" ")}`, nome = p => `${p.marca} ${p.produto}${V[p.sku].raw ? " — " + V[p.sku].raw : ""}`;
   const line = p => { const v = V[p.sku], tags = [v.cor && `🎨 ${v.cor}`, v.gb.length && `💾 ${v.gb.join(" / ")}`].filter(Boolean).join(" · ");
-    return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
+    return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${usdBadge(p)}${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
   const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
   [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
-  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "" }], busy = false;
-  root.innerHTML = `<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2>
+  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", origem: "Nacional", preco_usd: "", custo_usd: "" }], busy = false, cot = null;
+  root.innerHTML = `${!emb && adm ? '<div id="cotacao"></div>' : ""}<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2>
   ${emb ? '<p class="muted">Vários itens de uma vez · NÃO soma ao estoque da loja.</p>' : adm ? `<label>Destino</label><select id="dst"><option value="loja">Loja (soma ao estoque da loja)</option><option value="esp" ${o.dest === "esp" ? "selected" : ""}>Depósito Especial (só admin · não aparece na loja)</option></select>` : ""}
   <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
   <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
@@ -1057,48 +1163,84 @@ async function viewCompras(o = {}) {
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
   <button class="btn" id="sv">Salvar</button></div>
   ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Compra</th><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
-  ${PU.map(p => `<tr><td>${p.compra_id ? `<a href="#imei" class="cpn" data-c="${p.compra_id}">C-${String(p.compra_id).padStart(6, "0")}</a>` : "—"}</td><td>${esc(p.data)}</td><td>${esc(p.sku)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
+  ${PU.map(p => `<tr><td>${p.compra_id ? `<a href="#imei" class="cpn" data-c="${p.compra_id}">C-${String(p.compra_id).padStart(6, "0")}</a>` : "—"}</td><td>${esc(p.data)}</td><td>${esc(p.sku)}${usdBadge(p)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
   root.querySelectorAll(".cpn").forEach(a => a.onclick = e => { e.preventDefault(); viewImei({ numero: a.dataset.c }); });
-  const dest = () => emb ? "esp" : ($("#dst") || {}).value || "loja", sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; }; if ($("#dst")) $("#dst").onchange = sb0; sb0();
-  combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
-    k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
+  const dest = () => emb ? "esp" : ($("#dst") || {}).value || "loja", loja = () => !emb && dest() !== "esp";
+  const sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; };
+  const OP = globalThis.BAGDA_ORIGEM;
   const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
-  const tot = () => { const ok = L.filter(l => l.sku); $("#gt").textContent = brl(ok.reduce((a, l) => a + (+l.qtd || 0) * (num(l.custo) || 0), 0)); $("#gq").textContent = `${ok.length} item(ns) · ${ok.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
+  const blank = () => ({ sku: "", qtd: 1, custo: "", origem: "Nacional", preco_usd: "", custo_usd: "" });
+  const prevTxt = l => {
+    if (!loja() || l.origem !== "Importado") return "";
+    const u = OP.parseUsd(l.preco_usd);
+    if (!String(l.preco_usd || "").trim()) return `<p class="muted lprev">Informe o preço de venda em US$. O R$ da loja sai da cotação, com a regra ,99.</p>`;
+    if (u.error) return `<p class="warn lprev">${esc(u.error)}</p>`;
+    if (!(cot && cot.valor > 0)) return `<p class="warn lprev">Defina a cotação do dólar para ver o preço em R$.</p>`;
+    const custo = l.custo === "" || l.custo == null ? (cm[l.sku] != null ? cm[l.sku] : null) : num(l.custo);
+    const calc = OP.precoReaisImportado(u.value, cot.valor, custo);
+    if (calc.error) return `<p class="warn lprev">${esc(calc.error)}</p>`;
+    return `<p class="muted lprev">Venda na loja: <b>${brl(calc.preco)}</b>${calc.aplicado99 ? "" : " (valor redondo — o ,99 ficaria abaixo do custo)"}</p>`;
+  };
+  const tot = () => { const okL = L.filter(l => l.sku); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * (num(l.custo) || 0), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
     document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * (num(l.custo) || 0)); }); };
-  const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div></div>
+  const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && l.origem === "Importado"; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>
+    ${loja() ? `<div class="clu"><div><label>Origem</label><select class="lo"><option value="Nacional" ${l.origem !== "Importado" ? "selected" : ""}>Nacional</option><option value="Importado" ${l.origem === "Importado" ? "selected" : ""}>Importado</option></select></div>${imp ? `<div><label>Preço venda (US$)</label><input class="lu" inputmode="decimal" autocomplete="off" value="${esc(l.preco_usd ?? "")}" placeholder="Ex.: 199,00"></div><div><label>Custo (US$) opcional</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}"></div>` : ""}</div>${prevTxt(l)}` : ""}</div>
     <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>Custo un. (R$)</label><input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}"></div>
     <div><label>Total</label><div class="lt n" data-i="${i}"></div></div><div><button type="button" class="btn ghost rm" title="Remover linha" ${L.length < 2 ? "disabled" : ""}>✕</button></div></div>`; }).join("");
     document.querySelectorAll("#lns .cl").forEach(r => { const i = +r.dataset.i, l = L[i], pq = r.querySelector(".pq");
+      const paint = () => { const html = prevTxt(l); const box = r.querySelector(".lprev"); if (!html) { if (box) box.remove(); return; } if (box) box.outerHTML = html; else { const host = r.querySelector(".clu"); if (host) host.insertAdjacentHTML("afterend", html); } };
       combo(pq, r.querySelector(".sug"), q => (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: line(p) + (L.some((x, j) => j !== i && x.sku === p.sku) ? '<small class="warn">já está em outra linha</small>' : "") })),
-        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
+        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); if (loja() && p.origem === "Importado") { l.origem = "Importado"; if (p.preco_usd != null) l.preco_usd = p.preco_usd; } drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
       pq.addEventListener("typed", () => { if (l.sku) { l.sku = ""; r.querySelector(".ps").innerHTML = ""; tot(); } });
-      r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); }; r.querySelector(".lc").oninput = e => { l.custo = e.target.value; tot(); };
+      const lo = r.querySelector(".lo"); if (lo) lo.onchange = e => { l.origem = e.target.value; if (l.origem !== "Importado") { l.preco_usd = ""; l.custo_usd = ""; } drawL(); };
+      const lu = r.querySelector(".lu"); if (lu) lu.oninput = e => { l.preco_usd = e.target.value; paint(); };
+      const lcu = r.querySelector(".lcu"); if (lcu) lcu.oninput = e => { l.custo_usd = e.target.value; const cu = OP.parseCustoUsd(e.target.value); if (!cu.error && cu.value != null && cot && cot.valor) { const cr = OP.custoReaisDeUsd(cu.value, cot.valor); if (!cr.error) { l.custo = cr.value; r.querySelector(".lc").value = cr.value; tot(); } } paint(); };
+      r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); }; r.querySelector(".lc").oninput = e => { l.custo = e.target.value; tot(); paint(); };
       r.querySelector(".lc").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#add").click(); } };
       r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
     tot(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
-  $("#add").onclick = () => { L.push({ sku: "", qtd: 1, custo: "" }); drawL(true); };
+  if ($("#dst")) $("#dst").onchange = () => { sb0(); drawL(); }; sb0();
+  combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
+    k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
+  $("#add").onclick = () => { L.push(blank()); drawL(true); };
+  const onCot = async saved => { cot = saved || cot; if (cot && cot.valor) P.forEach(p => { if (p.origem !== "Importado" || !(Number(p.preco_usd) > 0)) return; const calc = OP.precoReaisImportado(p.preco_usd, cot.valor, cm[p.sku] != null ? cm[p.sku] : null); if (!calc.error) p.preco_venda = calc.preco; }); if ($("#cotacao")) cot = await mountCotacao($("#cotacao"), onCot) || cot; drawL(); };
+  if ($("#cotacao")) cot = await mountCotacao($("#cotacao"), onCot);
   drawL();
-  $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" ), w = $("#pw");
-    for (const [i, l] of it.entries()) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`; if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
+  $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" || String(l.preco_usd || "") !== "" || String(l.custo_usd || "") !== ""), w = $("#pw");
+    for (const l of it) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`;
+      if (loja()) { if (l.origem === "Importado") { const u = OP.parseUsd(l.preco_usd); if (u.error) return w.textContent = `Linha ${n}: ${u.error}`; l.preco_usd = u.value;
+          if (String(l.custo_usd || "").trim() !== "") { const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error) return w.textContent = `Linha ${n}: ${cu.error}`; l.custo_usd = cu.value; if (l.custo === "" || l.custo == null) { const cr = OP.custoReaisDeUsd(cu.value, cot && cot.valor); if (cr.error) return w.textContent = `Linha ${n}: ${cr.error}`; l.custo = cr.value; } } else l.custo_usd = null;
+          if (!(cot && Number(cot.valor) > 0)) return w.textContent = "Defina a cotação do dólar antes de salvar um importado. Nada foi salvo.";
+          const prev = OP.precoReaisImportado(l.preco_usd, cot.valor, l.custo === "" ? null : num(l.custo)); if (prev.error) return w.textContent = `Linha ${n}: ${prev.error}`; }
+        else { l.origem = "Nacional"; l.preco_usd = null; l.custo_usd = null; } }
+      if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
     if (!it.length) return w.textContent = "Adicione pelo menos um item";
     const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#cdt").value || today(), ob = $("#ob").value.trim() || null;
-    const itens = it.map(l => ({ sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) })), total = itens.reduce((a, x) => a + x.qtd * x.custo_unit, 0);
+    const itens = it.map(l => { const row = { sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) }; if (loja()) { row.origem = l.origem === "Importado" ? "Importado" : "Nacional"; if (row.origem === "Importado") { row.preco_usd = l.preco_usd; if (l.custo_usd != null && l.custo_usd !== "") row.custo_usd = l.custo_usd; } } return row; });
+    const precisaOrigem = itens.some(x => x.origem === "Importado" || x.preco_usd != null || x.custo_usd != null);
+    const semOrigem = rows => rows.map(({ origem, preco_usd, custo_usd, ...r }) => r);
+    const pendente = e => !!(e && (e.norpc || /PGRST202|could not find the function|does not exist|schema cache|registrar_compra_origem/i.test(e.message || "")));
     busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
     if (fx.length >= 2 && api.salvarFornecedor && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {});
     if (dest() === "esp") { const mot = ["Compra", fx, dt !== today() ? dt : "", ob].filter(Boolean).join(" · ").slice(0, 200);
-      try { if (!api.depEspLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.depEspLote({ fornecedor: fx || null, data: dt, observacao: ob, motivo: mot }, itens); toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
-      catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
-      const fl = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length} no Depósito Especial…`; try { await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, mot); } catch (er) { fl.push({ ...x, erro: er.message }); } }
+      try { if (!api.depEspLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); await api.depEspLote({ fornecedor: fx || null, data: dt, observacao: ob, motivo: mot }, semOrigem(itens)); toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
+      catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
+      const fl = []; for (const [i, x] of semOrigem(itens).entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length} no Depósito Especial…`; try { await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, mot); } catch (er) { fl.push({ ...x, erro: er.message }); } }
       busy = false; $("#sv").disabled = false; if (!fl.length) { toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
-      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
+      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: "Nacional", preco_usd: "", custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob };
-    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); const rs = await api.compraLote(hd, itens); toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); }
-    catch (e) { if (!(e.norpc || /PGRST202|could not find the function|does not exist|schema cache/i.test(e.message))) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
-    const fail = []; for (const [i, x] of itens.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
+    const okCompra = rs => { toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); };
+    try { if (!api.compraOrigem) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); return await okCompra(await api.compraOrigem(hd, itens)); }
+    catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; }
+      if (precisaOrigem) { busy = false; $("#sv").disabled = false; w.textContent = "Produto importado ainda depende da atualização do banco (supabase-loja/migration-origem-dolar.sql). Nada foi salvo."; return; } }
+    const simples = semOrigem(itens);
+    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); return await okCompra(await api.compraLote(hd, simples)); }
+    catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
+    const fail = []; for (const [i, x] of simples.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
       try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
     busy = false; $("#sv").disabled = false;
     if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
-    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit })); drawL();
+    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: f.origem || "Nacional", preco_usd: f.preco_usd || "", custo_usd: f.custo_usd || "" })); drawL();
     w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
 }
 // ---------- Compras numeradas + IMEI ----------
@@ -1216,13 +1358,26 @@ async function viewDepEsp(o = {}) {
 }
 async function viewProdutos() {
   const [P, K] = await Promise.all([api.products(), api.costs()]); const cm = Object.fromEntries(K.map(k => [k.sku, k.custo]));
-  app.innerHTML = `<div class="card"><h2>Produtos e custos (admin) <button class="btn" id="csv" style="float:right;margin:0">Exportar CSV</button></h2><input id="b" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…"><table id="pt"></table></div>
-  <div class="card"><h2>Adicionar / editar produto</h2><form id="f"><div class="grid"><div><label>SKU</label><input id="sku" required pattern="[A-Z0-9-]{3,20}"></div><div><label>Marca</label><input id="ma" required></div><div><label>Produto</label><input id="pr" required></div><div><label>Tamanho</label><input id="ta"></div><div><label>Preço de venda</label><input id="pv" type="number" step="0.01" required></div><div><label>Custo (só admin vê)</label><input id="cu" type="number" step="0.01"></div><div><label>Estoque mínimo</label><input id="em" type="number" value="2"></div></div><button class="btn">Salvar</button></form></div>`;
-  const head = `<tr><th>SKU</th><th>Produto</th><th class="n">Custo</th><th class="n">Venda</th><th class="n">Margem</th><th class="n">Estoque</th></tr>`;
-  const drawP = () => { $("#pt").innerHTML = head + P.filter(p => match(p, $("#b").value)).map(p => { const c = cm[p.sku]; return `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</td><td class="n">${c != null ? brl(c) : "—"}</td><td class="n">${brl(p.preco_venda)}</td><td class="n">${c ? ((p.preco_venda - c) / p.preco_venda * 100).toFixed(0) + "%" : "—"}</td><td class="n">${p.estoque}</td></tr>`; }).join(""); };
-  $("#b").oninput = drawP; drawP(); $("#b").focus();
+  const OP = globalThis.BAGDA_ORIGEM;
+  app.innerHTML = `<div id="cotacao"></div><div class="card"><h2>Produtos e custos (admin) <button class="btn" id="csv" style="float:right;margin:0">Exportar CSV</button></h2><input id="b" type="search" autocomplete="off" placeholder="Buscar produto, marca ou SKU…"><table id="pt"></table></div>
+  <div class="card"><h2>Adicionar / editar produto</h2><p class="muted">Nacional: o preço em R$ é o que você digitar e a cotação não mexe nele. Importado: o preço em R$ é o US$ × cotação, com a regra ,99.</p><form id="f"><div class="grid"><div><label>SKU</label><input id="sku" required pattern="[A-Z0-9-]{3,20}"></div><div><label>Marca</label><input id="ma" required></div><div><label>Produto</label><input id="pr" required></div><div><label>Tamanho</label><input id="ta"></div><div><label for="og">Origem</label><select id="og"><option value="Nacional">Nacional</option><option value="Importado">Importado</option></select></div><div id="usdbox" hidden><label for="pu">Preço (US$)</label><input id="pu" inputmode="decimal" autocomplete="off" placeholder="Ex.: 199,00"><p class="muted" id="puprev"></p></div><div><label for="pv">Preço de venda (R$)</label><input id="pv" inputmode="decimal"></div><div><label>Custo (R$, só admin vê)</label><input id="cu" inputmode="decimal" autocomplete="off"></div><div><label>Estoque mínimo</label><input id="em" type="number" value="2"></div></div><button class="btn">Salvar</button></form></div>`;
+  const cot = await mountCotacao($("#cotacao"), () => viewProdutos());
+  const head = `<tr><th>SKU</th><th>Produto</th><th class="n">Custo</th><th class="n">Venda</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>`;
+  const drawP = () => { $("#pt").innerHTML = head + P.filter(p => match(p, $("#b").value)).map(p => { const c = cm[p.sku]; return `<tr><td>${esc(p.sku)}</td><td>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}${usdBadge(p)}</td><td class="n">${c != null ? brl(c) : "—"}</td><td class="n">${brl(p.preco_venda)}${p.origem === "Importado" && p.preco_usd != null ? `<br><small>${OP.formatUsd(p.preco_usd)}</small>` : ""}</td><td class="n">${c ? ((p.preco_venda - c) / p.preco_venda * 100).toFixed(0) + "%" : "—"}</td><td class="n">${p.estoque}</td><td><button type="button" class="btn ghost epd" data-sku="${esc(p.sku)}" style="margin:0">Editar</button></td></tr>`; }).join(""); };
+  const custoAtual = () => { const raw = $("#cu").value.trim(); if (!raw) return cm[$("#sku").value] != null ? cm[$("#sku").value] : null; const c = globalThis.BAGDA_CUSTO.parseCusto(raw); return c.error ? null : c.value; };
+  const sync = () => { const imp = $("#og").value === "Importado"; $("#usdbox").hidden = !imp; $("#pv").readOnly = imp; $("#puprev").textContent = ""; if (!imp) return;
+    const u = OP.parseUsd($("#pu").value); if (!$("#pu").value.trim()) { $("#pv").value = ""; $("#puprev").textContent = "Informe o preço em US$."; return; } if (u.error) { $("#pv").value = ""; $("#puprev").textContent = u.error; return; }
+    if (!(cot && cot.valor)) { $("#pv").value = ""; $("#puprev").textContent = "Defina a cotação do dólar para calcular o R$."; return; }
+    const calc = OP.precoReaisImportado(u.value, cot.valor, custoAtual()); if (calc.error) { $("#pv").value = ""; $("#puprev").textContent = calc.error; return; }
+    $("#pv").value = (Math.round(calc.preco * 100) / 100).toFixed(2); $("#puprev").textContent = calc.aplicado99 ? "R$ com a regra ,99." : "Valor redondo: o ,99 ficaria abaixo do custo."; };
+  const fill = p => { $("#sku").value = p.sku; $("#ma").value = p.marca || ""; $("#pr").value = p.produto || ""; $("#ta").value = p.tamanho || ""; $("#og").value = p.origem === "Importado" ? "Importado" : "Nacional"; $("#pu").value = p.preco_usd != null ? p.preco_usd : ""; $("#pv").value = p.preco_venda; $("#cu").value = cm[p.sku] != null ? cm[p.sku] : ""; $("#em").value = p.estoque_minimo; sync(); $("#ma").focus(); };
+  const draw = () => { drawP(); app.querySelectorAll(".epd").forEach(b => b.onclick = () => fill(P.find(p => p.sku === b.dataset.sku))); };
+  $("#b").oninput = draw; draw(); $("#b").focus(); $("#og").onchange = sync; $("#pu").oninput = sync; $("#cu").oninput = sync; sync();
   $("#csv").onclick = () => exportCSV().catch(e => toast(e.message));
-  $("#f").onsubmit = async ev => { ev.preventDefault(); try { await api.saveProduct({ sku: $("#sku").value, marca: $("#ma").value, produto: $("#pr").value, tamanho: $("#ta").value || null, preco_venda: +$("#pv").value, estoque_minimo: +$("#em").value, ativo: true }, $("#cu").value); toast("Produto salvo ✓"); viewProdutos(); } catch (e) { toast(e.message); } };
+  $("#f").onsubmit = async ev => { ev.preventDefault(); try { const origem = $("#og").value; const body = { sku: $("#sku").value, marca: $("#ma").value, produto: $("#pr").value, tamanho: $("#ta").value || null, estoque_minimo: +$("#em").value, ativo: true, origem };
+    if (origem === "Importado") { const u = OP.parseUsd($("#pu").value); if (u.error) throw new Error(u.error); if (!(cot && cot.valor)) throw new Error("Defina a cotação do dólar antes de salvar um importado."); body.preco_usd = u.value; sync(); }
+    body.preco_venda = Number(String($("#pv").value).replace(",", ".")); if (!(body.preco_venda >= 0)) throw new Error("Informe o preço de venda em R$.");
+    await api.saveProduct(body, $("#cu").value); toast("Produto salvo ✓"); viewProdutos(); } catch (e) { toast(e.message); } };
 }
 async function viewSeguranca() {
   const F = (await api.factors()).filter(f => f.status === "verified");
@@ -1317,7 +1472,7 @@ async function viewNota() {
   const chk = () => { const p = P.find(x => x.sku === $("#sku").value), v = +$("#pv").value; if (p && !$("#pv").value) $("#pv").placeholder = p.preco_venda; $("#w").textContent = ""; showDisp(); }; /* sem trava/aviso de preço mínimo (MB 05/11) */
   let hi = 0, M = [];
   const drawS = () => { const q = $("#bq").value.trim(); M = q ? P.filter(p => match(p, q)).sort((a, b) => (b.estoque > 0) - (a.estoque > 0)).slice(0, 12) : []; hi = Math.min(hi, Math.max(M.length - 1, 0));
-    $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${VO.available(p.estoque, espDe(p.sku), "principal") < 1 && (!oferece || VO.available(p.estoque, espDe(p.sku), "especial") < 1) ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> <small>${esc(p.sku)} · ${brl(p.preco_venda)} · Principal ${p.estoque}${oferece ? ` · Especial ${espDe(p.sku)}` : ""}</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
+    $("#sug").innerHTML = M.map((p, i) => `<li data-s="${esc(p.sku)}" class="${i === hi ? "hi" : ""} ${VO.available(p.estoque, espDe(p.sku), "principal") < 1 && (!oferece || VO.available(p.estoque, espDe(p.sku), "especial") < 1) ? "off" : ""}"><b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b>${usdBadge(p)} <small>${esc(p.sku)} · ${brl(p.preco_venda)} · Principal ${p.estoque}${oferece ? ` · Especial ${espDe(p.sku)}` : ""}</small></li>`).join("") || (q ? '<li class="off">Nada encontrado</li>' : "");
     document.querySelectorAll("#sug li[data-s]").forEach(li => li.onmousedown = e => { e.preventDefault(); pick(li.dataset.s); }); };
   const selTxt = p => { const d = esp.find(x => x.sku === p.sku); const custoEsp = oferece && me.role === "admin" && origemSel() === "especial" && d && d.custo != null ? ` · custo deste Especial <b>${brl(d.custo)}</b>` : "";
     return `Selecionado: <b>${esc(p.marca)} ${esc(p.produto)} ${esc(p.tamanho || "")}</b> · ${esc(p.sku)} · tabela ${brl(p.preco_venda)} · Principal ${p.estoque}${oferece ? ` · Especial ${espDe(p.sku)}` : ""}${custoEsp}`; };
@@ -1684,6 +1839,7 @@ async function viewReceber(rfSel = "") {
 }
 async function exportCSV() {
   const R = stockSort(await api.adminProducts()), cols = ["sku", "marca", "produto", "tamanho", "fornecedor", "custo", "preco_venda", "margem_pct", "estoque", "estoque_minimo", "ativo"];
+  if (R.some(r => r.origem != null || r.preco_usd != null)) cols.push("origem", "preco_usd");
   const cell = v => { let s = String(v ?? ""); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
   const csv = "\ufeff" + cols.join(";") + "\n" + R.map(r => cols.map(c => cell(r[c])).join(";")).join("\n");
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
