@@ -222,6 +222,13 @@ ok(await num("select count(*) from purchases") === nPurch + 1, "the debt compra 
 await as(pam);
 e = await err(`select public.registrar_compra_pagamento('${hdr({ pagamento: "divida", caixa_id: 17 })}'::jsonb, '${item()}'::jsonb)`);
 ok(/Só admin registra compra/.test(e), "financeiro cannot launch a debt compra: " + e);
+e = await err(`insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo) values (17, 'entrada', 100, 'abater sem permissao')`);
+ok(/Caixa só admin/.test(e), "financeiro cannot transfer into an admin-only caixa: " + e);
+await as(mike);
+const antesAbate = await num("select caixa_saldo_calc(17::smallint)");
+await db.query(`insert into public.caixa_movimentos(caixa_id, tipo, valor, motivo) values (17, 'entrada', 1500, 'Transferência de CAIXA S2: abate divida')`);
+const depoisAbate = await num("select caixa_saldo_calc(17::smallint)");
+ok(depoisAbate === antesAbate + 1500 && depoisAbate < 0, "money in lowers the debt and it stays negative (" + antesAbate + " -> " + depoisAbate + ")");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
 console.log("compras pagamento ok");

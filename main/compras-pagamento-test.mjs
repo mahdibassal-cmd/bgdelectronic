@@ -10,7 +10,7 @@ const sql = readFileSync(join(dir, "../supabase-loja/migration-compras-pagamento
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261113h") && html.includes('data-v="cpend" data-p="financas"') && html.includes("Compras pendentes"), "nav and cache expose Compras pendentes to financeiro");
+ok(html.includes("app.js?v=20261113i") && html.includes('data-v="cpend" data-p="financas"') && html.includes("Compras pendentes"), "nav and cache expose Compras pendentes to financeiro");
 ok(html.includes('data-v="pagar" data-p="financas"'), "the manual Contas a pagar button stays");
 
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
@@ -24,7 +24,11 @@ ok(compras.includes('id="taxa"') && compras.includes(">Nacional<") && compras.in
 const lista = app.slice(app.indexOf("async function viewComprasPendentes"), app.indexOf("async function viewPagar"));
 ok(lista.includes("Compras pendentes") && lista.includes("atrasada") && lista.includes("Pagar") && lista.includes("caixa só admin") && lista.includes("Compras antigas"), "pending list groups what is owed and hides admin-only caixa names");
 ok(app.includes('cpend: "financas"') && app.includes("cpend: viewComprasPendentes"), "the route is financeiro, which admin also has");
-ok(app.includes("PAGAMENTO PRODUTOS") && app.includes("somente_admin: true"), "demo includes the admin-only product caixa");
+ok(app.includes("PAGAMENTO PRODUTOS") && app.includes("COMPRA PRODUTOS") && app.includes("caixa_id: 18") && app.includes("somente_admin: true"), "demo includes PAGAMENTO PRODUTOS and COMPRA PRODUTOS as admin-only");
+ok(compras.includes('c.caixa_id === 18 ? "selected"'), "dívida defaults to COMPRA PRODUTOS (id 18)");
+const caixa = app.slice(app.indexOf("async function viewCaixa"), app.indexOf("async function viewUsuarios"));
+ok(caixa.includes('id="tpa"') && caixa.includes("somente_admin") && caixa.includes("COMPRA PRODUTOS"), "admin transfer Para lists the admin-only compra caixa");
+ok(caixa.includes("SA.filter(c => !c.somente_admin)"), "De stays the regular caixas; admin-only caixas are the destination");
 ok(sql.includes("pagamento is null") && sql.includes("Compra antiga sem controle de pagamento") && sql.includes("(select public.can('financas'))") && sql.includes("somente_admin") && sql.includes("p_divida") && sql.includes("Dívida só no caixa especial"), "SQL keeps legacy compras out, wraps the permission check, and lets an admin debt skip the saldo");
 ok(app.includes("caixaSaldoHtml") && app.includes("· dívida"), "a negative caixa saldo is labeled dívida");
 

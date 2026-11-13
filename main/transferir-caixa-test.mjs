@@ -32,7 +32,7 @@ ok(hx.includes("<th>Cliente</th>") && hx.includes("<th>Motivo</th>"), "HX por di
 
 ok(app.includes('rpc("transferir_caixa"') && app.includes("async transferirCaixa"), "live and mock APIs call transferir_caixa");
 ok(!kiosk.includes("transferir_caixa") && !kiosk.includes("Transferir entre caixas"), "kiosk is unchanged");
-ok(html.includes("app.js?v=20261113h"), "cache tag is newer than 20261109e");
+ok(html.includes("app.js?v=20261113i"), "cache tag is newer than 20261109e");
 
 ok(sql.includes("create or replace function public.transferir_caixa") && sql.includes("caixa_acesso()") && sql.includes("caixa_saldo_calc") && sql.includes("grant execute on function public.transferir_caixa"), "draft RPC is security definer, gated by caixa_acesso, checks saldo, granted to authenticated");
 ok(sql.includes("Transferência para ") && sql.includes("Transferência de ") && sql.includes("'saida'") && sql.includes("'entrada'"), "paired motivos use existing saida/entrada types");

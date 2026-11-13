@@ -45,8 +45,8 @@ ok(cob.clientes.some(c => c.nome === "João Lima" && c.tem_vence_hoje && c.notas
 ok(!cob.clientes.some(c => c.nome === "Pedro Pago"), "fully paid nota is not listed");
 ok(cob.clientes.some(c => c.nome === "Sofia Prado" && c.no_limite && !c.tem_vencida && !c.tem_vence_hoje), "Sofia is only over the limite");
 
-ok(html.includes("prazo-vencimento.js?v=20261111e") && html.includes("app.js?v=20261113h"), "cache 20261111e for the new helper and app");
-ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261113h"), "prazo helper loads before the app");
+ok(html.includes("prazo-vencimento.js?v=20261111e") && html.includes("app.js?v=20261113i"), "cache 20261111e for the new helper and app");
+ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261113i"), "prazo helper loads before the app");
 ok(app.includes('id="prazobox"') && app.includes('id="pagaem"') && app.includes("Paga em *"), "Nova nota has required Paga em selector");
 ok(app.includes("prazoNeed") && app.includes("prazoSync") && app.includes("p_prazo_dias"), "selector is shown for prazo and sent as p_prazo_dias");
 ok(app.includes("Informe em quantos dias o cliente paga (1 a 30)"), "Paga em is required before saving a prazo note");

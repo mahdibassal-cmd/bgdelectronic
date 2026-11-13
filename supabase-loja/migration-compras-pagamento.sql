@@ -385,5 +385,28 @@ grant execute on function public.registrar_compra_lote(jsonb, jsonb),
   public.compras_caixas_pagamento(),
   public.compras_pendentes() to authenticated;
 
+-- Transferir (e qualquer outra saída/entrada) em caixa somente_admin é só admin.
+-- O RPC de transferência é security definer e não herda a RLS de caixas.
+create or replace function public.tg_mov_somente_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+begin
+  if auth.uid() is not null
+     and exists (select 1 from public.caixas c where c.id = new.caixa_id and c.somente_admin)
+     and not public.has_perm('admin') then
+    raise exception 'Caixa só admin' using errcode = '42501';
+  end if;
+  return new;
+end
+$fn$;
+revoke all on function public.tg_mov_somente_admin() from public, anon, authenticated;
+drop trigger if exists mov_somente_admin on public.caixa_movimentos;
+create trigger mov_somente_admin
+  before insert on public.caixa_movimentos
+  for each row execute function public.tg_mov_somente_admin();
+
 notify pgrst, 'reload schema';
 select 'compras-pagamento draft' as status;
