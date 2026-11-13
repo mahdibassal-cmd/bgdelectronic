@@ -10,7 +10,7 @@ const sql = readFileSync(join(dir, "../supabase-loja/migration-compras-pagamento
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261113i") && html.includes('data-v="cpend" data-p="financas"') && html.includes("Compras pendentes"), "nav and cache expose Compras pendentes to financeiro");
+ok(html.includes("app.js?v=20261113j") && html.includes('data-v="cpend" data-p="admin"') && html.includes("Compras pendentes"), "nav and cache keep Compras pendentes for admin only");
 ok(html.includes('data-v="pagar" data-p="financas"'), "the manual Contas a pagar button stays");
 
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
@@ -22,8 +22,9 @@ ok(compras.includes("depEspLote") && compras.indexOf('dest() === "esp"') < compr
 ok(compras.includes('id="taxa"') && compras.includes(">Nacional<") && compras.includes(">Importado<"), "Nacional/Importado cost lines stay on the compra screen");
 
 const lista = app.slice(app.indexOf("async function viewComprasPendentes"), app.indexOf("async function viewPagar"));
-ok(lista.includes("Compras pendentes") && lista.includes("atrasada") && lista.includes("Pagar") && lista.includes("caixa só admin") && lista.includes("Compras antigas"), "pending list groups what is owed and hides admin-only caixa names");
-ok(app.includes('cpend: "financas"') && app.includes("cpend: viewComprasPendentes"), "the route is financeiro, which admin also has");
+ok(lista.includes("Compras pendentes") && lista.includes("atrasada") && lista.includes("Pagar") && lista.includes("caixa só admin") && lista.includes("Compras antigas") && lista.includes('!can("admin")'), "pending list is admin only and hides admin-only caixa names");
+ok(app.includes("Liberar histórico para Financeiro") && app.includes("sem saldo acumulado") && app.includes("fl-rev"), "caixa screen hides the accumulated saldo from financeiro and lets admin grant or revoke a wider window");
+ok(app.includes('cpend: "admin"') && app.includes("cpend: viewComprasPendentes"), "the route is admin only");
 ok(app.includes("PAGAMENTO PRODUTOS") && app.includes("COMPRA PRODUTOS") && app.includes("caixa_id: 18") && app.includes("somente_admin: true"), "demo includes PAGAMENTO PRODUTOS and COMPRA PRODUTOS as admin-only");
 ok(compras.includes('c.caixa_id === 18 ? "selected"'), "dívida defaults to COMPRA PRODUTOS (id 18)");
 const caixa = app.slice(app.indexOf("async function viewCaixa"), app.indexOf("async function viewUsuarios"));
