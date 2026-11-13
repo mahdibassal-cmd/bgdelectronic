@@ -57,6 +57,10 @@ const motivoBox = html => new Promise(res => { const o = document.createElement(
   const done = v => { o.remove(); res(v); }; document.body.append(o); const i = o.querySelector("#mbm"); i.focus(); o.querySelector("#cbn").onclick = () => done(null);
   o.querySelector("#cby").onclick = () => { const m = i.value.trim(); if (m.length < 3) { o.querySelector("#mbw").textContent = "Informe o motivo (mín. 3 letras)"; i.focus(); return; } done(m); }; });
 const estErr = e => /could not find the function|schema cache|does not exist|PGRST202/i.test(e.message) ? "Estorno ainda não instalado no banco (falta rodar migration-estornos.sql)" : e.message;
+const escolherClienteBox = (html, okLbl) => new Promise(res => { const o = document.createElement("div"); o.className = "nmodal"; o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:16px";
+  o.innerHTML = `<div class="card" role="dialog" aria-modal="true" style="max-width:480px;margin:0"><h2>Cliente já cadastrado</h2><p>${html}</p><button type="button" class="btn ghost" id="cbn">Voltar</button> <button type="button" class="btn gold" id="cby">${esc(okLbl || "Usar este cliente")}</button></div>`;
+  const done = v => { o.remove(); document.removeEventListener("keydown", k); res(v); }, k = e => { if (e.key === "Escape") done(false); };
+  document.body.append(o); o.querySelector("#cbn").onclick = () => done(false); o.querySelector("#cby").onclick = () => done(true); document.addEventListener("keydown", k); o.querySelector("#cby").focus(); });
 const printVia = via => { let v = document.querySelector(".recibo .via"); if (!v) { v = document.createElement("pre"); v.className = "via rpre"; const r = document.querySelector(".recibo .rh"); r ? r.after(v) : document.querySelector(".recibo")?.prepend(v); } v.textContent = rcC("*** " + via + " ***"); window.print(); };
 const printBtns = () => { const pr = $("#pr"); if (!pr) return; pr.textContent = "🖨️ Imprimir de novo"; pr.onclick = () => printVia("VIA DA LOJA");
   const c = document.createElement("button"); c.className = "btn gold"; c.id = "prc"; c.textContent = "🧾 Imprimir via do cliente"; c.style.marginLeft = "6px"; c.onclick = () => printVia("VIA DO CLIENTE"); pr.after(c); setTimeout(() => printVia("VIA DA LOJA"), 350); };
@@ -98,7 +102,7 @@ const caxinhaOn = () => today() <= CAXINHA_ATE;
 const toEmail = v => { v = v.trim(); if (v.includes("@")) return v.toLowerCase();
   const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   return n ? n + "@loja.bgdstores.local" : ""; };
-const toast = m => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3500); };
+const toast = m => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", /Já existe um cliente/.test(String(m || "")) ? 8000 : 3500); };
 let me = null, isOwner = false, lockedNow = false;
 // ---------- Links de convite / recuperação do Supabase ----------
 const H = new URLSearchParams(location.hash.slice(1));
@@ -195,13 +199,20 @@ if (!MOCK && !CONFIGURED) {
     async lancarCredito(cid, tipo, v, obs) { return ok(await sb.rpc("lancar_credito", { p_cliente: cid, p_tipo: tipo, p_valor: v, p_obs: obs || null })); },
     async lancarCreditoCaixa(cid, v, cx, forma, obs, data) { const r = await sb.rpc("lancar_credito_caixa", { p_cliente: cid, p_valor: v, p_caixa: cx, p_forma: forma || null, p_obs: obs || null, p_data: data || null }); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || ""; if (r.error && /PGRST202|42883|lancar_credito_caixa|schema cache/.test(em)) throw new Error("Crédito no caixa ainda depende da atualização do banco (supabase-loja/migration-credito-caixa.sql). Nada foi lançado."); return ok(r); },
     async buscarClientes(q) { return ok(await sb.rpc("buscar_clientes", { p_q: q })); },
-    async criarCliente(c) { if ("atendimento" in c) { const r = await sb.rpc("criar_cliente_atendimento", { p_nome: c.nome, p_atendimento: c.atendimento || null });
+    async clientePorNome(nome) { const r = await sb.rpc("cliente_por_nome", { p_nome: nome }); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|cliente_por_nome|schema cache|does not exist/i.test(em)) return null; if (r.error) throw new Error(globalThis.BAGDA_CLIENTE_NOME ? BAGDA_CLIENTE_NOME.limparErro(r.error.message) : r.error.message);
+      const row = Array.isArray(r.data) ? r.data[0] : r.data; return row && row.id ? row : null; },
+    async criarCliente(c) { const CN = globalThis.BAGDA_CLIENTE_NOME; if (CN && c && c.nome) { const dup = await localizarClienteDuplicado(c, null); if (dup) throw new Error(CN.mensagem(dup)); }
+      const limpo = e => { throw new Error(CN ? CN.limparErro(e.message) : e.message); };
+      try { if ("atendimento" in c) { const r = await sb.rpc("criar_cliente_atendimento", { p_nome: c.nome, p_atendimento: c.atendimento || null });
         if (!r.error) return r.data; if (!/PGRST202|criar_cliente_atendimento|schema cache/i.test((r.error.code || "") + " " + (r.error.message || ""))) return ok(r); }
-      return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); },
+      return ok(await sb.rpc("criar_cliente", { p_nome: c.nome, p_telefone: c.telefone || null, p_doc: c.doc || null, p_email: c.email || null, p_endereco: c.endereco || null, p_obs: c.obs || null })); }
+      catch (e) { limpo(e); } },
     async clienteExtrato(id) { const r = await sb.rpc("cliente_extrato", { p_cliente: id }); if (r.error && /PGRST202|42883|cliente_extrato/.test((r.error.code || "") + " " + (r.error.message || ""))) throw new Error("Extrato do cliente depende de atualização do banco — avise o admin (supabase-loja/migration-cliente-extrato.sql)."); return ok(r); },
     async clientes() { const L = ok(await sb.from("v_clientes_saldo").select("*").order("nome")); const A = await sb.from("clientes").select("id,atendimento").limit(5000);
       if (!A.error && A.data) { const m = Object.fromEntries(A.data.map(x => [x.id, x.atendimento])); L.forEach(c => { if (c.atendimento == null) c.atendimento = m[c.id] ?? null; }); } return L; },
-    async salvarCliente(id, c) { ok(await sb.from("clientes").update(c).eq("id", id)); },
+    async salvarCliente(id, c) { const CN = globalThis.BAGDA_CLIENTE_NOME; if (CN && c && (c.nome || c.doc || c.telefone)) { const dup = await localizarClienteDuplicado(c, id); if (dup) throw new Error(CN.mensagem(dup)); }
+      try { ok(await sb.from("clientes").update(c).eq("id", id)); } catch (e) { throw new Error(CN ? CN.limparErro(e.message) : e.message); } },
     async fornecedores() { return ok(await sb.from("fornecedores").select("*").order("nome")); },
     async salvarFornecedor(id, f) { ok(id ? await sb.from("fornecedores").update(f).eq("id", id) : await sb.from("fornecedores").insert(f)); },
     async contas() { return ok(await sb.from("v_contas_pagar").select("*").order("vencimento")); },
@@ -416,7 +427,9 @@ if (!MOCK && !CONFIGURED) {
     async repPay(d) { const ids = N.filter(n => n.status === "ativa" && n.data === d).map(n => n.nota_id); return role !== "admin" ? [] : grp(PG.filter(g => ids.includes(g.nota_id)), "metodo", (g, r) => { g.vendas++; g.faturamento += r.valor; }).map(g => ({ ...g, forma_pagamento: g.metodo })); },
     async repProfit(d) { const r = await this.repSeller(d); return r.map(x => ({ ...x, lucro: x.faturamento - x.custo })); },
     async buscarClientes(q) { if (q.trim().length < 2) return []; const d = dig(q); return CL.filter(c => c.ativo && (norm(c.nome).includes(norm(q)) || (d.length >= 3 && (dig(c.doc).includes(d) || dig(c.telefone).includes(d))))).slice(0, 15).map(({ id, nome, telefone, doc }) => ({ id, nome, telefone, doc })); },
+    async clientePorNome(nome) { const CN = globalThis.BAGDA_CLIENTE_NOME; return CN ? CN.findNome(CL, nome) : null; },
     async criarCliente(c) { if (role === "financeiro" && false) return; if (!c.nome || c.nome.trim().length < 2) throw new Error("Informe o nome do cliente"); const d = dig(c.doc) || null; if (d && !docOk(d)) throw new Error("CPF/CNPJ inválido"); const ex = d && CL.find(x => x.doc === d); if (ex) return ex.id;
+      const dupN = globalThis.BAGDA_CLIENTE_NOME && BAGDA_CLIENTE_NOME.duplicata(CL, c, null); if (dupN) throw new Error(BAGDA_CLIENTE_NOME.mensagem(dupN));
       const nc = { id: CL.length + 1, nome: c.nome.trim(), telefone: c.telefone || "", doc: d, email: role !== "vendedor" ? c.email || "" : "", endereco: role !== "vendedor" ? c.endereco || "" : "", obs: role !== "vendedor" ? c.obs || "" : "", atendimento: c.atendimento || null, ativo: true }; CL.push(nc); return nc.id; },
     async clientes() { await ready; needFin(); return CL.map(c => ({ ...c, total_fiado: fiado(c.id), total_recebido: recebido(c.id), saldo: fiado(c.id) - recebido(c.id) })); },
     async clienteExtrato(cid) { await ready; needFin(); const c = CL.find(x => x.id === cid); if (!c) throw new Error("Cliente não encontrado");
@@ -427,7 +440,7 @@ if (!MOCK && !CONFIGURED) {
       const total_prazo = notas.filter(n => n.status === "ativa").reduce((a, n) => a + n.prazo, 0), total_recebido = recebido(cid), saldo = total_prazo - total_recebido;
       return { cliente_id: cid, nome: c.nome, saldo, total_prazo, total_recebido, recebido_vinculado: 0, credito_saldo, explicacao: `Saldo a receber = Paga Depois das notas ativas vinculadas a este cliente (${total_prazo.toFixed(2)}) menos os recebimentos (${total_recebido.toFixed(2)}). O crédito da loja é outra conta e não abate essa dívida.`, historico_sem_vinculo: "Notas antigas só com nome digitado, sem cliente vinculado, não são procuradas nem listadas.", notas, recebimentos: [], creditos }; },
     async adicionarDivida(cli, v0, obs, chave) { await ready; if (role !== "admin") throw new Error("Somente admin"); if (!chave || !/^[A-Za-z0-9._:-]{8,80}$/.test(String(chave))) throw new Error("Informe a chave da dívida"); const parsed = parseValorDivida(v0); if (parsed.error) throw new Error(parsed.error); const v = parsed.value; const prev = DIVK[chave]; if (prev) { if (prev.cliente_id !== cli || prev.valor !== v) throw new Error("Chave já usada em outra dívida"); return { ...prev, idempotente: true, saldo: fiado(cli) - recebido(cli) }; } const c = CL.find(x => x.id === cli); if (!c) throw new Error("Cliente não encontrado"); if (!c.ativo) throw new Error("Cliente inativo"); const est = P.reduce((a, p) => a + p.estoque, 0), cx0 = MV.length, cr0 = CR.length; const nid = id++; const label = ("DÍVIDA ANTERIOR" + (obs && String(obs).trim() ? " — " + String(obs).trim() : "")).slice(0, 200); N.push({ frete: v, caxinha_natal: 0, local_pagamento: null, obs_pagamento: label, cliente_id: cli, nota_id: nid, data: today(), created_at: new Date().toISOString(), cliente: c.nome, status: "ativa", total: v, handle: meU.handle, nome: meU.nome, pagamento: "prazo" }); PG.push({ nota_id: nid, metodo: "prazo", valor: v }); if (P.reduce((a, p) => a + p.estoque, 0) !== est || MV.length !== cx0 || CR.length !== cr0 || IT.some(i => i.nota_id === nid)) throw new Error("Dívida não pode mover estoque, caixa ou crédito"); const out = { nota_id: nid, valor: v, cliente_id: cli, frete: v, saldo: fiado(cli) - recebido(cli), idempotente: false, rotulo: "DÍVIDA ANTERIOR" }; DIVK[chave] = out; return out; },
-    async salvarCliente(cid, c) { needFin(); if (c.doc && !docOk(c.doc)) throw new Error("CPF/CNPJ inválido"); Object.assign(CL.find(x => x.id === cid), c); },
+    async salvarCliente(cid, c) { needFin(); if (c.doc && !docOk(c.doc)) throw new Error("CPF/CNPJ inválido"); const dupN = c && globalThis.BAGDA_CLIENTE_NOME && (c.nome || c.doc || c.telefone) && BAGDA_CLIENTE_NOME.duplicata(CL, c, cid); if (dupN) throw new Error(BAGDA_CLIENTE_NOME.mensagem(dupN)); Object.assign(CL.find(x => x.id === cid), c); },
     async fornecedores() { await ready; needFin(); return FO; },
     async salvarFornecedor(fid, f) { needFin(); if (f.cnpj && !docOk(f.cnpj)) throw new Error("CNPJ inválido"); fid ? Object.assign(FO.find(x => x.id === fid), f) : FO.push({ id: FO.length + 1, ativo: true, ...f }); },
     async contas() { await ready; needFin(); const hj = today(); return CP.map(k => { const p = pago(k.id); return { ...k, fornecedor: (FO.find(f => f.id === k.fornecedor_id) || {}).nome, pago: p, restante: k.valor - p, status: p >= k.valor ? "paga" : k.vencimento < hj ? "vencida" : p > 0 ? "parcial" : "aberta" }; }); },
@@ -1160,6 +1173,47 @@ async function viewSeguranca() {
     <h3>2. Digite o código</h3><form id="vf"><input id="c" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required style="max-width:160px"><button class="btn">Confirmar</button></form>`;
     $("#vf").onsubmit = async ev => { ev.preventDefault(); try { await api.verify(r.id, $("#c").value); toast("2FA ativado ✓"); viewSeguranca(); } catch { toast("Código inválido"); } }; };
 }
+async function localizarClientePorNome(nome, exceptId) {
+  const CN = globalThis.BAGDA_CLIENTE_NOME;
+  if (!CN || CN.key(nome).length < 2) return null;
+  if (api && api.clientePorNome) {
+    const hit = await api.clientePorNome(nome);
+    if (hit && (exceptId == null || String(hit.id) !== String(exceptId))) return { ...hit, motivo: "nome" };
+  }
+  const seen = [];
+  for (const q of CN.consultas(nome)) {
+    let rows = [];
+    try { rows = (await api.buscarClientes(q)) || []; } catch { rows = []; }
+    for (const row of rows) seen.push(row);
+  }
+  if (can("financas")) { try { const all = await api.clientes(); for (const row of all || []) seen.push(row); } catch { /* vendedor não lista a tabela */ } }
+  const hit = CN.findNome(seen, nome, exceptId);
+  return hit ? { ...hit, motivo: "nome" } : null;
+}
+async function localizarClienteDuplicado(c, exceptId) {
+  const CN = globalThis.BAGDA_CLIENTE_NOME;
+  if (!CN || !c) return null;
+  if (c.nome) { const porNome = await localizarClientePorNome(c.nome, exceptId); if (porNome) return porNome; }
+  if (!(c.doc || c.telefone) || !can("financas")) return null;
+  let all = [];
+  try { all = (await api.clientes()) || []; } catch { return null; }
+  const doc = CN.findDoc(all, c.doc, exceptId); if (doc) return { ...doc, motivo: "doc" };
+  const tel = CN.findTel(all, c.telefone, exceptId); if (tel) return { ...tel, motivo: "tel" };
+  return null;
+}
+async function clienteCadastroLivre(c, exceptId) {
+  const CN = globalThis.BAGDA_CLIENTE_NOME;
+  let dup = null;
+  try { dup = await localizarClienteDuplicado(c, exceptId); }
+  catch (e) { toast(CN ? CN.limparErro(e.message) : e.message); return false; }
+  if (!dup) return true;
+  const usar = await escolherClienteBox(esc(CN.mensagem(dup)), "Abrir o cadastro existente");
+  if (usar) {
+    const busca = $("#b"); if (busca) { busca.value = dup.nome || ""; busca.dispatchEvent(new Event("input")); }
+    const b = document.querySelector(`.ed[data-i="${dup.id}"]`); if (b) b.click();
+  }
+  return false;
+}
 async function viewNota() {
   const P = (await api.products()).filter(p => p.ativo); let items = [];
   const VO = globalThis.BAGDA_VENDA_ORIGEM;
@@ -1230,7 +1284,11 @@ async function viewNota() {
   $("#cnovo").onclick = () => { $("#cform").hidden = !$("#cform").hidden; $("#cn").value = $("#cl").value; $("#cn").focus(); };
   $("#csave").onclick = async () => { const c = { nome: $("#cn").value.trim(), atendimento: $("#cat").value || null };
     if (c.nome.length < 2) return toast("Informe o nome do cliente"); if (!c.atendimento) return toast("Escolha o Atendimento número");
-    try { const cid = await api.criarCliente(c); setCli({ id: +cid, ...c }); $("#cform").hidden = true; toast("Cliente salvo ✓"); } catch (e) { toast(e.message); } };
+    const CN = globalThis.BAGDA_CLIENTE_NOME;
+    const escolher = async dup => { if (await escolherClienteBox(esc(CN.mensagem(dup)), "Usar este cliente na nota")) { setCli({ id: dup.id, nome: dup.nome, telefone: dup.telefone || "", doc: dup.doc || null }); $("#cform").hidden = true; $("#csel").scrollIntoView({ block: "center" }); } };
+    try { const dup = await localizarClientePorNome(c.nome); if (dup) return escolher(dup);
+      const cid = await api.criarCliente(c); setCli({ id: +cid, ...c }); $("#cform").hidden = true; toast("Cliente salvo ✓"); }
+    catch (e) { const msg = CN ? CN.limparErro(e.message) : e.message; const parsed = CN && CN.parseErro(msg); if (parsed) return escolher(parsed); toast(msg); } };
   let pgs = [{ metodo: "", valor: null }]; /* sem forma pré-escolhida: antes vinha PIX e uma nota refeita podia sair como PIX sem querer */
   const lpNeed = () => pgs.length === 1 ? !!pgs[0].metodo && pgs[0].metodo !== "prazo" : pgs.some(g => g.metodo && g.metodo !== "prazo" && +g.valor > 0);
   const lpSync = () => { const n = lpNeed(); $("#lpbox").style.display = n ? "" : "none"; $("#lp").required = n; $("#lpinfo").hidden = !n; };
@@ -1410,6 +1468,7 @@ async function viewClientes() {
   $("#b").oninput = draw; draw(); $("#cn").onclick = () => viewClientes();
   $("#f").onsubmit = async ev => { ev.preventDefault(); const c = { nome: val("n"), doc: dig(val("d")) || null, telefone: val("t") || null, email: val("e") || null, endereco: val("a") || null, obs: val("o") || null };
     if (c.doc && !docOk(c.doc)) return toast("CPF/CNPJ inválido"); ev.submitter && (ev.submitter.disabled = true);
+    if (!(await clienteCadastroLivre(c, ed))) { ev.submitter && (ev.submitter.disabled = false); return; }
     try { ed ? await api.salvarCliente(ed, c) : await api.criarCliente(c); toast("Cliente salvo ✓"); viewClientes(); } catch (e) { toast(e.message); ev.submitter && (ev.submitter.disabled = false); } };
 }
 async function viewFornecedores() {
