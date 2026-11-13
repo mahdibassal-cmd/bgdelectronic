@@ -35,8 +35,10 @@ const nacional = O.aplicarLinha({ sku: "JBL-001", origem: "Nacional", preco_vend
 ok(nacional.product.preco_venda === 799 && nacional.product.origem === "Nacional", "Nacional keeps the current R$ price");
 const intact = O.aplicarLinha({ sku: "JBL-001", origem: "Importado", preco_venda: 799, preco_usd: 100 }, { origem: null }, 5.4);
 ok(intact.product.preco_venda === 799 && intact.product.preco_usd === 100, "a purchase line without origin does not retouch the product");
-const imp = O.aplicarLinha({ sku: "APL-001", origem: "Nacional", preco_venda: 1299 }, { origem: "Importado", preco_usd: 100, custo_reais: 40 }, 1);
-ok(imp.product.origem === "Importado" && imp.product.preco_usd === 100 && cents(imp.product.preco_venda) === 9999, "Importado at compra time stores US$ and the ,99 R$ price");
+const imp = O.aplicarLinha({ sku: "APL-001", origem: "Nacional", preco_venda: 1299, preco_usd: null }, { origem: "Importado", custo_reais: 400 }, 5.4);
+ok(imp.product.origem === "Importado" && imp.product.preco_usd == null && imp.product.preco_venda === 1299, "a compra does not invent a US$ sale price or zero the shelf price");
+const ja = O.aplicarLinha({ sku: "APL-001", origem: "Importado", preco_venda: 10, preco_usd: 100 }, { origem: "Importado", custo_reais: 40 }, 1);
+ok(ja.product.preco_usd === 100 && cents(ja.product.preco_venda) === 9999, "an existing US$ sale price is repriced from the global rate");
 
 const notas = [{ sku: "APL-001", preco_vendido: 1299, preco_tabela: 1299 }];
 const antes = JSON.stringify(notas);
@@ -62,12 +64,19 @@ const acima = O.aplicarCotacao([{ sku: "IMP", origem: "Importado", preco_usd: 10
 ok(cents(acima.costs.IMP.custo) === 54000 && cents(acima.products[0].preco_venda) === 54000, "when the new R$ cost is 540 the ,99 price is kept at the round 540");
 const compra = O.custoReaisDeUsd(80, 5.8);
 ok(cents(compra.value) === 46400 && cents(ex.costs.IMP.custo) === 43200, "the compra rate prices that purchase; the live cost stays on the global rate");
+const semPreco = O.aplicarCotacao([{ sku: "IMP", origem: "Importado", preco_venda: 799, preco_usd: null }], { IMP: { custo: 10, custo_usd: 80 } }, 5.4);
+ok(cents(semPreco.costs.IMP.custo) === 43200 && semPreco.products[0].preco_venda === 799, "rate save updates the R$ cost and leaves the shelf price when there is no US$ price");
 
 const app = read("app.js");
 const html = read("index.html");
-ok(html.includes("origem-preco.js?v=20261113e") && html.includes("app.js?v=20261113e") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
-ok(app.includes('class="lo"') && app.includes(">Nacional<") && app.includes(">Importado<") && app.includes("preco_usd") && app.includes("custo_usd"), "compra lines choose Nacional or Importado and send the US$ price");
-ok(app.includes('id="taxa"') && app.includes("Taxa do dólar desta compra"), "an Importado compra has an editable dollar rate");
+ok(html.includes("origem-preco.js?v=20261113f") && html.includes("app.js?v=20261113f") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
+const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
+ok(compras.includes('class="lo"') && compras.includes(">Nacional<") && compras.includes(">Importado<") && compras.includes("Custo (US$)") && compras.includes("Custo un. (R$)"), "compra lines ask only for cost, in R$ or US$");
+ok(!compras.includes("Preço venda") && !compras.includes('class="lu"') && !compras.includes("Preço (US$)"), "Compras has no selling-price input");
+ok(compras.includes('id="taxa"') && compras.includes("Taxa do dólar desta compra") && compras.indexOf('id="lns"') < compras.indexOf('id="taxabox"'), "one dollar rate sits after the lines");
+ok(compras.includes("Custo em R$") && compras.includes("custo_usd"), "an Importado line previews custo_usd times the compra rate");
+const telaProdutos = app.slice(app.indexOf("async function viewProdutos"), app.indexOf("async function viewSeguranca"));
+ok(telaProdutos.includes('id="pu"') && telaProdutos.includes("Preço (US$)"), "the US$ selling price stays on the product screen");
 ok(app.includes('id="cotacao"') && app.includes("Cotação do dólar") && app.includes("cotacaoSalvar") && app.includes("última atualização"), "admin can edit the rate and sees when it last changed");
 ok(app.includes("usd-b") && app.includes(">US$<"), "importado rows get a US$ badge");
 const nota = app.slice(app.indexOf("async function viewNota"), app.indexOf("async function viewRecibo"));
@@ -88,6 +97,7 @@ ok(sql.includes("where origem = 'Importado'") && sql.includes("bagda.recalc_dola
 ok(sql.includes("origem_ok") && sql.includes("registrar_compra_origem") && sql.includes("new.origem is null then return null"), "compra sets origin only when the line sends it");
 ok(sql.includes("custo_usd") && sql.includes("product_costs") && sql.includes("round(c.custo_usd * round(p_valor, 4), 2)") && sql.includes("p.origem = 'Importado' and c.custo_usd is not null"), "saving the global rate recomputes Importado R$ cost from custo_usd");
 ok(sql.includes("new.custo_usd * new.taxa_dolar") && sql.includes("new.taxa_dolar := null") && sql.includes("new.custo_usd * v_global"), "the compra rate prices that purchase line; the live cost uses the global rate; Nacional stores no rate");
+ok(sql.includes("if new.preco_usd is null then") && sql.includes("return new") && !sql.includes("Item importado precisa de preço em US$") && sql.includes("Item importado precisa de custo em US$"), "without a US$ sale price the shelf price stays, and an import costs in US$");
 ok(sql.includes("compras add column if not exists taxa_dolar") && sql.includes("purchases add column if not exists taxa_dolar"), "the rate used is stored on the compra and on the purchase line");
 const sellerView = sql.slice(sql.indexOf("view public.estoque_vendedor"), sql.indexOf("view public.v_admin_products"));
 ok(sellerView.includes("p.origem") && !sellerView.includes("preco_usd"), "seller stock view gains origin and not the US$ price");

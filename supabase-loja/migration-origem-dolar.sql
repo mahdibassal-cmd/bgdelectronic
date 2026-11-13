@@ -38,8 +38,9 @@ alter table public.products add constraint products_origem_check check (origem i
 alter table public.products add column if not exists preco_usd numeric(10,2);
 alter table public.products drop constraint if exists products_preco_usd_check;
 alter table public.products add constraint products_preco_usd_check check (preco_usd is null or (preco_usd > 0 and preco_usd <= 999999.99));
+-- Importado pode existir sem preco_usd: a compra só grava o custo.
+-- Sem preço em US$ no cadastro, preco_venda em R$ fica como está.
 alter table public.products drop constraint if exists products_importado_preco_check;
-alter table public.products add constraint products_importado_preco_check check (origem <> 'Importado' or preco_usd is not null);
 create index if not exists products_importado_idx on public.products (sku) where origem = 'Importado';
 
 alter table public.product_costs add column if not exists custo_usd numeric(10,2);
@@ -56,7 +57,7 @@ alter table public.purchases add constraint purchases_preco_usd_check check (pre
 alter table public.purchases drop constraint if exists purchases_custo_usd_check;
 alter table public.purchases add constraint purchases_custo_usd_check check (custo_usd is null or (custo_usd >= 0 and custo_usd <= 999999.99));
 alter table public.purchases drop constraint if exists purchases_importado_usd_check;
-alter table public.purchases add constraint purchases_importado_usd_check check (origem is distinct from 'Importado' or preco_usd is not null);
+alter table public.purchases add constraint purchases_importado_usd_check check (origem is distinct from 'Importado' or custo_usd is not null);
 alter table public.purchases add column if not exists taxa_dolar numeric(7,4);
 alter table public.purchases drop constraint if exists purchases_taxa_dolar_check;
 alter table public.purchases add constraint purchases_taxa_dolar_check check (taxa_dolar is null or (taxa_dolar > 0 and taxa_dolar <= 999));
@@ -127,7 +128,10 @@ begin
     raise exception 'Origem inválida' using errcode = 'P0001';
   end if;
   if not v_recalc then return new; end if;
-  if new.preco_usd is null or new.preco_usd <= 0 then
+  if new.preco_usd is null then
+    return new;
+  end if;
+  if new.preco_usd <= 0 then
     raise exception 'Produto importado precisa de preço em US$' using errcode = 'P0001';
   end if;
   v_cot := public.cotacao_dolar_valor();
@@ -162,9 +166,10 @@ begin
     raise exception 'Item importado precisa da taxa do dólar desta compra' using errcode = 'P0001';
   end if;
   new.taxa_dolar := round(new.taxa_dolar, 4);
-  if new.custo_usd is not null then
-    new.custo_unit := round(new.custo_usd * new.taxa_dolar, 2);
+  if new.custo_usd is null or new.custo_usd < 0 then
+    raise exception 'Item importado precisa de custo em US$' using errcode = 'P0001';
   end if;
+  new.custo_unit := round(new.custo_usd * new.taxa_dolar, 2);
   return new;
 end $$;
 revoke all on function public.tg_purchase_taxa_bi() from public, anon, authenticated;
@@ -198,11 +203,8 @@ begin
   end if;
   if new.origem is null then return null; end if;
   if new.origem = 'Importado' then
-    if new.preco_usd is null or new.preco_usd <= 0 then
-      raise exception 'Item importado precisa de preço em US$' using errcode = 'P0001';
-    end if;
-    update public.products set origem = 'Importado', preco_usd = round(new.preco_usd, 2), updated_at = now()
-     where sku = new.sku;
+    perform set_config('bagda.recalc_dolar', '1', true);
+    update public.products set origem = 'Importado', updated_at = now() where sku = new.sku;
   elsif new.origem = 'Nacional' then
     update public.products set origem = 'Nacional', updated_at = now() where sku = new.sku;
   else
@@ -272,7 +274,7 @@ declare v_lote uuid := gen_random_uuid(); it jsonb; n int := 0; v_tot numeric :=
   v_obs text := nullif(btrim(coalesce(p_header->>'observacao', '')), '');
   v_data date := coalesce(nullif(p_header->>'data', '')::date, (now() at time zone 'America/Sao_Paulo')::date);
   v_taxa numeric := nullif(p_header->>'taxa_dolar', '')::numeric;
-  v_origem text; v_usd numeric; v_cusd numeric; v_custo numeric;
+  v_origem text; v_cusd numeric; v_custo numeric;
 begin
   if not (public.can('admin')) then raise exception 'Só admin registra compra' using errcode = '42501'; end if;
   if jsonb_typeof(p_itens) <> 'array' or jsonb_array_length(p_itens) = 0 then raise exception 'Nenhum item' using errcode = 'P0001'; end if;
@@ -283,21 +285,18 @@ begin
   for it in select * from jsonb_array_elements(p_itens) loop
     n := n + 1;
     v_origem := nullif(btrim(coalesce(it->>'origem', '')), '');
-    v_usd := nullif(it->>'preco_usd', '')::numeric;
     v_cusd := nullif(it->>'custo_usd', '')::numeric;
     if not exists (select 1 from public.products where sku = it->>'sku') then raise exception 'Item %: SKU % não existe', n, it->>'sku' using errcode = 'P0001'; end if;
     if coalesce((it->>'qtd')::int, 0) <= 0 then raise exception 'Item %: quantidade inválida', n using errcode = 'P0001'; end if;
-    if coalesce((it->>'custo_unit')::numeric, -1) < 0 then raise exception 'Item %: custo inválido', n using errcode = 'P0001'; end if;
     if v_origem is not null and v_origem not in ('Nacional', 'Importado') then raise exception 'Item %: origem inválida', n using errcode = 'P0001'; end if;
-    if v_origem = 'Importado' and (v_usd is null or v_usd <= 0) then raise exception 'Item %: informe o preço em US$', n using errcode = 'P0001'; end if;
     if v_origem = 'Importado' and v_taxa is null then raise exception 'Item %: informe a taxa do dólar desta compra', n using errcode = 'P0001'; end if;
-    if v_cusd is not null and v_cusd < 0 then raise exception 'Item %: custo em US$ inválido', n using errcode = 'P0001'; end if;
-    v_custo := round((it->>'custo_unit')::numeric, 2);
-    if v_origem = 'Importado' and v_cusd is not null then v_custo := round(v_cusd * v_taxa, 2); end if;
+    if v_origem = 'Importado' and (v_cusd is null or v_cusd < 0) then raise exception 'Item %: informe o custo em US$', n using errcode = 'P0001'; end if;
+    if v_origem is distinct from 'Importado' and coalesce((it->>'custo_unit')::numeric, -1) < 0 then raise exception 'Item %: custo inválido', n using errcode = 'P0001'; end if;
+    v_custo := case when v_origem = 'Importado' then round(v_cusd * v_taxa, 2) else round((it->>'custo_unit')::numeric, 2) end;
     insert into public.purchases (data, sku, fornecedor, qtd, custo_unit, observacao, compra_lote, origem, preco_usd, custo_usd, taxa_dolar)
     values (v_data, it->>'sku', v_forn, (it->>'qtd')::int, v_custo, v_obs, v_lote,
-            v_origem, case when v_origem = 'Importado' then round(v_usd, 2) end,
-            case when v_cusd is not null then round(v_cusd, 2) end,
+            v_origem, null,
+            case when v_origem = 'Importado' then round(v_cusd, 2) end,
             case when v_origem = 'Importado' then round(v_taxa, 4) end);
     v_tot := v_tot + (it->>'qtd')::int * v_custo;
   end loop;

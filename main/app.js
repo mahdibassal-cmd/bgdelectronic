@@ -761,7 +761,7 @@ if (!MOCK && !CONFIGURED) {
     async compraOrigem(h, itens) { if (role !== "admin") throw new Error("Só admin registra compra"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c), origem_ok: true }; },
     async cotacaoLer() { if (role !== "admin") throw new Error("Sem permissão"); const c = COT[0]; return { valor: c ? c.valor : null, alterado_em: c ? c.alterado_em : null, handle: c ? c.handle : null, nome: c ? c.nome : null, historico: COT.map(x => ({ ...x })) }; },
     async cotacaoSalvar(valor) { if (role !== "admin") throw new Error("Só admin altera a cotação"); const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(valor); if (parsed.error) throw new Error(parsed.error); COT.unshift({ valor: parsed.value, alterado_em: new Date().toISOString(), handle: meU.handle, nome: meU.nome }); const costs = {}; P.forEach(p => { costs[p.sku] = { custo: K[p.sku], custo_usd: p.custo_usd }; }); const r = BAGDA_ORIGEM.aplicarCotacao(P, costs, parsed.value); r.products.forEach((p, i) => { if (p.error) throw new Error(p.error); P[i].preco_venda = p.preco_venda; if (P[i].origem === "Importado" && P[i].custo_usd != null && r.costs[p.sku]) K[p.sku] = r.costs[p.sku].custo; }); return api.cotacaoLer(); },
-    async recalcularImportado(sku) { if (role !== "admin") throw new Error("Só admin altera origem ou preço em US$"); const p = P.find(x => x.sku === sku); if (!p || p.origem !== "Importado") return; const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, (COT[0] || {}).valor, K[sku] != null ? K[sku] : null); if (calc.error) throw new Error(calc.error); p.preco_venda = calc.preco; },
+    async recalcularImportado(sku) { if (role !== "admin") throw new Error("Só admin altera origem ou preço em US$"); const p = P.find(x => x.sku === sku); if (!p || p.origem !== "Importado" || !(Number(p.preco_usd) > 0)) return; const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, (COT[0] || {}).valor, K[sku] != null ? K[sku] : null); if (calc.error) throw new Error(calc.error); p.preco_venda = calc.preco; },
     async comprasListar(q) { if (role === "vendedor") throw new Error("Sem permissão"); const A = role === "admin"; const G = new Map(); [...PU].reverse().forEach(p => { const g = G.get(p.compra_id) || { id: p.compra_id, numero: cnum(p.compra_id), data: p.data, fornecedor: p.fornecedor, observacao: p.observacao, itens: 0, unidades: 0, total: 0, imeis: 0, recebidos: 0, _h: "" }; g.itens++; g.unidades += p.qtd; g.total += p.total; g.imeis += IM.filter(i => i.purchase_id === p.id).length; g.recebidos += recb(p); const x = P.find(y => y.sku === p.sku); g._h += ` ${p.sku} ${x.marca} ${x.produto}`; G.set(p.compra_id, g); });
       q = norm(q || ""); return [...G.values()].filter(g => !q || norm(`${g.numero} ${g.fornecedor} ${g._h}`).includes(q)).map(g => ({ ...g, total: A ? g.total : null, status: g.recebidos >= g.unidades ? "completo" : "pendente" })).sort((a, b) => b.id - a.id); },
     async compraDetalhe(n) { if (role === "vendedor") throw new Error("Sem permissão"); const A = role === "admin"; const cid = +String(n).replace(/\D/g, ""), L = PU.filter(p => p.compra_id === cid).sort((a, b) => a.id - b.id); if (!L.length) throw new Error(`Compra ${n} não encontrada`);
@@ -788,15 +788,14 @@ if (!MOCK && !CONFIGURED) {
       let custoCompra = p.custo_unit, custoLoja = p.custo_unit, taxa = null;
       if (p.origem === "Importado") {
         if (!(Number(p.taxa_dolar) > 0)) throw new Error("Item importado precisa da taxa do dólar desta compra");
+        if (p.custo_usd == null || p.custo_usd === "") throw new Error("Item importado precisa de custo em US$");
         taxa = Number(p.taxa_dolar);
-        if (p.custo_usd != null && p.custo_usd !== "") {
-          const cr = OPX.custoReaisDeUsd(p.custo_usd, taxa); if (cr.error) throw new Error(cr.error);
-          custoCompra = cr.value;
-          const live = OPX.custoReaisDeUsd(p.custo_usd, global); if (live.error) throw new Error(live.error);
-          custoLoja = live.value; x.custo_usd = OPX.parseCustoUsd(p.custo_usd).value;
-        }
+        const cr = OPX.custoReaisDeUsd(p.custo_usd, taxa); if (cr.error) throw new Error(cr.error);
+        custoCompra = cr.value;
+        const live = OPX.custoReaisDeUsd(p.custo_usd, global); if (live.error) throw new Error(live.error);
+        custoLoja = live.value; x.custo_usd = OPX.parseCustoUsd(p.custo_usd).value;
       } else if (p.origem === "Nacional") { taxa = null; }
-      const applied = OPX.aplicarLinha(x, { origem: p.origem || null, preco_usd: p.preco_usd, custo_reais: p.origem === "Importado" ? custoLoja : p.custo_unit }, global);
+      const applied = OPX.aplicarLinha(x, { origem: p.origem || null, custo_reais: p.origem === "Importado" ? custoLoja : p.custo_unit }, global);
       if (applied.error) throw new Error(applied.error);
       const ci = p.compra_lote && (PU.find(z => z.compra_lote === p.compra_lote) || {}).compra_id || ++CNO;
       const gravado = { ...p, custo_unit: p.origem === "Importado" ? custoCompra : p.custo_unit, taxa_dolar: taxa };
@@ -1167,13 +1166,13 @@ async function viewCompras(o = {}) {
     return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${usdBadge(p)}${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
   const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
   [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
-  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", origem: "Nacional", preco_usd: "", custo_usd: "" }], busy = false, cot = null;
+  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", origem: "Nacional", custo_usd: "" }], busy = false, cot = null;
   root.innerHTML = `${!emb && adm ? '<div id="cotacao"></div>' : ""}<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2>
   ${emb ? '<p class="muted">Vários itens de uma vez · NÃO soma ao estoque da loja.</p>' : adm ? `<label>Destino</label><select id="dst"><option value="loja">Loja (soma ao estoque da loja)</option><option value="esp" ${o.dest === "esp" ? "selected" : ""}>Depósito Especial (só admin · não aparece na loja)</option></select>` : ""}
   <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
   <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
-  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Vem da cotação atual e pode ser alterada. Converte o US$ desta compra no custo em R$ da linha. O preço e o custo atuais do produto na loja usam a cotação geral.</p></div>
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
+  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. O custo em R$ de cada linha importada é o US$ × esta taxa.</p></div>
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
   <button class="btn" id="sv">Salvar</button></div>
   ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Compra</th><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
@@ -1183,49 +1182,37 @@ async function viewCompras(o = {}) {
   const sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; };
   const OP = globalThis.BAGDA_ORIGEM;
   const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
-  const blank = () => ({ sku: "", qtd: 1, custo: "", origem: "Nacional", preco_usd: "", custo_usd: "" });
-  const taxaAgora = () => { const raw = ($("#taxa") && $("#taxa").value) || ""; if (!String(raw).trim()) return cot && cot.valor ? { value: Number(cot.valor) } : { error: "Informe a taxa do dólar desta compra." }; return OP.parseCotacao(raw); };
+  const blank = () => ({ sku: "", qtd: 1, custo: "", origem: "Nacional", custo_usd: "" });
+  const taxaAgora = () => { const raw = ($("#taxa") && $("#taxa").value) || ""; if (!String(raw).trim()) return { error: "Informe a taxa do dólar desta compra." }; return OP.parseCotacao(raw); };
+  const custoReaisLinha = l => { if (!(loja() && l.origem === "Importado")) return num(l.custo) || 0; const taxa = taxaAgora(); if (taxa.error) return 0; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return 0; const cr = OP.custoReaisDeUsd(cu.value, taxa.value); return cr.error ? 0 : cr.value; };
   const prevTxt = l => {
     if (!loja() || l.origem !== "Importado") return "";
-    const u = OP.parseUsd(l.preco_usd);
-    if (!String(l.preco_usd || "").trim()) return `<p class="muted lprev">Informe o preço de venda em US$.</p>`;
-    if (u.error) return `<p class="warn lprev">${esc(u.error)}</p>`;
+    if (!String(l.custo_usd || "").trim()) return `<p class="muted lprev">Informe o custo em US$. O R$ da linha é esse valor × a taxa da compra.</p>`;
+    const cu = OP.parseCustoUsd(l.custo_usd);
+    if (cu.error || cu.value == null) return `<p class="warn lprev">${esc(cu.error || "Informe o custo em US$.")}</p>`;
     const taxa = taxaAgora();
     if (taxa.error) return `<p class="warn lprev">${esc(taxa.error)}</p>`;
-    if (!(cot && Number(cot.valor) > 0)) return `<p class="warn lprev">Defina a cotação geral da loja para gravar o preço de venda.</p>`;
-    let custoLoja = l.custo === "" || l.custo == null ? (cm[l.sku] != null ? cm[l.sku] : null) : num(l.custo);
-    let custoNota = "";
-    if (String(l.custo_usd || "").trim()) {
-      const cu = OP.parseCustoUsd(l.custo_usd);
-      if (!cu.error && cu.value != null) {
-        const naCompra = OP.custoReaisDeUsd(cu.value, taxa.value);
-        const naLoja = OP.custoReaisDeUsd(cu.value, cot.valor);
-        if (!naCompra.error) custoNota = ` Custo desta compra: <b>${brl(naCompra.value)}</b> (taxa ${OP.formatCotacao(taxa.value)}).`;
-        if (!naLoja.error) custoLoja = naLoja.value;
-      }
-    }
-    const calc = OP.precoReaisImportado(u.value, cot.valor, custoLoja);
-    if (calc.error) return `<p class="warn lprev">${esc(calc.error)}</p>`;
-    const mesma = Math.round(Number(taxa.value) * 10000) === Math.round(Number(cot.valor) * 10000);
-    return `<p class="muted lprev">Preço na loja: <b>${brl(calc.preco)}</b> (cotação geral ${OP.formatCotacao(cot.valor)}${calc.aplicado99 ? "" : ", valor redondo — o ,99 ficaria abaixo do custo"}).${custoNota}${mesma ? "" : " A taxa desta compra não muda o preço nem o custo atuais da loja."}</p>`;
+    const cr = OP.custoReaisDeUsd(cu.value, taxa.value);
+    if (cr.error) return `<p class="warn lprev">${esc(cr.error)}</p>`;
+    return `<p class="muted lprev">Custo em R$: <b>${brl(cr.value)}</b> (${OP.formatUsd(cu.value)} × taxa ${OP.formatCotacao(taxa.value)})</p>`;
   };
   const syncTaxa = () => { const box = $("#taxabox"); if (!box) return; const show = loja() && L.some(l => l.origem === "Importado"); box.hidden = !show; const inp = $("#taxa"); if (show && inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } };
-  const tot = () => { const okL = L.filter(l => l.sku); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * (num(l.custo) || 0), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
-    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * (num(l.custo) || 0)); }); };
+  const linhaConta = l => !!(l.sku || (loja() && l.origem === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
+  const tot = () => { const okL = L.filter(linhaConta); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
+    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * custoReaisLinha(l)); }); };
   const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && l.origem === "Importado"; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>
-    ${loja() ? `<div class="clu"><div><label>Origem</label><select class="lo"><option value="Nacional" ${l.origem !== "Importado" ? "selected" : ""}>Nacional</option><option value="Importado" ${l.origem === "Importado" ? "selected" : ""}>Importado</option></select></div>${imp ? `<div><label>Preço venda (US$)</label><input class="lu" inputmode="decimal" autocomplete="off" value="${esc(l.preco_usd ?? "")}" placeholder="Ex.: 199,00"></div><div><label>Custo (US$) opcional</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}"></div>` : ""}</div>${prevTxt(l)}` : ""}</div>
-    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>Custo un. (R$)</label><input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}"></div>
+    ${loja() ? `<div class="clu"><div><label>Origem</label><select class="lo"><option value="Nacional" ${l.origem !== "Importado" ? "selected" : ""}>Nacional</option><option value="Importado" ${l.origem === "Importado" ? "selected" : ""}>Importado</option></select></div>${imp ? `<div><label>Custo (US$)</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}" placeholder="Ex.: 80,00"></div>` : ""}</div>${prevTxt(l)}` : ""}</div>
+    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>${imp ? "Custo (R$)" : "Custo un. (R$)"}</label>${imp ? `<div class="lcro n">${String(l.custo_usd || "").trim() && !taxaAgora().error ? brl(custoReaisLinha(l)) : "—"}</div>` : `<input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}">`}</div>
     <div><label>Total</label><div class="lt n" data-i="${i}"></div></div><div><button type="button" class="btn ghost rm" title="Remover linha" ${L.length < 2 ? "disabled" : ""}>✕</button></div></div>`; }).join("");
     document.querySelectorAll("#lns .cl").forEach(r => { const i = +r.dataset.i, l = L[i], pq = r.querySelector(".pq");
       const paint = () => { const html = prevTxt(l); const box = r.querySelector(".lprev"); if (!html) { if (box) box.remove(); return; } if (box) box.outerHTML = html; else { const host = r.querySelector(".clu"); if (host) host.insertAdjacentHTML("afterend", html); } };
       combo(pq, r.querySelector(".sug"), q => (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: line(p) + (L.some((x, j) => j !== i && x.sku === p.sku) ? '<small class="warn">já está em outra linha</small>' : "") })),
-        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); if (loja() && p.origem === "Importado") { l.origem = "Importado"; if (p.preco_usd != null) l.preco_usd = p.preco_usd; } drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
+        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); if (loja() && p.origem === "Importado") l.origem = "Importado"; drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
       pq.addEventListener("typed", () => { if (l.sku) { l.sku = ""; r.querySelector(".ps").innerHTML = ""; tot(); } });
-      const lo = r.querySelector(".lo"); if (lo) lo.onchange = e => { l.origem = e.target.value; if (l.origem !== "Importado") { l.preco_usd = ""; l.custo_usd = ""; } drawL(); };
-      const lu = r.querySelector(".lu"); if (lu) lu.oninput = e => { l.preco_usd = e.target.value; paint(); };
-      const lcu = r.querySelector(".lcu"); if (lcu) lcu.oninput = e => { l.custo_usd = e.target.value; const cu = OP.parseCustoUsd(e.target.value); const taxa = taxaAgora(); if (!cu.error && cu.value != null && !taxa.error) { const cr = OP.custoReaisDeUsd(cu.value, taxa.value); if (!cr.error) { l.custo = cr.value; r.querySelector(".lc").value = cr.value; tot(); } } paint(); };
-      r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); }; r.querySelector(".lc").oninput = e => { l.custo = e.target.value; tot(); paint(); };
-      r.querySelector(".lc").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#add").click(); } };
+      const lo = r.querySelector(".lo"); if (lo) lo.onchange = e => { l.origem = e.target.value; if (l.origem !== "Importado") { l.custo_usd = ""; } else l.custo = ""; drawL(); };
+      const lcu = r.querySelector(".lcu"); if (lcu) lcu.oninput = e => { l.custo_usd = e.target.value; const cu = OP.parseCustoUsd(e.target.value); const taxa = taxaAgora(); const cell = r.querySelector(".lcro"); if (!cu.error && cu.value != null && !taxa.error) { const cr = OP.custoReaisDeUsd(cu.value, taxa.value); if (!cr.error) { l.custo = cr.value; if (cell) cell.textContent = brl(cr.value); tot(); } } else if (cell) cell.textContent = "—"; paint(); };
+      r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); };
+      const lc = r.querySelector(".lc"); if (lc) { lc.oninput = e => { l.custo = e.target.value; tot(); }; lc.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#add").click(); } }; }
       r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
     tot(); syncTaxa(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
   if ($("#dst")) $("#dst").onchange = () => { sb0(); drawL(); }; sb0();
@@ -1236,21 +1223,18 @@ async function viewCompras(o = {}) {
   if ($("#cotacao")) cot = await mountCotacao($("#cotacao"), onCot);
   const taxaInp = $("#taxa"); if (taxaInp) taxaInp.oninput = () => { taxaInp.dataset.auto = "0"; const t = OP.parseCotacao(taxaInp.value); if (!t.error) L.forEach(l => { if (l.origem !== "Importado" || !String(l.custo_usd || "").trim()) return; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return; const cr = OP.custoReaisDeUsd(cu.value, t.value); if (!cr.error) l.custo = cr.value; }); drawL(); };
   drawL();
-  $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" || String(l.preco_usd || "") !== "" || String(l.custo_usd || "") !== ""), w = $("#pw");
+  $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" || String(l.custo_usd || "") !== ""), w = $("#pw");
     for (const l of it) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`;
-      if (loja()) { if (l.origem === "Importado") { const u = OP.parseUsd(l.preco_usd); if (u.error) return w.textContent = `Linha ${n}: ${u.error}`; l.preco_usd = u.value;
-          const taxa = taxaAgora(); if (taxa.error) return w.textContent = taxa.error; l.taxa_dolar = taxa.value;
-          if (String(l.custo_usd || "").trim() !== "") { const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error) return w.textContent = `Linha ${n}: ${cu.error}`; l.custo_usd = cu.value; const cr = OP.custoReaisDeUsd(cu.value, taxa.value); if (cr.error) return w.textContent = `Linha ${n}: ${cr.error}`; l.custo = cr.value; } else l.custo_usd = null;
-          if (!(cot && Number(cot.valor) > 0)) return w.textContent = "Defina a cotação do dólar antes de salvar um importado. Nada foi salvo.";
-          const live = l.custo_usd != null ? OP.custoReaisDeUsd(l.custo_usd, cot.valor).value : (l.custo === "" ? null : num(l.custo));
-          const prev = OP.precoReaisImportado(l.preco_usd, cot.valor, live); if (prev.error) return w.textContent = `Linha ${n}: ${prev.error}`; }
-        else { l.origem = "Nacional"; l.preco_usd = null; l.custo_usd = null; l.taxa_dolar = null; } }
-      if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; }
+      if (loja() && l.origem === "Importado") { const taxa = taxaAgora(); if (taxa.error) return w.textContent = taxa.error; l.taxa_dolar = taxa.value;
+          const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return w.textContent = `Linha ${n}: informe o custo em US$`; l.custo_usd = cu.value;
+          const cr = OP.custoReaisDeUsd(cu.value, taxa.value); if (cr.error) return w.textContent = `Linha ${n}: ${cr.error}`; l.custo = cr.value;
+          if (!(cot && Number(cot.valor) > 0)) return w.textContent = "Defina a cotação do dólar antes de salvar um importado. Nada foi salvo."; }
+      else { if (loja()) { l.origem = "Nacional"; l.custo_usd = null; l.taxa_dolar = null; } if (!(num(l.custo) >= 0) || l.custo === "") return w.textContent = `Linha ${n}: informe o custo unitário`; } }
     if (!it.length) return w.textContent = "Adicione pelo menos um item";
     const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#cdt").value || today(), ob = $("#ob").value.trim() || null;
-    const itens = it.map(l => { const row = { sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) }; if (loja()) { row.origem = l.origem === "Importado" ? "Importado" : "Nacional"; if (row.origem === "Importado") { row.preco_usd = l.preco_usd; row.taxa_dolar = l.taxa_dolar; if (l.custo_usd != null && l.custo_usd !== "") row.custo_usd = l.custo_usd; } } return row; });
-    const precisaOrigem = itens.some(x => x.origem === "Importado" || x.preco_usd != null || x.custo_usd != null);
-    const semOrigem = rows => rows.map(({ origem, preco_usd, custo_usd, taxa_dolar, ...r }) => r);
+    const itens = it.map(l => { const row = { sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) }; if (loja()) { row.origem = l.origem === "Importado" ? "Importado" : "Nacional"; if (row.origem === "Importado") { row.taxa_dolar = l.taxa_dolar; row.custo_usd = l.custo_usd; } } return row; });
+    const precisaOrigem = itens.some(x => x.origem === "Importado" || x.custo_usd != null);
+    const semOrigem = rows => rows.map(({ origem, custo_usd, taxa_dolar, ...r }) => r);
     const pendente = e => !!(e && (e.norpc || /PGRST202|could not find the function|does not exist|schema cache|registrar_compra_origem/i.test(e.message || "")));
     busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
     if (fx.length >= 2 && api.salvarFornecedor && !inTab.has(fk(fx))) await api.salvarFornecedor(null, { nome: fx }).catch(() => {});
@@ -1259,7 +1243,7 @@ async function viewCompras(o = {}) {
       catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
       const fl = []; for (const [i, x] of semOrigem(itens).entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length} no Depósito Especial…`; try { await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, mot); } catch (er) { fl.push({ ...x, erro: er.message }); } }
       busy = false; $("#sv").disabled = false; if (!fl.length) { toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
-      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: "Nacional", preco_usd: "", custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
+      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: "Nacional", custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob }; if (itens.some(x => x.origem === "Importado")) hd.taxa_dolar = itens.find(x => x.origem === "Importado").taxa_dolar;
     const okCompra = rs => { toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); };
     try { if (!api.compraOrigem) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); return await okCompra(await api.compraOrigem(hd, itens)); }
@@ -1272,7 +1256,7 @@ async function viewCompras(o = {}) {
       try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
     busy = false; $("#sv").disabled = false;
     if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
-    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: f.origem || "Nacional", preco_usd: f.preco_usd || "", custo_usd: f.custo_usd || "" })); drawL();
+    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: f.origem || "Nacional", custo_usd: f.custo_usd || "" })); drawL();
     w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
 }
 // ---------- Compras numeradas + IMEI ----------

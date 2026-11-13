@@ -95,17 +95,17 @@
     if (item.origem == null || item.origem === "") return { product: next };
     if (item.origem === "Nacional") { next.origem = "Nacional"; return { product: next }; }
     if (item.origem !== "Importado") return { error: "Origem inválida." };
-    const calc = precoReaisImportado(item.preco_usd, cotacao, item.custo_reais);
-    if (calc.error) return calc;
-    const usd = unitsOf(item.preco_usd, 2);
     next.origem = "Importado";
-    next.preco_usd = fromUnits(usd, 2);
+    if (next.preco_usd == null || next.preco_usd === "") return { product: next };
+    const calc = precoReaisImportado(next.preco_usd, cotacao, item.custo_reais);
+    if (calc.error) return calc;
     next.preco_venda = calc.preco;
     return { product: next, aplicado99: calc.aplicado99, redondo: calc.redondo };
   }
   function recalcularImportados(products, custos, cotacao) {
     return products.map(p => {
       if (p.origem !== "Importado") return Object.assign({}, p);
+      if (p.preco_usd == null || p.preco_usd === "") return Object.assign({}, p);
       const calc = precoReaisImportado(p.preco_usd, cotacao, custos ? custos[p.sku] : null);
       if (calc.error) return Object.assign({}, p, { error: calc.error });
       return Object.assign({}, p, { preco_venda: calc.preco });
@@ -125,6 +125,7 @@
         custo = conv.value;
       }
       nextCosts[p.sku] = Object.assign({}, c, { custo: custo });
+      if (p.preco_usd == null || p.preco_usd === "") return Object.assign({}, p);
       const calc = precoReaisImportado(p.preco_usd, cotacao, custo != null && custo !== "" ? custo : null);
       if (calc.error) return Object.assign({}, p, { error: calc.error });
       return Object.assign({}, p, { preco_venda: calc.preco });
