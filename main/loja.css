@@ -146,6 +146,9 @@ html[data-theme=dark] .ext tr.exi>td{background:#1f1c15}html[data-theme=dark] .o
 @media (max-width:600px){.ii tr{display:grid;grid-template-columns:2.2em 1fr;gap:4px}.ii tr:first-child{display:none}.ii td:nth-child(3){grid-column:2}.ii td:nth-child(3) input::placeholder{opacity:.6}}
 /* status de recebimento + comprovante de compra (A4) */
 .badge{display:inline-block;font-size:.72rem;padding:1px 8px;border-radius:10px;font-weight:700;vertical-align:middle}.ok-b{background:#dcfce7;color:#166534}.pend-b{background:#fef3c7;color:#92400e}
+.usd-b{background:#dbeafe;color:#1d4ed8;letter-spacing:.03em}html[data-theme=dark] .usd-b{background:#1e3a5f;color:#dbeafe}
+.clu{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}.clu label{margin-top:0}
+input[readonly]{background:#f6f7fb}html[data-theme=dark] input[readonly]{background:#221f18}
 .cpa4{background:#fff;color:#000;max-width:190mm;margin:0 auto;padding:10mm;border:1px solid #ddd;font:12px Arial,sans-serif}
 .cpa4 .cph{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:6px}.cpa4 .cpl{font-size:20px}.cpa4 .cpt2{font-size:15px}.cpa4 .cpn{text-align:right;font-size:13px}
 .cpa4 table{width:100%;border-collapse:collapse;margin-top:10px}.cpa4 .cpi2 td{border:0;padding:3px 0}.cpa4 .cpt th,.cpa4 .cpt td{border:1px solid #444;padding:5px;color:#000}.cpa4 .cpt th{background:#eee}.cpa4 .cpt tr{break-inside:avoid}.cpa4 .cpt thead{display:table-header-group}
