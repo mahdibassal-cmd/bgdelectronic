@@ -14,7 +14,7 @@ ok(!locais.includes("BITLOG"), "BITLOG CONTAINER is not in the list everyone see
 ok(app.includes('const LOCAIS_ADMIN = ["BITLOG CONTAINER", "CAIXA ESPECIAL"]') && app.includes('LOCAIS.concat(me.role === "admin" ? LOCAIS_ADMIN : [])'), "BITLOG CONTAINER only appended for admin");
 ok(app.includes('const localLbl = l => l === "PRESTIGE AURA" ? "PRESTIGE ROSA" : l;') && app.includes("localLbl(h.local_pagamento)") && app.includes("localLbl(n.local_pagamento)"), "old notas with PRESTIGE AURA display as PRESTIGE ROSA");
 ok(app.includes('if (local === "BITLOG CONTAINER" && meU.role !== "admin") throw new Error("Somente admin");'), "demo mock also rejects BITLOG for non-admin");
-ok(html.includes("app.js?v=20261113f"), "cache tag 20261113f");
+ok(html.includes("app.js?v=20261113g"), "cache tag 20261113f");
 ok(sql.includes("if p_local in ('CAIXA ESPECIAL', 'BITLOG CONTAINER') then") && sql.includes("raise exception 'Somente admin'"), "server rejects BITLOG CONTAINER for non-admin");
 ok(sql.includes("if p_local = 'PRESTIGE AURA' then p_local := 'PRESTIGE ROSA'; end if;"), "old label from cached apps is saved as PRESTIGE ROSA");
 ok(sql.includes("'PRESTIGE AURA','PRESTIGE ROSA','BITLOG CONTAINER'") && sql.includes("notas_local_pag_chk"), "check keeps old value valid and allows the new ones");

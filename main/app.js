@@ -261,7 +261,13 @@ if (!MOCK && !CONFIGURED) {
     async receber(cli, v, cx, forma, data, obs) { return ok(await sb.rpc("registrar_recebimento_credito", { p_cliente: cli, p_valor: v, p_caixa: cx, p_forma: forma, p_data: data || null, p_obs: obs || null })); },
     async receberCxesp(cli, v, forma, data, obs, chave) { return ok(await sb.rpc("registrar_recebimento_cxesp", { p_cliente: cli, p_valor: v, p_forma: forma, p_data: data || null, p_obs: obs || null, p_chave: chave })); },
     async adicionarDivida(cli, v, obs, chave) { return ok(await sb.rpc("adicionar_divida", { p_cliente: cli, p_valor: v, p_obs: obs || null, p_chave: chave })); },
-    async caixasLista() { return ok(await sb.from("caixas").select("id,nome,metodo").eq("ativo", true).order("id")).map(c => ({ caixa_id: c.id, nome: c.nome, metodo: c.metodo })); },
+    async caixasLista() {
+      const q = await sb.from("caixas").select("id,nome,metodo,somente_admin").eq("ativo", true).order("id");
+      const rows = q.error && /somente_admin|42703/.test(q.error.message || "")
+        ? ok(await sb.from("caixas").select("id,nome,metodo").eq("ativo", true).order("id")).map(c => ({ ...c, somente_admin: false }))
+        : ok(q);
+      return rows.map(c => ({ caixa_id: c.id, nome: c.nome, metodo: c.metodo, somente_admin: !!c.somente_admin }));
+    },
     async cancelarNota(id, motivo) { ok(await sb.rpc("cancelar_nota", { p_id: id, p_motivo: motivo })); },
     async nota(id) { return ok(await sb.from("v_nota_itens").select("*").eq("nota_id", id)); },
     async notaPag(id) { return ok(await sb.from("nota_pagamentos").select("metodo,valor").eq("nota_id", id).order("id")); },
@@ -300,6 +306,30 @@ if (!MOCK && !CONFIGURED) {
       const r = await sb.rpc("registrar_compra_origem", { p_header: header, p_itens: itens });
       const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
       if (r.error && /PGRST202|42883|registrar_compra_origem|schema cache|does not exist/i.test(em)) { const err = new Error("registrar_compra_origem"); err.norpc = true; throw err; }
+      return ok(r);
+    },
+    async compraPagamento(header, itens) {
+      const r = await sb.rpc("registrar_compra_pagamento", { p_header: header, p_itens: itens });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|registrar_compra_pagamento|schema cache|does not exist/i.test(em)) { const err = new Error("Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi salvo."); err.norpc = true; throw err; }
+      return ok(r);
+    },
+    async comprasCaixas() {
+      const r = await sb.rpc("compras_caixas_pagamento");
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|compras_caixas_pagamento|schema cache|does not exist/i.test(em)) throw new Error("Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql).");
+      return ok(r);
+    },
+    async comprasPendentes() {
+      const r = await sb.rpc("compras_pendentes");
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|compras_pendentes|schema cache|does not exist/i.test(em)) throw new Error("Compras pendentes ainda dependem da atualização do banco (supabase-loja/migration-compras-pagamento.sql).");
+      return ok(r);
+    },
+    async compraPagar(id, valor, caixa) {
+      const r = await sb.rpc("compra_pagar", { p_compra: id, p_valor: valor, p_caixa: caixa });
+      const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|compra_pagar|schema cache|does not exist/i.test(em)) throw new Error("Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi lançado.");
       return ok(r);
     },
     async cotacaoLer() {
@@ -371,7 +401,8 @@ if (!MOCK && !CONFIGURED) {
     .map(([sku, marca, produto, tamanho, preco_venda, notas], i) => ({ sku, marca, produto, tamanho, preco_venda, notas: notas || null, fornecedor: sku.startsWith("BS-") ? "Distribuidora  Apple SP" : null, estoque: [5, 0, 8, 3, 0, 2, 20, 12, 6, 0, 9, 4, 3, 0, 1, 2, 4, 1][i], estoque_minimo: 2, ativo: true, origem: "Nacional", preco_usd: null }));
   const K = Object.fromEntries(P.map(p => [p.sku, Math.round(p.preco_venda * 0.6 * 100) / 100]));
   const COT = [{ valor: 5.4, alterado_em: "2026-11-13T12:00:00.000Z", handle: "@mike", nome: "Mike" }];
-  const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro" }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix" }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao" }, { caixa_id: 12, nome: "GASTOS LOJA", metodo: null }, { caixa_id: 13, nome: "PRIME", metodo: null }];
+  const CX = [{ caixa_id: 1, nome: "Caixa Dinheiro", metodo: "dinheiro", somente_admin: false }, { caixa_id: 2, nome: "Caixa PIX (HX)", metodo: "pix", somente_admin: false }, { caixa_id: 3, nome: "Máquina Loja", metodo: "cartao", somente_admin: false }, { caixa_id: 12, nome: "GASTOS LOJA", metodo: null, somente_admin: false }, { caixa_id: 13, nome: "PRIME", metodo: null, somente_admin: false }, { caixa_id: 17, nome: "PAGAMENTO PRODUTOS", metodo: null, somente_admin: true }];
+  const COMP = [], CPAGTO = [];
   const CXE = [], AL = [], CR = [], N = [], IT = [], PG = [], MV = [], SE = [], PU = [], CL = [], FO = [], CP = [], CPG = [], RC = [], DE = [{ sku: "APL-001", qtd: 10, custo: 780 }, { sku: "JBL-002", qtd: 4, custo: 210 }], DEM = [], IM = []; let CNO = 0; const cnum = c => "C-" + String(c).padStart(6, "0"); let id = 1, logged = qs.has("auto");
   if (qs.has("origemfix")) { P.push({ sku: "FX-ORG-1", marca: "Apple", produto: "iPhone 18 Pro Max FIXTURE", tamanho: "Preto", preco_venda: 9999, estoque: 2, estoque_minimo: 2, ativo: true, notas: null, fornecedor: null }); DE.push({ sku: "FX-ORG-1", qtd: 5, custo: 7000 }); K["FX-ORG-1"] = 6000; }
   const recb = p => Math.min(p.qtd, (p.rsi || 0) + IM.filter(i => i.purchase_id === p.id).length);
@@ -439,6 +470,9 @@ if (!MOCK && !CONFIGURED) {
     seedPrazo(6, "Sofia Prado", 1500, dAdd(15), hj, 0, 15);
     seedPrazo(7, "Pedro Pago", 400, dAdd(-10), dAdd(-17), 400, 7);
     mov(1, "entrada", 200, "Fundo de troco", null, U[0], H(5)); mov(1, "saida", 35, "Compra de material de limpeza", null, U[0], H(2)); mov(1, "entrada", 150, "Recebimento cliente Maria Souza", null, U[0], H(1)); MV[MV.length - 1].cliente = "Maria Souza"; mov(3, "entrada", 28600, "DANIEL IPHONE DUO", null, U.find(u => /pamela/i.test(u.handle || "")) || U[0], H(0.2)); MV[MV.length - 1].forma = "cartao";
+    mov(17, "entrada", 25000, "Saldo PAGAMENTO PRODUTOS", null, U[0], H(8)); mov(1, "entrada", 4000, "Reforço compras", null, U[0], H(8));
+    COMP.push({ id: 9001, numero: "C-009001", data: "2026-11-01", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-11-10", total: 1800 }, { id: 9002, numero: "C-009002", data: "2026-11-12", fornecedor: "Distribuidora Tech SP", pagamento: "depois", vencimento: "2026-12-01", total: 640 }, { id: 9003, numero: "C-009003", data: "2026-11-08", fornecedor: "Apple SP", pagamento: "depois", vencimento: null, total: 960 });
+    CPAGTO.push({ id: id++, compra_id: 9002, valor: 200, data: "2026-11-12", caixa_id: 1, caixa: "Caixa Dinheiro", somente_admin: false });
   });
   const vec = (seed) => Array.from({ length: 128 }, (_, i) => Number(((i + 1) * 0.001 + seed).toFixed(6)));
   const PONTOfaces = [];
@@ -582,7 +616,7 @@ if (!MOCK && !CONFIGURED) {
         if (open <= 0) continue; const a = Math.min(open, rest); AL.push({ nota_id: n.nota_id, valor: a, rec: RC[0].id }); al.push(String(n.nota_id).padStart(6, "0") + " (" + brl(a) + ")"); rest -= a; }
       mm.notas = al.join(", "); },
     async receberCxesp(cli, v0, forma, data, obs, chave) { if (meU.role !== "admin") throw new Error("Somente admin"); if (!chave || String(chave).length < 8) throw new Error("Informe a chave do recebimento"); if (!["dinheiro", "pix", "cartao", "transferencia"].includes(forma)) throw new Error("Forma de pagamento inválida"); const sig = chave + "|" + cli + "|" + v0 + "|" + forma; if (RC._cx && RC._cx[sig]) return { ...RC._cx[sig], idempotente: true }; const sd = Math.max(fiado(cli) - recebido(cli), 0), v = Math.min(v0, sd), ex = Math.round((v0 - v) * 100) / 100, antes = MV.length; const mid = id++; CXE.push({ id: mid, tipo: "entrada", valor: v0, motivo: "Recebimento cliente " + CL.find(c => c.id === cli).nome, created_at: new Date().toISOString() }); let rid = null, cred = null; if (v > 0) { rid = id++; RC.unshift({ id: rid, cliente_id: cli, valor: v, caixa_id: null, cxesp: mid, forma, data: data || today(), obs }); let rest = v; for (const n of N.filter(x => x.cliente_id === cli && x.status === "ativa").sort((a, b) => a.nota_id - b.nota_id)) { if (rest <= 0) break; const open = PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0) - AL.filter(x => x.nota_id === n.nota_id).reduce((a, x) => a + x.valor, 0); if (open <= 0) continue; const a = Math.min(open, rest); AL.push({ nota_id: n.nota_id, valor: a, rec: rid }); rest -= a; } } if (ex > 0) { cred = id++; CR.push({ id: cred, cliente_id: cli, tipo: "entrada", valor: ex, obs: v > 0 ? "Excedente pagamento" : "Excedente pagamento (sem dívida em aberto)", nota_id: null, handle: meU.handle, created_at: new Date().toISOString() }); if (rid) RC[0].excedente = cred; } if (MV.length !== antes) throw new Error("CAIXA SPECIAL não entra nos caixas do dia"); const res = { recebimento_id: rid, quitado: v, credito: ex, cxesp_id: mid, destino: "cxesp", idempotente: false }; RC._cx = RC._cx || {}; RC._cx[sig] = res; return res; },
-    async caixasLista() { needCx(); return CX; },
+    async caixasLista() { needCx(); return CX.filter(c => !c.somente_admin || role === "admin"); },
     async criarNota(items, pags, cliente, clienteId, local, obs, frete = 0, caxinha = 0, prazoDias = null) { await new Promise(r => setTimeout(r, 400)); if (qs.has("fail")) throw new Error("Falha simulada (demo ?fail=1)"); if (role === "financeiro") throw new Error("Sem permissão para criar nota"); const locaisOk = LOCAIS.concat(meU.role === "admin" ? ["CAIXA ESPECIAL"] : []); if (local ? !locaisOk.includes(local) : pags.some(g => g.metodo !== "prazo" && +g.valor > 0)) throw new Error("Escolha o Local do pagamento");
       if (pags.some(g => g.metodo === "prazo") && (prazoDias == null || prazoDias === "" || !(+prazoDias >= 1 && +prazoDias <= 30))) throw new Error("Informe o prazo (1 a 30 dias) para Paga Depois");
       if (local === "CAIXA GERAL") { if (!clienteId) throw new Error("Caixa Geral exige cliente cadastrado"); const t = Math.round((items.reduce((a, x) => a + x.qtd * x.preco_vendido, 0) + (+frete || 0) + (+caxinha || 0)) * 100) / 100, sd = crSaldo(clienteId); if (t > sd + 0.001) throw new Error(`Crédito insuficiente na Caixa Geral (saldo ${brl(sd)})`);
@@ -759,6 +793,79 @@ if (!MOCK && !CONFIGURED) {
     async adminProducts() { return role === "admin" ? P.map(p => ({ ...p, custo: K[p.sku] })) : []; },
     async compraLote(h, itens) { if (!qs.has("lote")) throw new Error("PGRST202 Could not find the function public.registrar_compra_lote (demo sem ?lote=1)"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c) }; },
     async compraOrigem(h, itens) { if (role !== "admin") throw new Error("Só admin registra compra"); const lote = "demo-" + Date.now(); for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote }); const c = PU[0].compra_id; return { lote, itens: itens.length, compra_id: c, numero: cnum(c), origem_ok: true }; },
+    async compraPagamento(h, itens) {
+      if (role !== "admin") throw new Error("Só admin registra compra");
+      const pag = String(h.pagamento || "").toLowerCase();
+      if (pag !== "agora" && pag !== "depois") throw new Error("Escolha a forma de pagamento");
+      if (pag === "depois" && h.vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(h.vencimento)) throw new Error("Vencimento inválido");
+      const OPX = globalThis.BAGDA_ORIGEM;
+      let total = 0;
+      for (const p of itens) {
+        let custo = Number(p.custo_unit);
+        if (p.origem === "Importado") {
+          if (!(Number(p.taxa_dolar) > 0)) throw new Error("Item importado precisa da taxa do dólar desta compra");
+          const cr = OPX.custoReaisDeUsd(p.custo_usd, p.taxa_dolar);
+          if (cr.error) throw new Error(cr.error);
+          custo = cr.value;
+        } else if (!(custo >= 0)) throw new Error("Item: custo inválido");
+        total += (+p.qtd) * custo;
+      }
+      total = Math.round(total * 100) / 100;
+      let cx = null;
+      if (pag === "agora" && total > 0) {
+        cx = CX.find(c => c.caixa_id === +h.caixa_id && c.ativo !== false && (!c.somente_admin || role === "admin"));
+        if (!cx) throw new Error("Caixa inválido");
+        const s = Math.round(saldo(cx.caixa_id) * 100) / 100;
+        if (total > s + 0.001) throw new Error("Saldo insuficiente no caixa (R$ " + s.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
+      }
+      const lote = "demo-" + Date.now();
+      for (const x of itens) await api.addPurchase({ ...x, fornecedor: h.fornecedor, observacao: h.observacao, compra_lote: lote, ...(h.data ? { data: h.data } : {}) });
+      const c = PU[0].compra_id, numero = cnum(c);
+      const tot = Math.round(PU.filter(p => p.compra_id === c).reduce((a, p) => a + Number(p.total), 0) * 100) / 100;
+      COMP.push({ id: c, numero, data: h.data || today(), fornecedor: h.fornecedor || null, pagamento: pag, vencimento: pag === "depois" ? (h.vencimento || null) : null, total: tot });
+      if (pag === "agora" && tot > 0) {
+        mov(cx.caixa_id, "saida", tot, "Compra " + numero + " — " + (h.fornecedor || "fornecedor"), null, meU);
+        CPAGTO.push({ id: id++, compra_id: c, valor: tot, data: today(), caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
+      }
+      return { lote, itens: itens.length, compra_id: c, numero, total: tot, origem_ok: true, pagamento_ok: true, pagamento: pag };
+    },
+    async comprasCaixas() {
+      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      return CX.filter(c => c.ativo !== false && (!c.somente_admin || role === "admin")).map(c => ({ caixa_id: c.caixa_id, nome: c.nome, metodo: c.metodo, somente_admin: !!c.somente_admin, saldo: Math.round(saldo(c.caixa_id) * 100) / 100 }));
+    },
+    async comprasPendentes() {
+      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      const hj = today();
+      const rows = COMP.filter(c => c.pagamento === "agora" || c.pagamento === "depois").map(c => {
+        const pags = CPAGTO.filter(p => p.compra_id === c.id).map(p => { const hide = !!(p.somente_admin && role !== "admin"); return { id: p.id, valor: p.valor, data: p.data, caixa: hide ? null : p.caixa, caixa_id: hide ? null : p.caixa_id, caixa_oculto: hide }; });
+        const pago = Math.round(pags.reduce((a, p) => a + Number(p.valor), 0) * 100) / 100;
+        const restante = Math.round((Number(c.total) - pago) * 100) / 100;
+        return { ...c, fornecedor: c.fornecedor || "Sem fornecedor", pago, restante, atrasada: !!(c.vencimento && c.vencimento < hj && restante > 0), pagamentos: pags };
+      });
+      const grupos = new Map();
+      rows.filter(r => r.restante > 0).sort((a, b) => (b.atrasada - a.atrasada) || String(a.vencimento || "9999").localeCompare(String(b.vencimento || "9999"))).forEach(r => {
+        const g = grupos.get(r.fornecedor) || { fornecedor: r.fornecedor, total_devido: 0, compras: [] };
+        g.compras.push(r); g.total_devido = Math.round((g.total_devido + r.restante) * 100) / 100; grupos.set(r.fornecedor, g);
+      });
+      return { grupos: [...grupos.values()].sort((a, b) => a.fornecedor.localeCompare(b.fornecedor, "pt-BR")), pagas: rows.filter(r => r.restante <= 0).sort((a, b) => b.id - a.id).slice(0, 40) };
+    },
+    async compraPagar(cid, valor, caixa) {
+      await ready; if (role !== "admin" && role !== "financeiro") throw new Error("Sem permissão (financeiro/admin)");
+      const c = COMP.find(x => x.id === +cid);
+      if (!c || (c.pagamento !== "agora" && c.pagamento !== "depois")) throw new Error("Compra antiga sem controle de pagamento");
+      valor = Math.round(Number(valor) * 100) / 100;
+      if (!(valor > 0)) throw new Error("Valor inválido");
+      const pago = CPAGTO.filter(p => p.compra_id === c.id).reduce((a, p) => a + Number(p.valor), 0);
+      const rest = Math.round((Number(c.total) - pago) * 100) / 100;
+      if (valor > rest + 0.001) throw new Error("Pagamento maior que o saldo da compra (R$ " + rest.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
+      const cx = CX.find(x => x.caixa_id === +caixa && x.ativo !== false && (!x.somente_admin || role === "admin"));
+      if (!cx) throw new Error("Caixa inválido");
+      const s = Math.round(saldo(cx.caixa_id) * 100) / 100;
+      if (valor > s + 0.001) throw new Error("Saldo insuficiente no caixa (R$ " + s.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")");
+      mov(cx.caixa_id, "saida", valor, "Compra " + c.numero + " — " + (c.fornecedor || "fornecedor"), null, meU);
+      CPAGTO.push({ id: id++, compra_id: c.id, valor, data: today(), caixa_id: cx.caixa_id, caixa: cx.nome, somente_admin: !!cx.somente_admin });
+      return { pagamento_id: CPAGTO[CPAGTO.length - 1].id, valor, restante: Math.round((rest - valor) * 100) / 100, saldo_caixa: Math.round(saldo(cx.caixa_id) * 100) / 100, caixa: cx.nome };
+    },
     async cotacaoLer() { if (role !== "admin") throw new Error("Sem permissão"); const c = COT[0]; return { valor: c ? c.valor : null, alterado_em: c ? c.alterado_em : null, handle: c ? c.handle : null, nome: c ? c.nome : null, historico: COT.map(x => ({ ...x })) }; },
     async cotacaoSalvar(valor) { if (role !== "admin") throw new Error("Só admin altera a cotação"); const parsed = globalThis.BAGDA_ORIGEM.parseCotacao(valor); if (parsed.error) throw new Error(parsed.error); COT.unshift({ valor: parsed.value, alterado_em: new Date().toISOString(), handle: meU.handle, nome: meU.nome }); const costs = {}; P.forEach(p => { costs[p.sku] = { custo: K[p.sku], custo_usd: p.custo_usd }; }); const r = BAGDA_ORIGEM.aplicarCotacao(P, costs, parsed.value); r.products.forEach((p, i) => { if (p.error) throw new Error(p.error); P[i].preco_venda = p.preco_venda; if (P[i].origem === "Importado" && P[i].custo_usd != null && r.costs[p.sku]) K[p.sku] = r.costs[p.sku].custo; }); return api.cotacaoLer(); },
     async recalcularImportado(sku) { if (role !== "admin") throw new Error("Só admin altera origem ou preço em US$"); const p = P.find(x => x.sku === sku); if (!p || p.origem !== "Importado" || !(Number(p.preco_usd) > 0)) return; const calc = BAGDA_ORIGEM.precoReaisImportado(p.preco_usd, (COT[0] || {}).valor, K[sku] != null ? K[sku] : null); if (calc.error) throw new Error(calc.error); p.preco_venda = calc.preco; },
@@ -888,12 +995,12 @@ function navMark(v) {
   });
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", cpend: "financas", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
   if (!need[v] && v !== "seguranca" && v !== "ponto") v = "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
   navMark(v);
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei(), ponto: () => window.BAGDA_PONTO.view({ $, app, me, api, toast, esc, today }) }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, cpend: viewComprasPendentes, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei(), ponto: () => window.BAGDA_PONTO.view({ $, app, me, api, toast, esc, today }) }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -1167,13 +1274,22 @@ async function viewCompras(o = {}) {
   const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
   [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
   const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", origem: "Nacional", custo_usd: "" }], busy = false, cot = null;
+  let CXS = [], pagSql = !emb;
+  if (!emb && api.comprasCaixas) { try { CXS = await api.comprasCaixas() || []; } catch (e) { if (/migration-compras-pagamento|PGRST202|schema cache|does not exist|compras_caixas/i.test(e.message || "")) pagSql = false; else throw e; } }
+  else if (!emb) pagSql = false;
+  const prefCx = CXS.some(c => c.caixa_id === 17) ? 17 : (CXS[0] || {}).caixa_id;
   root.innerHTML = `${!emb && adm ? '<div id="cotacao"></div>' : ""}<div class="card"><h2>${emb ? "Entrada no Depósito Especial" : "Registrar compra"}</h2>
   ${emb ? '<p class="muted">Vários itens de uma vez · NÃO soma ao estoque da loja.</p>' : adm ? `<label>Destino</label><select id="dst"><option value="loja">Loja (soma ao estoque da loja)</option><option value="esp" ${o.dest === "esp" ? "selected" : ""}>Depósito Especial (só admin · não aparece na loja)</option></select>` : ""}
   <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
   <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
   <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. O custo em R$ de cada linha importada é o US$ × esta taxa.</p></div>
-  <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p><p class="warn" id="pw"></p>
+  <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p>
+  ${emb ? "" : `<div id="fpbox"><h3>Forma de pagamento</h3>${pagSql ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-agora" value="agora" checked style="width:auto"> Pagar agora de um caixa</label>
+  <div id="fp-agora-box"><label for="fpcx">Caixa</label><select id="fpcx">${CXS.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === prefCx ? "selected" : ""}>${esc(c.nome)}${c.somente_admin ? " (só admin)" : ""}</option>`).join("")}</select><p id="fpsaldo"></p></div>
+  <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-depois" value="depois" style="width:auto"> Pagar depois (a pagar ao fornecedor)</label>
+  <div id="fp-depois-box" hidden><label for="fpven">Vencimento (opcional)</label><input id="fpven" type="date"></div>` : `<p class="warn">Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada será salvo até lá.</p>`}</div>`}
+  <p class="warn" id="pw"></p>
   <button class="btn" id="sv">Salvar</button></div>
   ${emb ? "" : `<div class="card"><h2>Últimas compras</h2><table><tr><th>Compra</th><th>Data</th><th>SKU</th><th>Fornecedor</th><th class="n">Qtd</th><th class="n">Custo un.</th><th class="n">Total</th></tr>
   ${PU.map(p => `<tr><td>${p.compra_id ? `<a href="#imei" class="cpn" data-c="${p.compra_id}">C-${String(p.compra_id).padStart(6, "0")}</a>` : "—"}</td><td>${esc(p.data)}</td><td>${esc(p.sku)}${usdBadge(p)}</td><td>${esc(p.fornecedor)}</td><td class="n">${p.qtd}</td><td class="n">${brl(p.custo_unit)}</td><td class="n">${brl(p.total)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra.</td></tr>'}</table></div>`}`;
@@ -1198,8 +1314,12 @@ async function viewCompras(o = {}) {
   };
   const syncTaxa = () => { const box = $("#taxabox"); if (!box) return; const show = loja() && L.some(l => l.origem === "Importado"); box.hidden = !show; const inp = $("#taxa"); if (show && inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } };
   const linhaConta = l => !!(l.sku || (loja() && l.origem === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
+  const totalAgora = () => Math.round(L.filter(linhaConta).reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0) * 100) / 100;
+  const syncPag = () => { const box = $("#fpbox"); if (!box) return; const show = loja(); box.hidden = !show; const depois = !!($("#fp-depois") || {}).checked; const a = $("#fp-agora-box"), d = $("#fp-depois-box"); if (a) a.hidden = depois; if (d) d.hidden = !depois;
+    const el = $("#fpsaldo"); if (!el) return; const cx = CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")); if (!cx) { el.innerHTML = CXS.length ? "" : '<span class="warn">Nenhum caixa disponível.</span>'; return; }
+    const total = totalAgora(), falta = !depois && total > Number(cx.saldo) + 0.001; el.innerHTML = `Saldo deste caixa: <b>${brl(cx.saldo)}</b>${falta ? ` <span class="warn">Saldo insuficiente para o total ${brl(total)}.</span>` : ""}`; };
   const tot = () => { const okL = L.filter(linhaConta); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
-    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * custoReaisLinha(l)); }); };
+    document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * custoReaisLinha(l)); }); syncPag(); };
   const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && l.origem === "Importado"; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>
     ${loja() ? `<div class="clu"><div><label>Origem</label><select class="lo"><option value="Nacional" ${l.origem !== "Importado" ? "selected" : ""}>Nacional</option><option value="Importado" ${l.origem === "Importado" ? "selected" : ""}>Importado</option></select></div>${imp ? `<div><label>Custo (US$)</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}" placeholder="Ex.: 80,00"></div>` : ""}</div>${prevTxt(l)}` : ""}</div>
     <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>${imp ? "Custo (R$)" : "Custo un. (R$)"}</label>${imp ? `<div class="lcro n">${String(l.custo_usd || "").trim() && !taxaAgora().error ? brl(custoReaisLinha(l)) : "—"}</div>` : `<input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}">`}</div>
@@ -1216,6 +1336,7 @@ async function viewCompras(o = {}) {
       r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
     tot(); syncTaxa(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
   if ($("#dst")) $("#dst").onchange = () => { sb0(); drawL(); }; sb0();
+  document.querySelectorAll('input[name="fp"]').forEach(r => r.onchange = syncPag); if ($("#fpcx")) $("#fpcx").onchange = syncPag;
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
   $("#add").onclick = () => { L.push(blank()); drawL(true); };
@@ -1233,7 +1354,6 @@ async function viewCompras(o = {}) {
     if (!it.length) return w.textContent = "Adicione pelo menos um item";
     const fo = sp($("#fo").value), fx = fo && FN.get(fk(fo)) || fo, dt = $("#cdt").value || today(), ob = $("#ob").value.trim() || null;
     const itens = it.map(l => { const row = { sku: l.sku, qtd: +l.qtd, custo_unit: num(l.custo) }; if (loja()) { row.origem = l.origem === "Importado" ? "Importado" : "Nacional"; if (row.origem === "Importado") { row.taxa_dolar = l.taxa_dolar; row.custo_usd = l.custo_usd; } } return row; });
-    const precisaOrigem = itens.some(x => x.origem === "Importado" || x.custo_usd != null);
     const semOrigem = rows => rows.map(({ origem, custo_usd, taxa_dolar, ...r }) => r);
     const pendente = e => !!(e && (e.norpc || /PGRST202|could not find the function|does not exist|schema cache|registrar_compra_origem/i.test(e.message || "")));
     busy = true; $("#sv").disabled = true; w.textContent = "Salvando…";
@@ -1246,18 +1366,16 @@ async function viewCompras(o = {}) {
       L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: "Nacional", custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob }; if (itens.some(x => x.origem === "Importado")) hd.taxa_dolar = itens.find(x => x.origem === "Importado").taxa_dolar;
     const okCompra = rs => { toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); };
-    try { if (!api.compraOrigem) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); return await okCompra(await api.compraOrigem(hd, itens)); }
-    catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; }
-      if (precisaOrigem) { busy = false; $("#sv").disabled = false; w.textContent = "Produto importado ainda depende da atualização do banco (supabase-loja/migration-origem-dolar.sql). Nada foi salvo."; return; } }
-    const simples = semOrigem(itens);
-    try { if (!api.compraLote) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); return await okCompra(await api.compraLote(hd, simples)); }
-    catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
-    const fail = []; for (const [i, x] of simples.entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length}… (modo linha a linha — lote atômico ainda não instalado no banco)`;
-      try { await api.addPurchase({ sku: x.sku, fornecedor: hd.fornecedor, qtd: x.qtd, custo_unit: x.custo_unit, observacao: ob, ...(dt !== today() ? { data: dt } : {}) }); } catch (er) { fail.push({ ...x, erro: er.message }); } }
-    busy = false; $("#sv").disabled = false;
-    if (!fail.length) { toast(`Compra salva ✓ ${itens.length} item(ns)`); return again(); }
-    L = fail.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: f.origem || "Nacional", custo_usd: f.custo_usd || "" })); drawL();
-    w.innerHTML = `${itens.length - fail.length} de ${itens.length} item(ns) salvos. <b>Falharam ${fail.length}</b> (ficaram no carrinho):<br>` + fail.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); };
+    const totalCompra = Math.round(itens.reduce((a, l) => a + l.qtd * l.custo_unit, 0) * 100) / 100;
+    if (!pagSql) { busy = false; $("#sv").disabled = false; w.textContent = "Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi salvo."; return; }
+    const depois = !!($("#fp-depois") || {}).checked;
+    if (depois) { hd.pagamento = "depois"; if ($("#fpven") && $("#fpven").value) hd.vencimento = $("#fpven").value; }
+    else { const cx = CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")); if (!cx) { busy = false; $("#sv").disabled = false; w.textContent = "Escolha o caixa. Nada foi salvo."; return; }
+      if (totalCompra > Number(cx.saldo) + 0.001) { busy = false; $("#sv").disabled = false; w.textContent = "Saldo insuficiente no caixa (R$ " + Number(cx.saldo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "). Nada foi salvo."; return; }
+      hd.pagamento = "agora"; hd.caixa_id = cx.caixa_id; }
+    try { if (!api.compraPagamento) throw Object.assign(new Error("sem rpc"), { norpc: 1 }); const rs = await api.compraPagamento(hd, itens);
+      if (rs && rs.pagamento_ok === false) throw new Error("O banco gravou a compra sem a forma de pagamento. Avise o admin."); return await okCompra(rs); }
+    catch (e) { busy = false; $("#sv").disabled = false; w.textContent = (e.norpc || /PGRST202|could not find the function|does not exist|schema cache|registrar_compra_pagamento|migration-compras-pagamento/i.test(e.message || "")) ? "Pagamento da compra ainda depende da atualização do banco (supabase-loja/migration-compras-pagamento.sql). Nada foi salvo." : e.message; } };
 }
 // ---------- Compras numeradas + IMEI ----------
 const CEL = /iphone|celular|smartphone|galaxy|redmi|poco|xiaomi.*note|motorola|moto ?[geg]\d|realme|pixel/i, isCel = it => CEL.test(`${it.marca} ${it.produto} ${it.sku}`);
@@ -1746,11 +1864,43 @@ async function viewFornecedores() {
     if (f.cnpj && !docOk(f.cnpj)) return toast("CNPJ inválido");
     try { await api.salvarFornecedor(ed, f); toast("Fornecedor salvo ✓"); viewFornecedores(); } catch (e) { toast(e.message); } };
 }
+async function viewComprasPendentes() {
+  if (!can("financas")) return viewSeguranca();
+  let D, CX = [], err = "";
+  try { [D, CX] = await Promise.all([api.comprasPendentes(), api.comprasCaixas()]); }
+  catch (e) { if (/migration-compras-pagamento|PGRST202|schema cache|does not exist/i.test(e.message || "")) { app.innerHTML = `<div class="card"><h2>Compras pendentes</h2><p class="warn">${esc(e.message)}</p></div>`; return; } err = e.message; D = { grupos: [], pagas: [] }; }
+  D = D || { grupos: [], pagas: [] };
+  const grupos = D.grupos || [], pagas = D.pagas || [];
+  const aberto = grupos.reduce((a, g) => a + Number(g.total_devido || 0), 0);
+  const venc = grupos.reduce((a, g) => a + g.compras.filter(c => c.atrasada).reduce((s, c) => s + Number(c.restante || 0), 0), 0);
+  const hist = pagsList => (pagsList || []).length ? `<div class="muted">Pagamentos: ${(pagsList || []).map(p => `${esc(dBR(p.data))} ${brl(p.valor)} · ${p.caixa_oculto ? "caixa só admin" : esc(p.caixa || "—")}`).join(" · ")}</div>` : "";
+  const linha = (c, pagar) => `<tr class="${c.atrasada ? "low" : ""}"><td><b>${esc(c.numero)}</b></td><td>${esc(dBR(c.data))}</td><td class="${c.atrasada ? "low" : ""}">${c.vencimento ? esc(dBR(c.vencimento)) : "—"}${c.atrasada ? " · atrasada" : ""}</td><td class="n">${brl(c.total)}</td><td class="n">${brl(c.pago)}</td><td class="n">${brl(c.restante)}</td><td>${pagar && Number(c.restante) > 0 ? `<button type="button" class="btn ghost pgcp" data-i="${c.id}">Pagar</button>` : ""}</td></tr>
+    ${(c.pagamentos || []).length ? `<tr><td colspan="7">${hist(c.pagamentos)}</td></tr>` : ""}
+    <tr class="pgf" id="pc${c.id}" hidden><td colspan="7"><div class="grid pgrow"><div><label>Valor</label><input class="pv" type="number" min="0.01" step="0.01" value="${Number(c.restante).toFixed(2)}"></div>
+    <div><label>Sai do caixa</label><select class="pcx">${CX.map(x => `<option value="${x.caixa_id}">${esc(x.nome)}${x.somente_admin ? " (só admin)" : ""} · saldo ${brl(x.saldo)}</option>`).join("")}</select></div>
+    <div><label>&nbsp;</label><button type="button" class="btn pok" data-i="${c.id}" data-rest="${c.restante}">Confirmar pagamento</button></div></div><p class="warn pcw"></p></td></tr>`;
+  app.innerHTML = `<div class="card"><h2>Contas a pagar — compras pendentes</h2><p class="muted">Compras novas que ficaram a pagar ao fornecedor. Compras antigas, sem forma de pagamento, não entram aqui. O custo por produto continua só no admin.</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div>${err ? `<p class="warn">${esc(err)}</p>` : ""}</div>
+  ${grupos.map(g => `<div class="card"><h2>${esc(g.fornecedor)} <span class="muted">· deve ${brl(g.total_devido)}</span></h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Vencimento</th><th class="n">Total</th><th class="n">Pago</th><th class="n">Restante</th><th></th></tr>
+  ${g.compras.map(c => linha(c, true)).join("") || '<tr><td colspan="7" class="muted">Nenhuma.</td></tr>'}</table></div>`).join("") || '<div class="card"><p class="muted">Nenhuma compra pendente.</p></div>'}
+  <div class="card"><h2>Compras pagas</h2><table class="stk"><tr><th>Compra</th><th>Data</th><th>Vencimento</th><th class="n">Total</th><th class="n">Pago</th><th class="n">Restante</th><th></th></tr>
+  ${pagas.map(c => `<tr><td><b>${esc(c.numero)}</b></td><td>${esc(dBR(c.data))}</td><td>${c.vencimento ? esc(dBR(c.vencimento)) : "—"}</td><td class="n">${brl(c.total)}</td><td class="n">${brl(c.pago)}</td><td class="n">${brl(c.restante)}</td><td>${esc(c.fornecedor || "")}</td></tr><tr><td colspan="7">${hist(c.pagamentos)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma compra paga por aqui ainda.</td></tr>'}</table></div>`;
+  document.querySelectorAll(".pgcp").forEach(b => b.onclick = () => { const r = $("#pc" + b.dataset.i); if (r) r.hidden = !r.hidden; });
+  document.querySelectorAll(".pok").forEach(b => b.onclick = async () => {
+    const r = $("#pc" + b.dataset.i), w = r.querySelector(".pcw"), v = Math.round(+r.querySelector(".pv").value * 100) / 100, cx = CX.find(x => String(x.caixa_id) === r.querySelector(".pcx").value);
+    if (!(v > 0)) { w.textContent = "Informe o valor"; return; }
+    if (v > Number(b.dataset.rest) + 0.001) { w.textContent = "Pagamento maior que o saldo da compra"; return; }
+    if (!cx) { w.textContent = "Escolha o caixa"; return; }
+    if (v > Number(cx.saldo) + 0.001) { w.textContent = "Saldo insuficiente no caixa (R$ " + Number(cx.saldo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")"; return; }
+    b.disabled = true;
+    try { await api.compraPagar(+b.dataset.i, v, cx.caixa_id); toast("Pagamento registrado ✓ (saída no caixa)"); viewComprasPendentes(); }
+    catch (e) { w.textContent = e.message; b.disabled = false; }
+  });
+}
 async function viewPagar() {
   const [K, F, CX] = await Promise.all([api.contas(), api.fornecedores(), api.caixasLista()]);
   const ord = { vencida: 0, aberta: 1, parcial: 1, paga: 2 }; K.sort((a, b) => (ord[a.status] - ord[b.status]) || String(a.vencimento).localeCompare(String(b.vencimento)));
   const aberto = K.filter(k => k.status !== "paga").reduce((a, k) => a + Number(k.restante), 0), venc = K.filter(k => k.status === "vencida").reduce((a, k) => a + Number(k.restante), 0);
-  app.innerHTML = `<div class="card"><h2>Contas a pagar — dívidas com fornecedores</h2><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div></div>
+  app.innerHTML = `<div class="card"><h2>Contas a pagar — dívidas com fornecedores</h2><p class="muted">Contas lançadas à mão. Compras da loja que ficaram a pagar estão em <button type="button" class="btn ghost" id="go-cpend">Compras pendentes</button>.</p><div class="grid"><div class="kpi"><small>Em aberto</small><b>${brl(aberto)}</b></div><div class="kpi"><small>Vencido</small><b class="low">${brl(venc)}</b></div></div></div>
   <div class="card"><h2>Nova conta</h2><form id="f"><div class="grid"><div><label>Fornecedor</label><select id="fo" required>${F.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select></div>
   <div><label>Valor (R$)</label><input id="v" type="number" min="0.01" step="0.01" required></div><div><label>Vencimento</label><input id="ve" type="date" required></div></div>
   <label>Descrição</label><input id="ds" maxlength="300"><button class="btn">Salvar conta</button>${F.length ? "" : ' <span class="warn">Cadastre um fornecedor primeiro.</span>'}</form></div>
@@ -1760,6 +1910,7 @@ async function viewPagar() {
     <tr class="pgf" id="pf${k.id}" hidden><td colspan="8"><div class="grid pgrow"><div><label>Valor</label><input class="pv" type="number" min="0.01" step="0.01" value="${Number(k.restante).toFixed(2)}"></div>
     <div><label>Data</label><input class="pd" type="date" value="${today()}"></div><div><label>Forma</label><select class="pfm">${PAYF.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>
     <div><label>Sai do caixa</label><select class="pcx">${CX.map(c => `<option value="${c.caixa_id}">${esc(c.nome)}</option>`).join("")}</select></div><div><button class="btn pok" data-i="${k.id}">Confirmar pagamento</button></div></div></td></tr>`).join("") || '<tr><td colspan="8" class="muted">Nenhuma conta.</td></tr>'}</table></div>`;
+  const goPend = $("#go-cpend"); if (goPend) goPend.onclick = () => go("cpend");
   document.querySelectorAll(".pg").forEach(b => b.onclick = () => { const r = $("#pf" + b.dataset.i); r.hidden = !r.hidden; });
   document.querySelectorAll(".pok").forEach(b => b.onclick = async () => { const r = $("#pf" + b.dataset.i), v = +r.querySelector(".pv").value; if (!(v > 0)) return toast("Informe o valor"); b.disabled = true;
     try { await api.pagarConta(+b.dataset.i, Math.round(v * 100) / 100, +r.querySelector(".pcx").value, r.querySelector(".pfm").value, r.querySelector(".pd").value); toast("Pagamento registrado ✓ (saída no caixa)"); viewPagar(); } catch (e) { toast(e.message); b.disabled = false; } });

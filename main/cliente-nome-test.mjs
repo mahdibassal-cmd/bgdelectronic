@@ -48,7 +48,7 @@ ok(CN.consultas("  Tiago   Belmonts ").includes("Tiago Belmonts") && CN.consulta
 const app = readFileSync(join(dir, "app.js"), "utf8");
 const html = readFileSync(join(dir, "index.html"), "utf8");
 const sql = readFileSync(join(dir, "../supabase-loja/migration-cliente-nome-unico.sql"), "utf8");
-ok(html.includes("cliente-nome.js?v=20261113a") && html.includes("app.js?v=20261113f") && html.indexOf("cliente-nome.js") < html.indexOf("app.js?v=20261113f"), "cache is the next tag after 20261111f and the helper loads first");
+ok(html.includes("cliente-nome.js?v=20261113a") && html.includes("app.js?v=20261113g") && html.indexOf("cliente-nome.js") < html.indexOf("app.js?v=20261113g"), "cache is the next tag after 20261111f and the helper loads first");
 ok(!html.includes("app.js?v=20261111f"), "old app.js cache tag is gone");
 const nota = app.slice(app.indexOf("async function viewNota"), app.indexOf("async function viewRecibo"));
 ok(nota.includes("localizarClientePorNome") && nota.includes("Usar este cliente na nota") && nota.includes("escolherClienteBox") && nota.includes("parseErro"), "Nova nota blocks a duplicate name and offers the existing client, including when the database raises");
