@@ -57,8 +57,13 @@ begin
   );
   if fn is not null then
     begin
-      execute format('select %s($1)', fn::text) into s using s;
-    exception when undefined_function then
+      -- fn::text is 'schema.unaccent(text)'; call it by schema-qualified name only.
+      if pg_catalog.to_regprocedure('extensions.unaccent(text)') is not null then
+        execute 'select extensions.unaccent($1)' into s using s;
+      else
+        execute 'select public.unaccent($1)' into s using s;
+      end if;
+    exception when others then
       fn := null;
     end;
   end if;
