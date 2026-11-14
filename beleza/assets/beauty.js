@@ -43,21 +43,21 @@ window.BAGDA_BEAUTY = [
     desc: "Máscara facial em folha com o sérum clareador Pore + Dark Spot.",
     img: "celimax-pore-dark-spot-mask", price: "R$ 29,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask", getnet: "https://pag.getnet.com.br/N8tByUE56" },
   { sku: "MED-001", name: "Zero Pore Pad, 70 pads (155 g)", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-001-zero-pore-pad", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-001-zero-pore-pad", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-002", name: "Collagen Night Wrapping Mask, 75 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-002-collagen-night-wrapping-mask", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-002-collagen-night-wrapping-mask", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-003", name: "Collagen Jelly Cream, 110 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-003-collagen-jelly-cream", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-003-collagen-jelly-cream", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-004", name: "PDRN Pink One Day Serum", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-004-pdrn-pink-one-day-serum", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-004-pdrn-pink-one-day-serum", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-005", name: "Deep Vita C Capsule Cream, 55 g", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-006", name: "Zero Pore One Day Peptide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-007", name: "PDRN Pink Collagen Bubble Serum, 95 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: null, novo: false, chegou: true },
+    desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: null, novo: false, chegou: true }
+    desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: "R$ 119,99", novo: false, chegou: true }
 ];
 (function(){
   var L=window.BAGDA_BEAUTY, IMG='/perfumes/img/beauty/', CATS=['Cabelo','Pele/Skincare','Maquiagem','Corpo'];
