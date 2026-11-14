@@ -13,51 +13,24 @@
       getnet   link de pagamento Getnet (opcional) -> mostra o botão "Pagar · PIX ou cartão"
    Nada mais precisa mudar: filtros, busca e cards se atualizam sozinhos. */
 window.BAGDA_BEAUTY = [
-  { name: "Fino Premium Touch Hair Oil", brand: "Shiseido / Fine Today", origin: "Japão", category: "Cabelo",
-    desc: "Óleo capilar de tampa vermelha com fórmula rica para cabelos secos e danificados.",
-    img: "fino-premium-touch", price: "R$ 99,99", novo: true,
-    getnet: "https://pag.getnet.com.br/l008yVJEa" },
-  { name: "Fino Premium Touch Hair Oil Serum Airy Smooth", brand: "Shiseido / Fine Today", origin: "Japão", category: "Cabelo",
-    desc: "Sérum capilar de fórmula leve e sedosa, na embalagem branca e rosa.",
-    img: "fino-airy-smooth", price: "R$ 99,99", novo: true,
-    getnet: "https://pag.getnet.com.br/5RnCiqv4z" },
-  { name: "Celimax Retinal Shot Tightening Booster 15 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Booster com Retinal 0,1%, Pantenol 1% e Matrixyl 3000 3% para uma pele mais firme.",
-    img: "celimax-retinal-shot", price: "R$ 89,99", novo: true, wkey: "Celimax Retinal Shot", getnet: "https://pag.getnet.com.br/2VP-9ehzSM" },
-  { name: "Celimax Retinol Shot Tightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Sérum com retinol para firmeza e textura da pele. Produto diferente do Retinal Shot.",
-    img: "celimax-retinol-shot", price: "R$ 89,99", novo: true, wkey: "Celimax Retinol Shot Serum", getnet: "https://pag.getnet.com.br/XXemNZCwd" },
-  { name: "Celimax Dual Barrier Skin Wearable Cream 50 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Creme hidratante com 5 ceramidas e ácido hialurônico para fortalecer a barreira da pele seca e sensível.",
-    img: "celimax-dual-barrier-cream", price: "R$ 89,99", novo: true, wkey: "Celimax Dual Barrier Cream", getnet: "https://pag.getnet.com.br/36f6S2hSp" },
-  { name: "Celimax Pore + Dark Spot Brightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Sérum clareador com niacinamida e ácido tranexâmico para manchas e poros.",
-    img: "celimax-pore-dark-spot-serum", price: "R$ 99,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum", getnet: "https://pag.getnet.com.br/yBaNGcGVY" },
-  { name: "Celimax The Real Noni Energy Ampoule 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Ampola de noni calmante e iluminadora para hidratar e revitalizar a pele.",
-    img: "celimax-noni-ampoule", price: "R$ 89,99", novo: true, wkey: "Celimax Noni Ampoule", getnet: "https://pag.getnet.com.br/saoi-LuqG" },
-  { name: "Celimax Ji Woo Gae Cica BHA Blemish Toner Pad (60 pads)", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Discos tônicos com centella (cica) e BHA para pele oleosa e com imperfeições.",
-    img: "celimax-cica-bha-toner-pad", price: "R$ 89,99", novo: true, wkey: "Celimax Cica BHA Toner Pad", getnet: "https://pag.getnet.com.br/zYJcZNkII" },
-  { name: "Celimax Pore + Dark Spot Brightening Serum Mask 27 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
-    desc: "Máscara facial em folha com o sérum clareador Pore + Dark Spot.",
-    img: "celimax-pore-dark-spot-mask", price: "R$ 29,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask", getnet: "https://pag.getnet.com.br/N8tByUE56" },
-  { sku: "MED-001", name: "Zero Pore Pad, 70 pads (155 g)", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-001-zero-pore-pad", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-002", name: "Collagen Night Wrapping Mask, 75 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-002-collagen-night-wrapping-mask", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-003", name: "Collagen Jelly Cream, 110 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-003-collagen-jelly-cream", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-004", name: "PDRN Pink One Day Serum", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-004-pdrn-pink-one-day-serum", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-005", name: "Deep Vita C Capsule Cream, 55 g", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-006", name: "Zero Pore One Day Peptide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-007", name: "PDRN Pink Collagen Bubble Serum, 95 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
-    desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: "R$ 119,99", novo: false, chegou: true }
+  { name: "Fino Premium Touch Hair Oil", brand: "Shiseido / Fine Today", origin: "Japão", category: "Cabelo", desc: "Óleo capilar de tampa vermelha com fórmula rica para cabelos secos e danificados.", img: "fino-premium-touch", price: "R$ 89,99", novo: true },
+  { name: "Fino Premium Touch Hair Oil Serum Airy Smooth", brand: "Shiseido / Fine Today", origin: "Japão", category: "Cabelo", desc: "Sérum capilar de fórmula leve e sedosa, na embalagem branca e rosa.", img: "fino-airy-smooth", price: "R$ 99,99", novo: true, getnet: "https://pag.getnet.com.br/5RnCiqv4z" },
+  { name: "Celimax Retinal Shot Tightening Booster 15 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Booster com Retinal 0,1%, Pantenol 1% e Matrixyl 3000 3% para uma pele mais firme.", img: "celimax-retinal-shot", price: "R$ 99,99", novo: true, wkey: "Celimax Retinal Shot" },
+  { name: "Celimax Retinol Shot Tightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Sérum com retinol para firmeza e textura da pele. Produto diferente do Retinal Shot.", img: "celimax-retinol-shot", price: "R$ 99,99", novo: true, wkey: "Celimax Retinol Shot Serum" },
+  { name: "Celimax Dual Barrier Skin Wearable Cream 50 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Creme hidratante com 5 ceramidas e ácido hialurônico para fortalecer a barreira da pele seca e sensível.", img: "celimax-dual-barrier-cream", price: "R$ 99,99", novo: true, wkey: "Celimax Dual Barrier Cream" },
+  { name: "Celimax Pore + Dark Spot Brightening Serum 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Sérum clareador com niacinamida e ácido tranexâmico para manchas e poros.", img: "celimax-pore-dark-spot-serum", price: "R$ 99,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum", getnet: "https://pag.getnet.com.br/yBaNGcGVY" },
+  { name: "Celimax The Real Noni Energy Ampoule 30 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Ampola de noni calmante e iluminadora para hidratar e revitalizar a pele.", img: "celimax-noni-ampoule", price: "R$ 99,99", novo: true, wkey: "Celimax Noni Ampoule" },
+  { name: "Celimax Ji Woo Gae Cica BHA Blemish Toner Pad (60 pads)", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Discos tônicos com centella (cica) e BHA para pele oleosa e com imperfeições.", img: "celimax-cica-bha-toner-pad", price: "R$ 89,99", novo: true, wkey: "Celimax Cica BHA Toner Pad", getnet: "https://pag.getnet.com.br/zYJcZNkII" },
+  { name: "Celimax Pore + Dark Spot Brightening Serum Mask 27 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare", desc: "Máscara facial em folha com o sérum clareador Pore + Dark Spot.", img: "celimax-pore-dark-spot-mask", price: "R$ 99,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask" },
+  { sku: "MED-001", name: "Zero Pore Pad, 70 pads (155 g)", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-001-zero-pore-pad", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-002", name: "Collagen Night Wrapping Mask, 75 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-002-collagen-night-wrapping-mask", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-003", name: "Collagen Jelly Cream, 110 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-003-collagen-jelly-cream", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-004", name: "PDRN Pink One Day Serum", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-004-pdrn-pink-one-day-serum", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-005", name: "Deep Vita C Capsule Cream, 55 g", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-006", name: "Zero Pore One Day Peptide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-007", name: "PDRN Pink Collagen Bubble Serum, 95 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: "R$ 119,99", novo: false, chegou: true },
+  { sku: "PERF-109", name: "Premium Hair Oil Serum", brand: "Fino", category: "Cabelo", desc: "", img: "fino-premium-hair-oil-serum-perf-109", price: "R$ 89,99", novo: false }
 ];
 (function(){
   var L=window.BAGDA_BEAUTY, IMG='/perfumes/img/beauty/', CATS=['Cabelo','Pele/Skincare','Maquiagem','Corpo'];
@@ -65,7 +38,7 @@ window.BAGDA_BEAUTY = [
   var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')};
   function card(p){
     var wa='https://wa.me/5511992873509?text='+encodeURIComponent(p.price?'Olá! Quero comprar o '+p.name+' ('+p.price+')':'Olá! Quero saber o preço do '+p.name);
-    var src=IMG+p.img, v='?v=i4', mp=/^https:\/\//.test(p.getnet||'')?p.getnet:'';
+    var src=IMG+p.img, v='?v=i5', mp=/^https:\/\//.test(p.getnet||'')?p.getnet:'';
     return '<article class="bcard'+(p.chegou?' chegou':'')+'"><div class="bimg"><picture><source srcset="'+src+'.webp'+v+'" type="image/webp"><img src="'+src+'.jpg'+v+'" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
       '<div class="bbody"><span class="bmeta">'+esc(p.brand)+(p.origin?' · '+esc(p.origin):'')+'</span><h3>'+esc(p.name)+'</h3>'+(p.desc?'<p>'+esc(p.desc)+'</p>':'')+
       '<div class="bfoot"><span class="'+(p.price?'price':'bask')+'">'+(p.price?esc(p.price):'Consulte')+'</span>'+

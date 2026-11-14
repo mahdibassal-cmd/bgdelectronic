@@ -39,7 +39,7 @@ var S={q:"",brand:[],gender:[],family:[],price:[],house:[],insp:false,avail:fals
 var MAXES=[150,200,300];
 var CMP=[];
 var PRICE=[{k:"a",l:"Até R$ 150",t:function(v){return v<=150}},{k:"b",l:"R$ 150 – 250",t:function(v){return v>150&&v<=250}},{k:"c",l:"Acima de R$ 250",t:function(v){return v>250}}];
-var BRAND_ORDER=["Arabiyat Prestige","Armaf","Ferassa","MPF","French Avenue","Paris Corner","Ibraheem Al Qurashi","Al Wataniah","Rayhaan","Rasasi"];
+var BRAND_ORDER=["Arabiyat Prestige", "Armaf", "Ferassa", "MPF", "French Avenue", "Paris Corner", "Ibraheem Al Qurashi", "Al Wataniah", "Rayhaan", "Rasasi", "Al Haramain", "Bharara", "Dior", "Hamidi", "Ibrahim Al Qurashi", "Lattafa", "Maison Alhambra", "Maison Asrar", "Manasik", "Mugler", "Versace"];
 var OFFICIAL={"Arabiyat Prestige":1,"Ferassa":1};
 
 function count(fn){return P.filter(fn).length}
@@ -134,7 +134,7 @@ function card(p,extra,cls){
    (lowStock(p)?'<span class="lowb">Últimas unidades</span>':'')+(OFFICIAL[p.brand]?OFFB:'')+
    (p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+(extra||'')+'</div>'+
    '<div class="info"><span class="brand">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3>'+inspTag(p)+
-   '<div class="bottom">'+priceHTML(p)+'<span class="ml">'+p.ml+' ml</span></div>'+
+   '<div class="bottom">'+priceHTML(p)+(sizeLabel(p)?'<span class="ml">'+esc(sizeLabel(p))+'</span>':'')+'</div>'+
    (p.soldOut?soldWA(p):(p.price==null?'':'<div class="inst">'+instText(p)+'</div>'))+'</div></article>';
 }
 var io=("IntersectionObserver" in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -5% 0px"}):null;
@@ -158,8 +158,10 @@ function openModal(html,cls){
   document.body.classList.add("lock"); $(".box",m).scrollTop=0; setTimeout(function(){$(".x",m).focus()},60);
 }
 function closeModal(){ var m=$("#modal"); m.className="modal"; m.setAttribute("aria-hidden","true"); document.body.classList.remove("lock"); if(location.hash.indexOf("#p=")===0) history.replaceState(null,"",location.pathname+location.search); if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
-function waLink(p){ if(p.soldOut) return waSold(p); if(p.price==null) return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero saber o preço do perfume "+p.brand+" "+p.name+" ("+p.ml+" ml), que vi no site."); return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero comprar o perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+", que vi no site. Entrega ou retirada na loja?"); }
-function waSold(p){ return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! O perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) está esgotado no site. Pode me avisar quando chegar?"); }
+function sizeLabel(p){ return typeof p.ml==="number"?p.ml+" ml":(p.size||""); }
+function sizeParen(p){ var s=sizeLabel(p); return s?" ("+s+")":""; }
+function waLink(p){ if(p.soldOut) return waSold(p); if(p.price==null) return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero saber o preço do perfume "+p.brand+" "+p.name+sizeParen(p)+", que vi no site."); return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero comprar o perfume "+p.brand+" "+p.name+sizeParen(p)+" de "+p.priceLabel+", que vi no site. Entrega ou retirada na loja?"); }
+function waSold(p){ return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! O perfume "+p.brand+" "+p.name+sizeParen(p)+" está esgotado no site. Pode me avisar quando chegar?"); }
 function related(p){
   var L=P.filter(function(x){return x.id!==p.id&&!x.soldOut&&x.price!=null&&p.familyGroup&&x.familyGroup===p.familyGroup});
   if(p.price==null) return [];
@@ -173,7 +175,7 @@ function detail(p){
   var acc=(p.accords||[]).slice(0,6);
   var h='<div class="pd"><div class="pic"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'">'+(p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+'</div><div class="txt">';
   h+='<span class="kicker">'+esc(p.brand)+'</span>'+(OFFICIAL[p.brand]?'<span class="offb inl">✦ Distribuidor oficial</span>':'')+'<h2>'+esc(p.name)+'</h2>';
-  h+='<div class="tags">'+(p.familyGroup?'<span class="tag g">'+esc(p.familyGroup)+'</span>':'')+(p.gender?'<span class="tag">'+esc(p.gender)+'</span>':'')+'<span class="tag">'+p.ml+' ml</span>'+(p.soldOut?'<span class="tag">Esgotado</span>':'')+'</div>';
+  h+='<div class="tags">'+(p.familyGroup?'<span class="tag g">'+esc(p.familyGroup)+'</span>':'')+(p.gender?'<span class="tag">'+esc(p.gender)+'</span>':'')+(sizeLabel(p)?'<span class="tag">'+esc(sizeLabel(p))+'</span>':'')+(p.soldOut?'<span class="tag">Esgotado</span>':'')+'</div>';
   if(p.inspiredBy) h+='<div class="inspbox"><div class="k">Inspiração olfativa</div><div class="v">'+esc(p.inspiredBy)+'</div></div>';
   else if(p.originalCreation) h+='<div class="inspbox"><div class="k">Assinatura própria</div><div class="v">Criação original '+esc(p.brand)+'</div></div>';
   if(p.soldOut){
@@ -185,7 +187,7 @@ function detail(p){
     } else {
     h+='<div class="buy"><div><div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div><div class="inst lg">'+instText(p,true)+'</div>'+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
        '<div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Comprar pelo WhatsApp</a>'+
-       (window.BagdaCart?BagdaCart.button({key:"pf:"+p.id,name:p.brand+" "+p.name,variant:p.ml+" ml",price:p.price,payLink:mp,img:/^(\/|https?:)/.test(p.photo)?p.photo:"/perfumes/"+p.photo},"pill"):"")+
+       (window.BagdaCart?BagdaCart.button({key:"pf:"+p.id,name:p.brand+" "+p.name,variant:sizeLabel(p),price:p.price,payLink:mp,img:/^(\/|https?:)/.test(p.photo)?p.photo:"/perfumes/"+p.photo},"pill"):"")+
        (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a>':'')+'</div>'+(mp?'<div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div>';
     }
   }
@@ -331,7 +333,7 @@ function freteBox(pid){
 }
 function freteMsg(pid,c){
   var p=pid?byId(pid):null, info=CEPCACHE[c], where=info&&info.state?(info.city?info.city+"/":"")+info.state:"";
-  return "Olá! "+(p?"Quero o "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+". ":"")+"Meu CEP é "+fmtCep(c)+(where?" ("+where+")":"")+". Quanto fica o frete e o prazo?";
+  return "Olá! "+(p?"Quero o "+p.brand+" "+p.name+sizeParen(p)+" de "+(p.priceLabel||"Consulte")+". ":"")+"Meu CEP é "+fmtCep(c)+(where?" ("+where+")":"")+". Quanto fica o frete e o prazo?";
 }
 var CEPCACHE={};
 function cepLookup(c){ /* só enriquece a mensagem se já tiver resposta; nunca bloqueia o envio */
