@@ -14,10 +14,10 @@ let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
 ok(html.includes('data-v="ponto"') && /<button type="button" data-v="ponto">Ponto<\/button>/.test(html), "nav has Ponto with no data-p");
-ok(html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261114b") && html.includes("ponto.css?v=20261111d"), "cache ponto 20261111d, app 20261113f");
+ok(html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261114c") && html.includes("ponto.css?v=20261111d"), "cache ponto 20261111d, app 20261113f");
 ok(html.includes("loja.css?v=20261114a") && html.includes("venda-origem.js?v=20261109e"), "loja.css follows the app bump; venda-origem helper stays 20261109e");
 ok(/wasm-unsafe-eval/.test(html) && /worker-src 'self' blob:/.test(html) && /media-src 'self' blob:/.test(html), "CSP allows in-browser face models and camera frames");
-ok(html.indexOf("ponto.js") < html.indexOf("app.js?v=20261114b") && html.indexOf("prazo-vencimento.js?v=20261111e") < html.indexOf("app.js?v=20261114b"), "prazo helper and ponto.js load before app.js");
+ok(html.indexOf("ponto.js") < html.indexOf("app.js?v=20261114c") && html.indexOf("prazo-vencimento.js?v=20261111e") < html.indexOf("app.js?v=20261114c"), "prazo helper and ponto.js load before app.js");
 ok(/v !== "seguranca" && v !== "ponto"/.test(app) && /ponto: \(\) => window\.BAGDA_PONTO\.view\(/.test(app), "go() routes #ponto for every role");
 ok(js.includes("BAGDA_PONTO") && js.includes("Bater ponto") && js.includes("Cadastro facial") && js.includes("Totem de ponto") && js.includes("Espelho de ponto"), "punch, enrollment, totem and espelho screens exist");
 ok(js.includes("Lei 13.709/2018") && js.includes("biometria facial") && js.includes("Li e autorizo"), "LGPD consent text at enrollment");

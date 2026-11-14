@@ -45,12 +45,13 @@ ok(cob.clientes.some(c => c.nome === "João Lima" && c.tem_vence_hoje && c.notas
 ok(!cob.clientes.some(c => c.nome === "Pedro Pago"), "fully paid nota is not listed");
 ok(cob.clientes.some(c => c.nome === "Sofia Prado" && c.no_limite && !c.tem_vencida && !c.tem_vence_hoje), "Sofia is only over the limite");
 
-ok(html.includes("prazo-vencimento.js?v=20261111e") && html.includes("app.js?v=20261114b"), "cache 20261111e for the new helper and app");
-ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261114b"), "prazo helper loads before the app");
+ok(html.includes("prazo-vencimento.js?v=20261111e") && html.includes("app.js?v=20261114c"), "cache 20261111e for the new helper and app");
+ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261114c"), "prazo helper loads before the app");
 ok(app.includes('id="prazobox"') && app.includes('id="pagaem"') && app.includes("Paga em *"), "Nova nota has required Paga em selector");
 ok(app.includes("prazoNeed") && app.includes("prazoSync") && app.includes("p_prazo_dias"), "selector is shown for prazo and sent as p_prazo_dias");
 ok(app.includes("Informe em quantos dias o cliente paga (1 a 30)"), "Paga em is required before saving a prazo note");
 ok(app.includes("id=\"cobranca\"") && app.includes("Cobrança") && app.includes("refreshCobrancaBadge") && app.includes("rec-badge"), "Contas a receber has a Cobrança panel and a nav badge");
+ok(app.includes('class="cob-nota"') && app.includes('class="cob-cli"') && app.includes("viewRecibo(+a.dataset.n") && app.includes("viewClienteExtrato(+a.dataset.c"), "Cobrança nota numbers and client names open the existing viewers");
 ok(app.includes("me.role === \"vendedor\"") && app.includes("refreshCobrancaBadge") && app.includes("can(\"financas\")"), "badge is skipped for vendedores");
 ok(app.includes("Limite Paga Depois") && app.includes("limite_prazo"), "Clientes form and API expose limite_prazo");
 ok(app.includes("Carlos Mendes") && app.includes("Rita Alves") && app.includes("Sofia Prado") && app.includes("Pedro Pago"), "mock seeds cobrança example rows");

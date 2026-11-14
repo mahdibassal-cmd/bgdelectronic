@@ -495,6 +495,8 @@ if (!MOCK && !CONFIGURED) {
     const seedPrazo = (cli, nome, valor, venc, data, alloc, dias) => {
       const nid = id++;
       N.push({ frete: 0, caxinha_natal: 0, local_pagamento: null, obs_pagamento: null, cliente_id: cli, nota_id: nid, data: data || venc || hj, created_at: (data || hj) + "T12:00:00-03:00", cliente: nome, status: "ativa", total: valor, handle: "@kaio", nome: "Kaio", pagamento: "prazo", prazo_dias: dias == null ? null : dias, vencimento: venc || null });
+      const pr = P.find(x => x.sku === "JBL-001") || P[0];
+      if (pr) IT.push({ nota_id: nid, sku: pr.sku, marca: pr.marca, produto: pr.produto, tamanho: pr.tamanho, qtd: 1, preco_vendido: valor, total: valor, origem: "principal" });
       PG.push({ nota_id: nid, metodo: "prazo", valor });
       if (alloc > 0) { const rid = id++; RC.unshift({ id: rid, cliente_id: cli, valor: alloc, caixa_id: 1, forma: "pix", data: hj, obs: "quitação demo" }); AL.push({ nota_id: nid, valor: alloc, rec: rid }); }
       return nid;
@@ -1879,12 +1881,12 @@ async function viewNota() {
   if ($("#origem") && $("#origem").tagName === "SELECT") $("#origem").onchange = () => { showDisp(); const p = P.find(x => x.sku === $("#sku").value); if (p) { $("#sel").innerHTML = selTxt(p); if (me.role === "admin" && origemSel() !== "especial") api.costs().then(C => { const c = (C || []).find(x => x.sku === p.sku); if (c && c.custo != null && $("#sku").value === p.sku && origemSel() !== "especial") $("#sel").innerHTML += ` · custo <b>${brl(c.custo)}</b>`; }).catch(() => {}); } };
   draw(); $("#bq").focus();
 }
-async function viewRecibo(nid) {
+async function viewRecibo(nid, back) {
   const [R0, PGN] = await Promise.all([api.nota(nid), api.notaPag(nid)]), HD = R0.length ? [] : await api.notaHead(nid).catch(() => []); if (!R0.length && !HD.length) return toast("Nota não encontrada");
   const R = R0.map(r => { const o = r.estoque_origem === "especial" ? "Especial" : "Principal"; return { ...r, produto: `${r.produto} (${o})` }; }), h = { ...(R0[0] || HD[0]), ...((await api.notasInfo([nid]).catch(() => []))[0] || {}) }, tot = R.reduce((a, r) => a + Number(r.total), 0);
-  app.innerHTML = `<div class="noprint" style="margin-bottom:12px"><button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
+  app.innerHTML = `<div class="noprint" style="margin-bottom:12px">${back ? '<button class="btn ghost" id="bk">Voltar</button> ' : ""}<button class="btn gold" id="pr">Imprimir / Salvar PDF</button> <button class="btn ghost" id="nv">Nova nota</button></div>
   ${reciboTxt("BAGDA STORES", nid, h, R, tot, PGN.map(g => (PAYL[g.metodo] || g.metodo) + (PGN.length > 1 ? " R$ " + rnum(g.valor) : "")), h.status === "cancelada")}`;
-  $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota");
+  $("#pr").onclick = () => window.print(); $("#nv").onclick = () => go("nota"); if ($("#bk")) $("#bk").onclick = back;
 }
 async function viewNotas() {
   const R = await api.notas(), by = {}, adm = me.role === "admin", TZ = "America/Sao_Paulo";
@@ -2009,7 +2011,7 @@ const STL = { aberta: "Aberta", parcial: "Parcial", paga: "Paga", vencida: "Venc
 const STC = { aberta: "", parcial: "warn", paga: "", vencida: "low" };
 const dBR = d => d ? String(d).slice(0, 10).split("-").reverse().join("/") : "";
 const val = id => ($("#" + id).value || "").trim();
-async function viewClienteExtrato(cid) {
+async function viewClienteExtrato(cid, back) {
   if (!can("financas")) return go(can("vendas") ? "nota" : "seguranca");
   let x; try { x = await api.clienteExtrato(cid); } catch (e) { app.innerHTML = `<div class="card"><h2>Extrato do cliente</h2><p class="warn">${esc(e.message || e)}</p><button class="btn ghost" id="bk">Voltar</button></div>`; $("#bk").onclick = () => viewClientes(); return; }
   const notas = x.notas || [];
@@ -2024,7 +2026,7 @@ async function viewClienteExtrato(cid) {
   ${(x.recebimentos || []).map(r => `<tr><td>${esc(String(r.data || "").split("-").reverse().join("/"))}</td><td>${esc(PAYL[r.forma] || r.forma || "")}</td><td>${esc((r.notas || []).map(n => n.numero + " " + brl(n.valor)).join(", ") || "sem nota vinculada")}</td><td class="n">${brl(r.valor)}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">Nenhum recebimento.</td></tr>`}</table>
   <h3>Crédito da loja</h3><p class="muted">Não entra no saldo a receber.</p><table><tr><th>Tipo</th><th>Observação</th><th class="n">Valor</th></tr>
   ${(x.creditos || []).map(k => `<tr><td>${esc(k.tipo)}</td><td>${esc(k.obs || "")}</td><td class="n">${k.tipo === "uso" ? "−" : "+"}${brl(k.valor)}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Sem crédito da loja.</td></tr>`}</table></div>`;
-  $("#bk").onclick = () => viewClientes();
+  $("#bk").onclick = () => (back || viewClientes)();
   app.querySelectorAll(".cxe").forEach(tr => tr.onclick = () => { const d = app.querySelector(`tr.cxi[data-p="${tr.dataset.n}"]`); if (d) d.hidden = !d.hidden; });
 }
 async function viewClientes() {
@@ -2195,11 +2197,13 @@ async function viewReceber(rfSel = "") {
       const notas = (c.notas || []).map((n, i) => {
         const cls = n.classe || "";
         const atraso = n.dias_atraso != null && n.classe === "vencida" ? (n.dias_atraso + (n.dias_atraso === 1 ? " dia" : " dias")) : (n.classe === "vence_hoje" ? "0" : "—");
-        return `<tr class="${esc(cls)}">${i === 0 ? `<td rowspan="${Math.max((c.notas || []).length, 1)}"><b>${esc(c.nome)}</b><br>${motivos}<br><small>Em aberto: <b>${brl(c.saldo_aberto)}</b></small></td>` : ""}<td>${esc(n.numero)}</td><td class="n">${brl(n.em_aberto)}</td><td>${n.vencimento ? esc(dBR(n.vencimento)) : "—"}</td><td>${esc(atraso)}</td><td>${cls ? `<span class="badge ${esc(cls)}">${esc(PZ ? PZ.labelClasse(cls) : cls)}</span>` : (n.vencimento ? "" : "<span class=\"muted\">sem vencimento</span>")}</td></tr>`;
+        const cliNome = c.cliente_id && api.clienteExtrato ? `<a href="#receber" class="cob-cli" data-c="${c.cliente_id}">${esc(c.nome)}</a>` : esc(c.nome);
+        const notaN = n.nota_id ? `<a href="#receber" class="cob-nota" data-n="${n.nota_id}">${esc(n.numero)}</a>` : esc(n.numero || "—");
+        return `<tr class="${esc(cls)}">${i === 0 ? `<td rowspan="${Math.max((c.notas || []).length, 1)}"><b>${cliNome}</b><br>${motivos}<br><small>Em aberto: <b>${brl(c.saldo_aberto)}</b></small></td>` : ""}<td>${notaN}</td><td class="n">${brl(n.em_aberto)}</td><td>${n.vencimento ? esc(dBR(n.vencimento)) : "—"}</td><td>${esc(atraso)}</td><td>${cls ? `<span class="badge ${esc(cls)}">${esc(PZ ? PZ.labelClasse(cls) : cls)}</span>` : (n.vencimento ? "" : "<span class=\"muted\">sem vencimento</span>")}</td></tr>`;
       }).join("");
-      return notas || `<tr><td><b>${esc(c.nome)}</b><br>${motivos}</td><td>—</td><td class="n">${brl(c.saldo_aberto)}</td><td>—</td><td>—</td><td></td></tr>`;
+      return notas || `<tr><td><b>${c.cliente_id && api.clienteExtrato ? `<a href="#receber" class="cob-cli" data-c="${c.cliente_id}">${esc(c.nome)}</a>` : esc(c.nome)}</b><br>${motivos}</td><td>—</td><td class="n">${brl(c.saldo_aberto)}</td><td>—</td><td>—</td><td></td></tr>`;
     }).join("");
-    return `<div class="card cobranca-panel" id="cobranca"><h2>Cobrança <small class="muted">para o financeiro iniciar a cobrança</small></h2>
+    return `<div class="card cobranca-panel" id="cobranca"><style>#cobranca a.cob-nota,#cobranca a.cob-cli{text-decoration:underline;text-underline-offset:2px}</style><h2>Cobrança <small class="muted">para o financeiro iniciar a cobrança</small></h2>
     <div class="grid"><div class="kpi"><small>Clientes na lista</small><b>${L.length}</b></div>
     <div class="kpi"><small>Vencidas</small><b class="low">${cob && cob.n_vencidas || 0}</b></div>
     <div class="kpi"><small>Vence hoje</small><b>${cob && cob.n_vence_hoje || 0}</b></div>
@@ -2225,6 +2229,8 @@ async function viewReceber(rfSel = "") {
   ${isAdm ? '<p class="muted">Estornar: devolve o dinheiro do caixa (saída igual), o crédito da Caixa Geral, ou a entrada ligada na Caixa Especial. A dívida da nota volta a ficar em aberto.</p>' : ""}</div>`;
   $("#rf").onchange = e => viewReceber(e.target.value);
   refreshCobrancaBadge();
+  document.querySelectorAll(".cob-nota").forEach(a => a.onclick = ev => { ev.preventDefault(); viewRecibo(+a.dataset.n, () => viewReceber(rfSel)); });
+  document.querySelectorAll(".cob-cli").forEach(a => a.onclick = ev => { ev.preventDefault(); viewClienteExtrato(+a.dataset.c, () => viewReceber(rfSel)); });
   if ($("#fd")) $("#fd").onsubmit = async ev => { ev.preventDefault(); const parsed = parseValorDivida($("#dv").value); if (parsed.error) return toast(parsed.error); const vv = parsed.value; const cli = +$("#dc").value, nome = (ativos.find(c => c.id === cli) || {}).nome || ""; if (!(await confirmBox(`Lançar dívida anterior de <b>${brl(vv)}</b> para <b>${esc(nome)}</b>?<br><small>Nota Paga Depois só de frete. Não mexe em estoque, caixa nem crédito.</small>`))) return; const b = ev.submitter; b.disabled = true; const f = $("#fd"), sig = [cli, vv, val("do")].join("|"); if (f.dataset.divSig !== sig || !f.dataset.divChave) { f.dataset.divSig = sig; f.dataset.divChave = (crypto.randomUUID && crypto.randomUUID()) || ("dv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)); } try { const x = await api.adicionarDivida(cli, vv, val("do"), f.dataset.divChave); toast(x && x.idempotente ? "Dívida já estava lançada" : "Dívida anterior lançada ✓"); viewReceber(); } catch (e) { const em = e.message || ""; toast(/PGRST202|42883|adicionar_divida|schema cache|does not exist/i.test(em) ? "Adicionar dívida ainda depende da atualização do banco (supabase-loja/migration-adicionar-divida.sql). Nada foi lançado." : em); b.disabled = false; } };
   document.querySelectorAll(".est").forEach(b => b.onclick = async () => { const r = RC.find(x => x.id === +b.dataset.i);
     const m = await motivoBox(`Estornar o recebimento de <b>${esc(r.cliente)}</b> · ${esc(dBR(r.data))} · <b>${brl(r.valor)}</b> (${esc(FORMAR[r.forma] || r.forma)})?<br><small>${r.forma === "credito" ? "O valor volta para o crédito da Caixa Geral." : r.caixa === "CAIXA SPECIAL" ? "Estorna a entrada ligada na Caixa Especial (o excedente que virou crédito também volta, se ainda estiver lá). Os caixas do dia não mudam." : "Sai " + brl(r.valor) + " do caixa " + esc(r.caixa) + "."} A dívida volta a ficar em aberto.</small>`); if (!m) return;
