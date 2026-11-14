@@ -28,7 +28,7 @@ ok(!/create or replace function public\.(cx_esp_entrada|cx_esp_saida|criar_nota|
 ok(sql.includes("DRAFT") && sql.includes("não aplicar"), "SQL is marked draft, not to be applied yet");
 
 ok(!kiosk.includes("CAIXA ESPECIAL") && !kiosk.includes("p_destino_especial"), "kiosk is unchanged");
-ok(html.includes("app.js?v=20261113l") && html.includes("prazo-vencimento.js?v=20261111e") && html.includes("ponto.js?v=20261111d") && html.includes("ponto.css?v=20261111d"), "app cache 20261111e; ponto tags stay 20261111d");
+ok(html.includes("app.js?v=20261114a") && html.includes("prazo-vencimento.js?v=20261111e") && html.includes("ponto.js?v=20261111d") && html.includes("ponto.css?v=20261111d"), "app cache 20261111e; ponto tags stay 20261111d");
 ok(app.includes("Transferir entre caixas") && app.includes("lancar_credito_caixa") && app.includes("BAGDA_PONTO") && app.includes("<th>Cliente</th>"), "prior caixa, ponto, and Cliente features stay in app.js");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
