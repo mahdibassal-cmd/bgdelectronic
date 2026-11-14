@@ -8,7 +8,7 @@
       category "Cabelo" | "Pele/Skincare" | "Maquiagem" | "Corpo"
       desc     descrição curta em português
       img      nome do arquivo da foto, sem extensão
-      price    ex. "R$ 99,99" (vazio "" = mostra "Consulte o preço")
+      price    null = mostra "Consulte" (sem R$). Texto "R$ 99,99" quando o varejo estiver definido.
       novo     true = aparece também em Novidades na página de perfumes
       getnet   link de pagamento Getnet (opcional) -> mostra o botão "Pagar · PIX ou cartão"
    Nada mais precisa mudar: filtros, busca e cards se atualizam sozinhos. */
@@ -41,7 +41,23 @@ window.BAGDA_BEAUTY = [
     img: "celimax-cica-bha-toner-pad", price: "R$ 89,99", novo: true, wkey: "Celimax Cica BHA Toner Pad", getnet: "https://pag.getnet.com.br/zYJcZNkII" },
   { name: "Celimax Pore + Dark Spot Brightening Serum Mask 27 ml", brand: "Celimax", origin: "Coreia", category: "Pele/Skincare",
     desc: "Máscara facial em folha com o sérum clareador Pore + Dark Spot.",
-    img: "celimax-pore-dark-spot-mask", price: "R$ 29,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask", getnet: "https://pag.getnet.com.br/N8tByUE56" }
+    img: "celimax-pore-dark-spot-mask", price: "R$ 29,99", novo: true, wkey: "Celimax Pore + Dark Spot Serum Mask", getnet: "https://pag.getnet.com.br/N8tByUE56" },
+  { sku: "MED-001", name: "Zero Pore Pad, 70 pads (155 g)", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-001-zero-pore-pad", price: null, novo: false, chegou: true },
+  { sku: "MED-002", name: "Collagen Night Wrapping Mask, 75 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-002-collagen-night-wrapping-mask", price: null, novo: false, chegou: true },
+  { sku: "MED-003", name: "Collagen Jelly Cream, 110 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-003-collagen-jelly-cream", price: null, novo: false, chegou: true },
+  { sku: "MED-004", name: "PDRN Pink One Day Serum", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-004-pdrn-pink-one-day-serum", price: null, novo: false, chegou: true },
+  { sku: "MED-005", name: "Deep Vita C Capsule Cream, 55 g", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: null, novo: false, chegou: true },
+  { sku: "MED-006", name: "Zero Pore One Day Peptide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: null, novo: false, chegou: true },
+  { sku: "MED-007", name: "PDRN Pink Collagen Bubble Serum, 95 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: null, novo: false, chegou: true },
+  { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare",
+    desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: null, novo: false, chegou: true }
 ];
 (function(){
   var L=window.BAGDA_BEAUTY, IMG='/perfumes/img/beauty/', CATS=['Cabelo','Pele/Skincare','Maquiagem','Corpo'];
@@ -50,10 +66,10 @@ window.BAGDA_BEAUTY = [
   function card(p){
     var wa='https://wa.me/5511992873509?text='+encodeURIComponent(p.price?'Olá! Quero comprar o '+p.name+' ('+p.price+')':'Olá! Quero saber o preço do '+p.name);
     var src=IMG+p.img, v='?v=i4', mp=/^https:\/\//.test(p.getnet||'')?p.getnet:'';
-    return '<article class="bcard"><div class="bimg"><picture><source srcset="'+src+'.webp'+v+'" type="image/webp"><img src="'+src+'.jpg'+v+'" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
-      '<div class="bbody"><span class="bmeta">'+esc(p.brand)+(p.origin?' · '+esc(p.origin):'')+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p>'+
-      '<div class="bfoot"><span class="'+(p.price?'price':'bask')+'">'+(p.price?esc(p.price):'Consulte o preço')+'</span>'+
-      '<a class="btn wa sm" href="'+wa+'" target="_blank" rel="noopener">Comprar pelo WhatsApp</a>'+
+    return '<article class="bcard'+(p.chegou?' chegou':'')+'"><div class="bimg"><picture><source srcset="'+src+'.webp'+v+'" type="image/webp"><img src="'+src+'.jpg'+v+'" alt="'+esc(p.name)+'" loading="lazy" width="600" height="800"></picture></div>'+
+      '<div class="bbody"><span class="bmeta">'+esc(p.brand)+(p.origin?' · '+esc(p.origin):'')+'</span><h3>'+esc(p.name)+'</h3>'+(p.desc?'<p>'+esc(p.desc)+'</p>':'')+
+      '<div class="bfoot"><span class="'+(p.price?'price':'bask')+'">'+(p.price?esc(p.price):'Consulte')+'</span>'+
+      '<a class="btn wa sm" href="'+wa+'" target="_blank" rel="noopener">'+(p.price?'Comprar pelo WhatsApp':'Consultar no WhatsApp')+'</a>'+
       (mp?'<a class="btn gold sm mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a><div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div></div></article>';
   }
   var g=document.getElementById('beautyGrid');
@@ -71,5 +87,6 @@ window.BAGDA_BEAUTY = [
   chips.addEventListener('click',function(e){var b=e.target.closest('.chip');if(!b)return;cur=b.dataset.c;[].forEach.call(chips.children,function(x){x.classList.toggle('on',x===b)});draw();});
   q.addEventListener('input',draw);
   var h=decodeURIComponent(location.hash.slice(1)); if(h&&has(h)){cur=h;[].forEach.call(chips.children,function(x){x.classList.toggle('on',x.dataset.c===h)});}
+  try{ var qq=new URLSearchParams(location.search).get('q'); if(qq) q.value=qq; }catch(e){}
   draw();
 })();

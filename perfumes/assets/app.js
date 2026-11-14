@@ -59,7 +59,7 @@ function buildPanel(){
   h+='<div class="fgroup"><h4>Marca</h4><div class="chips">'+brands.map(function(b){return chipHTML("brand",b,b,count(function(p){return p.brand===b}))}).join("")+'</div></div>';
   h+='<div class="fgroup"><h4>Para quem</h4><div class="chips">'+["Masculino","Feminino","Unissex"].map(function(g){return chipHTML("gender",g,g,count(function(p){return p.gender===g}))}).join("")+'</div></div>';
   h+='<div class="fgroup"><h4>Família olfativa</h4><div class="chips">'+fams.map(function(f){return chipHTML("family",f,f,count(function(p){return p.familyGroup===f}))}).join("")+'</div></div>';
-  h+='<div class="fgroup"><h4>Faixa de preço</h4><div class="chips">'+PRICE.map(function(r){return chipHTML("price",r.k,r.l,count(function(p){return r.t(p.price)}))}).join("")+'</div></div>';
+  h+='<div class="fgroup"><h4>Faixa de preço</h4><div class="chips">'+PRICE.map(function(r){return chipHTML("price",r.k,r.l,count(function(p){return p.price!=null&&r.t(p.price)}))}).join("")+'</div></div>';
   h+='<div class="fgroup"><h4>Inspirado em</h4><input type="text" id="inspq" placeholder="Ex.: Sauvage, Aventus, Delina…" autocomplete="off"><div class="chips">'+houses.map(function(x){return chipHTML("house",x,x,count(function(p){return p.house===x}))}).join("")+'</div></div>';
   $("#panelBody").innerHTML=h;
   $("#inspq").value=S.q;
@@ -92,18 +92,18 @@ function filtered(){
     if(S.gender.length&&S.gender.indexOf(p.gender)<0) return false;
     if(S.family.length&&S.family.indexOf(p.familyGroup)<0) return false;
     if(S.house.length&&S.house.indexOf(p.house)<0) return false;
-    if(S.price.length&&!PRICE.some(function(r){return S.price.indexOf(r.k)>-1&&r.t(p.price)})) return false;
+    if(S.price.length&&!(p.price!=null&&PRICE.some(function(r){return S.price.indexOf(r.k)>-1&&r.t(p.price)}))) return false;
     if(S.insp&&!p.inspiredBy) return false;
     if(S.avail&&p.soldOut) return false;
-    if(S.max&&p.price>S.max) return false;
+    if(S.max&&!(typeof p.price==="number"&&p.price<=S.max)) return false;
     for(var i=0;i<terms.length;i++) if(p._hay.indexOf(terms[i])<0) return false;
     return true;
   });
   var s=S.sort;
   out.sort(function(a,b){
     if(s!=="featured"&&a.soldOut!==b.soldOut) return a.soldOut?1:-1;
-    if(s==="price-asc") return a.price-b.price;
-    if(s==="price-desc") return b.price-a.price;
+    if(s==="price-asc") return (a.price==null)-(b.price==null)||(a.price||0)-(b.price||0);
+    if(s==="price-desc") return (a.price==null)-(b.price==null)||(b.price||0)-(a.price||0);
     if(s==="name") return a.name.localeCompare(b.name,"pt");
     if(s==="brand") return a.brand.localeCompare(b.brand)||a.name.localeCompare(b.name,"pt");
     // destaque: marcas oficiais primeiro, com inspiração, disponíveis
@@ -121,6 +121,7 @@ function inspTag(p){
 }
 function priceHTML(p){
   if(p.soldOut) return '<div class="price">Esgotado</div>';
+  if(p.price==null) return '<div class="price">Consulte</div>';
   return '<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div>';
 }
 function soldWA(p,cls){ return '<a class="soldwa'+(cls?' '+cls:'')+'" href="'+waSold(p)+'" target="_blank" rel="noopener">'+ICON.wa+'<span>Esgotado · avise-me no WhatsApp</span></a>'; }
@@ -134,7 +135,7 @@ function card(p,extra,cls){
    (p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+(extra||'')+'</div>'+
    '<div class="info"><span class="brand">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3>'+inspTag(p)+
    '<div class="bottom">'+priceHTML(p)+'<span class="ml">'+p.ml+' ml</span></div>'+
-   (p.soldOut?soldWA(p):'<div class="inst">'+instText(p)+'</div>')+'</div></article>';
+   (p.soldOut?soldWA(p):(p.price==null?'':'<div class="inst">'+instText(p)+'</div>'))+'</div></article>';
 }
 var io=("IntersectionObserver" in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -5% 0px"}):null;
 function observe(root){ $$(".card:not(.in),.reveal:not(.in)",root).forEach(function(el,i){ if(io){ el.style.transitionDelay=(el.classList.contains("card")?Math.min(i%8,7)*45:0)+"ms"; io.observe(el);} else el.classList.add("in"); }); }
@@ -157,10 +158,11 @@ function openModal(html,cls){
   document.body.classList.add("lock"); $(".box",m).scrollTop=0; setTimeout(function(){$(".x",m).focus()},60);
 }
 function closeModal(){ var m=$("#modal"); m.className="modal"; m.setAttribute("aria-hidden","true"); document.body.classList.remove("lock"); if(location.hash.indexOf("#p=")===0) history.replaceState(null,"",location.pathname+location.search); if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
-function waLink(p){ if(p.soldOut) return waSold(p); return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero comprar o perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+", que vi no site. Entrega ou retirada na loja?"); }
+function waLink(p){ if(p.soldOut) return waSold(p); if(p.price==null) return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero saber o preço do perfume "+p.brand+" "+p.name+" ("+p.ml+" ml), que vi no site."); return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Quero comprar o perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) de "+p.priceLabel+", que vi no site. Entrega ou retirada na loja?"); }
 function waSold(p){ return "https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! O perfume "+p.brand+" "+p.name+" ("+p.ml+" ml) está esgotado no site. Pode me avisar quando chegar?"); }
 function related(p){
-  var L=P.filter(function(x){return x.id!==p.id&&!x.soldOut&&p.familyGroup&&x.familyGroup===p.familyGroup});
+  var L=P.filter(function(x){return x.id!==p.id&&!x.soldOut&&x.price!=null&&p.familyGroup&&x.familyGroup===p.familyGroup});
+  if(p.price==null) return [];
   L.sort(function(a,b){ var da=Math.abs(a.price-p.price)/p.price+(a.gender===p.gender||a.gender==="Unissex"?0:.6)+(OFFICIAL[a.brand]?0:.15), db=Math.abs(b.price-p.price)/p.price+(b.gender===p.gender||b.gender==="Unissex"?0:.6)+(OFFICIAL[b.brand]?0:.15); return da-db; });
   return L.slice(0,4);
 }
@@ -177,13 +179,17 @@ function detail(p){
   if(p.soldOut){
     h+='<div class="buy"><div class="price" style="color:var(--dim)">Esgotado</div>'+soldWA(p,'big')+'</div>';
   } else {
-    var mp=payLink(p);
+    var mp=p.price==null?'':payLink(p);
+    if(p.price==null){
+      h+='<div class="buy"><div class="price">Consulte</div><div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Consultar no WhatsApp</a></div></div>';
+    } else {
     h+='<div class="buy"><div><div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div><div class="inst lg">'+instText(p,true)+'</div>'+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
        '<div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Comprar pelo WhatsApp</a>'+
        (window.BagdaCart?BagdaCart.button({key:"pf:"+p.id,name:p.brand+" "+p.name,variant:p.ml+" ml",price:p.price,payLink:mp,img:/^(\/|https?:)/.test(p.photo)?p.photo:"/perfumes/"+p.photo},"pill"):"")+
        (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a>':'')+'</div>'+(mp?'<div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div>';
+    }
   }
-  h+='<div class="payline">PIX, dinheiro, débito ou crédito em até '+(X.installments.max||12)+'x'+(X.installments.noInterest?' sem juros':'')+'. Loja física no Brás · 08:00–17:30.</div>';
+  if(p.price!=null) h+='<div class="payline">PIX, dinheiro, débito ou crédito em até '+(X.installments.max||12)+'x'+(X.installments.noInterest?' sem juros':'')+'. Loja física no Brás · 08:00–17:30.</div>';
   h+='<ul class="pdlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>';
   if(!p.soldOut) h+=freteBox(p.id);
   if(hasNotes) h+='<div class="pyr"><h4>Pirâmide olfativa</h4>'+tier("t1","Notas de topo",p.notes.top)+tier("t2","Notas de coração",p.notes.heart)+tier("t3","Notas de fundo",p.notes.base)+'</div>';
