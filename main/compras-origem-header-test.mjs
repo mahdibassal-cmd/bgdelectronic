@@ -9,7 +9,7 @@ const html = readFileSync(join(dir, "index.html"), "utf8");
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261114c") && html.includes("loja.css?v=20261114a") && !html.includes("app.js?v=20261114a"), "cache bumped past 20261114a");
+ok(html.includes("app.js?v=20261114d") && html.includes("loja.css?v=20261114a") && !html.includes("app.js?v=20261114a"), "cache bumped past 20261114a");
 
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
 ok(compras.includes('id="corigem"') && compras.includes('id="origembox"') && compras.indexOf('id="corigem"') < compras.indexOf("<h3>Itens</h3>"), "Origem sits in the compra header, before the items");

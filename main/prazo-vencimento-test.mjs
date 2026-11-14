@@ -44,9 +44,23 @@ ok(cob.clientes.some(c => c.nome === "Maria Souza" && c.tem_vencida && c.no_limi
 ok(cob.clientes.some(c => c.nome === "João Lima" && c.tem_vence_hoje && c.notas.some(n => n.nota_id === 103 && n.classe == null)), "João includes legacy undated nota but is listed because of vence hoje");
 ok(!cob.clientes.some(c => c.nome === "Pedro Pago"), "fully paid nota is not listed");
 ok(cob.clientes.some(c => c.nome === "Sofia Prado" && c.no_limite && !c.tem_vencida && !c.tem_vence_hoje), "Sofia is only over the limite");
+const all = P.montar({
+  hoje: "2026-11-11",
+  todos: true,
+  clientes: [
+    { id: 2, nome: "João Lima", limite_prazo: null },
+    { id: 8, nome: "Ana Clara", limite_prazo: null }
+  ],
+  notas: [
+    { nota_id: 201, cliente_id: 2, nome: "João Lima", em_aberto: 80, vencimento: null, prazo_dias: null },
+    { nota_id: 202, cliente_id: 8, nome: "Ana Clara", em_aberto: 200, vencimento: "2026-12-01", prazo_dias: 20 },
+    { nota_id: 203, cliente_id: 8, nome: "Ana Clara", em_aberto: 0, vencimento: "2026-11-01", prazo_dias: 7 }
+  ]
+});
+ok(all.n_clientes === 2 && all.clientes.some(c => c.nome === "João Lima" && c.notas[0].classe == null) && all.clientes.some(c => c.nome === "Ana Clara" && c.notas.length === 1 && c.notas[0].nota_id === 202), "montar todos lists every unpaid nota, including undated and not-yet-due");
 
-ok(html.includes("prazo-vencimento.js?v=20261111e") && html.includes("app.js?v=20261114c"), "cache 20261111e for the new helper and app");
-ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261114c"), "prazo helper loads before the app");
+ok(html.includes("prazo-vencimento.js?v=20261114a") && html.includes("app.js?v=20261114d"), "cache 20261111e for the new helper and app");
+ok(html.indexOf("prazo-vencimento.js") < html.indexOf("app.js?v=20261114d"), "prazo helper loads before the app");
 ok(app.includes('id="prazobox"') && app.includes('id="pagaem"') && app.includes("Paga em *"), "Nova nota has required Paga em selector");
 ok(app.includes("prazoNeed") && app.includes("prazoSync") && app.includes("p_prazo_dias"), "selector is shown for prazo and sent as p_prazo_dias");
 ok(app.includes("Informe em quantos dias o cliente paga (1 a 30)"), "Paga em is required before saving a prazo note");

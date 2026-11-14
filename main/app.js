@@ -247,6 +247,9 @@ if (!MOCK && !CONFIGURED) {
     async cobrancaAlertas() { const r = await sb.rpc("cobranca_alertas"); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
       if (r.error && /PGRST202|42883|cobranca_alertas|schema cache|does not exist/i.test(em)) return { hoje: today(), clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_limite: 0, pendente_sql: true };
       return ok(r); },
+    async vencimentosVendedor() { const r = await sb.rpc("vencimentos_vendedor"); const em = (r.error && ((r.error.code || "") + " " + (r.error.message || ""))) || "";
+      if (r.error && /PGRST202|42883|vencimentos_vendedor|schema cache|does not exist/i.test(em)) return { hoje: today(), clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_sem_vencimento: 0, pendente_sql: true };
+      return ok(r); },
     async estornarRecebimento(rid, m) { return ok(await sb.rpc("estornar_recebimento", { p_rec: rid, p_motivo: m })); },
     async estornarCredito(kid, m) { return ok(await sb.rpc("estornar_credito", { p_id: kid, p_motivo: m })); },
     async cxEsp() { return ok(await sb.from("v_caixa_especial").select("*").order("id", { ascending: false }).limit(300)); },
@@ -670,6 +673,21 @@ if (!MOCK && !CONFIGURED) {
         return { nota_id: n.nota_id, cliente_id: n.cliente_id, nome: c.nome || n.cliente, em_aberto: Math.round((prazo - pago) * 100) / 100, vencimento: n.vencimento || null, prazo_dias: n.prazo_dias == null ? null : n.prazo_dias };
       });
       return PZ ? PZ.montar({ hoje: hj, notas, clientes: CL }) : { hoje: hj, clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_limite: 0 }; },
+    async vencimentosVendedor() { await ready; if (role !== "vendedor") throw new Error("Sem permissão");
+      const PZ = globalThis.BAGDA_PRAZO; const hj = today();
+      const notas = N.filter(n => n.status === "ativa" && n.cliente_id && n.handle === meU.handle).map(n => {
+        const prazo = PG.filter(g => g.nota_id === n.nota_id && g.metodo === "prazo").reduce((a, g) => a + g.valor, 0);
+        const pago = AL.filter(x => x.nota_id === n.nota_id).reduce((a, x) => a + x.valor, 0);
+        const c = CL.find(x => x.id === n.cliente_id) || {};
+        return { nota_id: n.nota_id, cliente_id: n.cliente_id, nome: c.nome || n.cliente, em_aberto: Math.round((prazo - pago) * 100) / 100, vencimento: n.vencimento || null, prazo_dias: n.prazo_dias == null ? null : n.prazo_dias };
+      });
+      const empty = { hoje: hj, clientes: [], n_clientes: 0, n_vencidas: 0, n_vence_hoje: 0, n_vence_breve: 0, n_sem_vencimento: 0 };
+      if (!PZ) return empty;
+      const x = PZ.montar({ hoje: hj, notas, clientes: CL, todos: true });
+      x.n_sem_vencimento = x.clientes.filter(c => (c.notas || []).some(n => !n.vencimento)).length;
+      const pri = r => r.tem_vencida ? 0 : r.tem_vence_hoje ? 1 : r.tem_vence_breve ? 2 : 3;
+      x.clientes.sort((a, b) => pri(a) - pri(b) || a.nome.localeCompare(b.nome, "pt"));
+      return x; },
     async estornarRecebimento(rid, m) { if (meU.role !== "admin") throw new Error("Somente admin pode estornar"); const r = RC.find(x => x.id === rid); if (!r) return { ja_estornado: true };
       const nm = CL.find(c => c.id === r.cliente_id).nome; if (r.cxesp) { if (CXE.some(y => y.estorno_de === r.cxesp)) return { ja_estornado: true }; const ent = CXE.find(y => y.id === r.cxesp), kex = r.excedente ? CR.find(x => x.id === r.excedente) : null; if (kex && kex.valor > crSaldo(r.cliente_id) + 0.001) throw new Error("Crédito do excedente já foi usado"); CXE.push({ id: id++, tipo: "saida", valor: ent ? ent.valor : r.valor, motivo: `Estorno recebimento #${rid} ${nm}: ${m}`, estorno_de: r.cxesp, created_at: new Date().toISOString() }); if (kex) CR.push({ id: id++, cliente_id: r.cliente_id, tipo: "uso", valor: kex.valor, obs: `Estorno excedente recebimento #${rid}: ${m}`, estorno_de: r.excedente, handle: meU.handle, created_at: new Date().toISOString() }); }
       else if (r.forma === "credito") { const u = CR.find(k => k.recebimento_id === rid && k.tipo === "uso"); CR.push({ id: id++, cliente_id: r.cliente_id, tipo: "entrada", valor: r.valor, obs: `Estorno recebimento #${rid}: ${m}`, nota_id: null, estorno_de: u ? u.id : null, handle: meU.handle, created_at: new Date().toISOString() }); }
@@ -1123,9 +1141,11 @@ async function boot() {
   $("#nav").hidden = false;
   if (window.BGDSwitch) BGDSwitch.mount(me, MOCK ? "mb@demo.local" : await api.email().catch(() => ""));
   document.querySelectorAll("nav button[data-p]").forEach(b => b.hidden = !can(b.dataset.p));
+  document.querySelectorAll("nav button[data-role]").forEach(b => { if (me.role !== b.dataset.role) b.hidden = true; });
   document.querySelectorAll("nav .navg").forEach(g => { const bs = [...g.querySelectorAll("button")]; g.hidden = bs.length > 0 && bs.every(b => b.hidden); });
   if (globalThis.BAGDA_PRAZO && BAGDA_PRAZO.installStyles) BAGDA_PRAZO.installStyles();
   refreshCobrancaBadge();
+  refreshVencimentosBadge();
   if (MOCK && qs.get("demo") === "resumo") { const L = await api.caixasLista(), px = L.find(x => x.metodo === "pix").caixa_id; await api.caixaAbrir(px, 0).catch(() => {}); await api.receber(1, 500, px, "pix", null, "parcial"); return viewResumo(today(), px); }
   if (MOCK && qs.get("demo") === "prazo") return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }], [{ metodo: "prazo", valor: 599 }, { metodo: "pix", valor: 200 }], null, 1, "DINHEIRO", null, 0, 0, 7));
   if (MOCK && qs.has("demo")) return viewRecibo(await api.criarNota([{ sku: "JBL-001", qtd: 1, preco_vendido: 799 }, { sku: "BAS-001", qtd: 2, preco_vendido: 49.9 }], [{ metodo: "pix", valor: 500 }, { metodo: "cartao", valor: 398.8 }], "Cliente Teste"));
@@ -1151,6 +1171,21 @@ async function refreshCobrancaBadge() {
     else el.removeAttribute("title");
   } catch { el.hidden = true; el.textContent = ""; }
 }
+async function refreshVencimentosBadge() {
+  const b = document.querySelector('nav button[data-v="vencimentos"]');
+  if (!b) return;
+  let el = b.querySelector("#venc-badge");
+  if (!el) { el = document.createElement("span"); el.id = "venc-badge"; el.className = "nav-alert"; el.hidden = true; el.setAttribute("aria-label", "clientes com notas suas em aberto"); b.append(" ", el); }
+  if (!me || me.role !== "vendedor" || !api.vencimentosVendedor) { el.hidden = true; el.textContent = ""; return; }
+  try {
+    const x = await api.vencimentosVendedor();
+    const n = x && !x.pendente_sql ? Number(x.n_clientes || 0) : 0;
+    el.textContent = n ? String(n) : "";
+    el.hidden = !n;
+    if (n) el.title = n === 1 ? "1 cliente com nota sua em aberto" : n + " clientes com notas suas em aberto";
+    else el.removeAttribute("title");
+  } catch { el.hidden = true; el.textContent = ""; }
+}
 function navMark(v) {
   document.querySelectorAll("nav button[data-v]").forEach(b => {
     const on = b.dataset.v === v;
@@ -1159,12 +1194,13 @@ function navMark(v) {
   });
 }
 function go(v) {
-  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", cpend: "admin", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
+  const need = { lancar: "financas", caixageral: "financas", clientes: "financas", fornecedores: "financas", pagar: "financas", cpend: "admin", receber: "financas", resumo: "financas", nota: "vendas", notas: "vendas", vencimentos: "vendas", estoque: "vendas|estoque", relatorio: "admin", compras: "admin", produtos: "admin", usuarios: "admin", depesp: "admin|estoque", hxdia: "admin", cxesp: "admin", imei: "financas|estoque", caixa: "caixa", comprovante: "admin" };
   if (!need[v] && v !== "seguranca" && v !== "ponto") v = "nota";
+  if (v === "vencimentos" && me && me.role !== "vendedor") v = can("financas") ? "receber" : "nota";
   if (need[v] && !can(need[v])) v = can("vendas") ? "nota" : can("caixa") ? "caixa" : can("estoque") ? "estoque" : "seguranca";
   navMark(v);
   history.replaceState(null, "", location.pathname + location.search + "#" + v);
-  ({ nota: viewNota, notas: viewNotas, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, cpend: viewComprasPendentes, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei(), ponto: () => window.BAGDA_PONTO.view({ $, app, me, api, toast, esc, today }) }[v] || viewSeguranca)()
+  ({ nota: viewNota, notas: viewNotas, vencimentos: viewVencimentos, caixa: viewCaixa, usuarios: viewUsuarios, estoque: viewEstoque, relatorio: viewRelatorio, compras: viewCompras, produtos: viewProdutos, seguranca: viewSeguranca, caixageral: viewCaixaGeral, lancar: viewLancar, clientes: viewClientes, fornecedores: viewFornecedores, pagar: viewPagar, cpend: viewComprasPendentes, receber: viewReceber, resumo: viewResumo, depesp: viewDepEsp, hxdia: viewHxDia, cxesp: viewCxEsp, imei: viewImei, comprovante: () => viewImei(), ponto: () => window.BAGDA_PONTO.view({ $, app, me, api, toast, esc, today }) }[v] || viewSeguranca)()
     .catch(e => toast(e.message));
 }
 document.querySelectorAll("nav button[data-v]").forEach(b => b.onclick = () => go(b.dataset.v));
@@ -2176,6 +2212,67 @@ function parseValorDivida(input) {
   // frete, total and the prazo amount are already numeric(12,2): 12 digits, 2 of them cents.
   if (Math.trunc(vv).toString().length > 12 - 2) return { error: "Valor inválido" };
   return { value: vv };
+}
+
+function vencimentosRowsHtml(cob, href, PZ) {
+  const L = (cob && cob.clientes) || [];
+  return L.flatMap(c => {
+    const motivos = [
+      c.tem_vencida ? `<span class="badge vencida">Vencida</span>` : "",
+      c.tem_vence_hoje ? `<span class="badge vence_hoje">Vence hoje</span>` : "",
+      c.tem_vence_breve ? `<span class="badge vence_breve">Vence em até 2 dias</span>` : ""
+    ].filter(Boolean).join(" ");
+    const notas = (c.notas || []).map((n, i) => {
+      const cls = n.classe || "";
+      const atraso = n.dias_atraso != null && n.classe === "vencida" ? (n.dias_atraso + (n.dias_atraso === 1 ? " dia" : " dias")) : (n.classe === "vence_hoje" ? "0" : "—");
+      const cliNome = c.cliente_id ? `<a href="${href}" class="cob-cli" data-c="${c.cliente_id}">${esc(c.nome)}</a>` : esc(c.nome);
+      const notaN = n.nota_id ? `<a href="${href}" class="cob-nota" data-n="${n.nota_id}">${esc(n.numero)}</a>` : esc(n.numero || "—");
+      return `<tr class="${esc(cls)}">${i === 0 ? `<td rowspan="${Math.max((c.notas || []).length, 1)}"><b>${cliNome}</b><br>${motivos}<br><small>Em aberto: <b>${brl(c.saldo_aberto)}</b></small></td>` : ""}<td>${notaN}</td><td class="n">${brl(n.em_aberto)}</td><td>${n.vencimento ? esc(dBR(n.vencimento)) : "—"}</td><td>${esc(atraso)}</td><td>${cls ? `<span class="badge ${esc(cls)}">${esc(PZ ? PZ.labelClasse(cls) : cls)}</span>` : (n.vencimento ? "" : "<span class=\"muted\">sem vencimento</span>")}</td></tr>`;
+    }).join("");
+    return notas || `<tr><td><b>${c.cliente_id ? `<a href="${href}" class="cob-cli" data-c="${c.cliente_id}">${esc(c.nome)}</a>` : esc(c.nome)}</b><br>${motivos}</td><td>—</td><td class="n">${brl(c.saldo_aberto)}</td><td>—</td><td>—</td><td></td></tr>`;
+  }).join("");
+}
+async function viewVencimentos() {
+  if (!me || me.role !== "vendedor") return go("nota");
+  const cob = api.vencimentosVendedor ? await api.vencimentosVendedor().catch(() => null) : null;
+  const PZ = globalThis.BAGDA_PRAZO;
+  if (cob && cob.pendente_sql) {
+    app.innerHTML = `<div class="card cobranca-panel" id="vencimentos"><h2>Vencimentos</h2><p class="muted">A lista de vencimentos ainda depende da atualização do banco (supabase-loja/migration-vencimentos-vendedor.sql).</p></div>`;
+    return;
+  }
+  const L = (cob && cob.clientes) || [];
+  const rows = vencimentosRowsHtml(cob, "#vencimentos", PZ);
+  app.innerHTML = `<div class="card cobranca-panel" id="vencimentos"><style>#vencimentos a.cob-nota,#vencimentos a.cob-cli{text-decoration:underline;text-underline-offset:2px}</style><h2>Vencimentos <small class="muted">somente as suas notas em aberto</small></h2>
+    <div class="grid"><div class="kpi"><small>Seus clientes em aberto</small><b>${L.length}</b></div>
+    <div class="kpi"><small>Vencidas</small><b class="low">${cob && cob.n_vencidas || 0}</b></div>
+    <div class="kpi"><small>Vence hoje</small><b>${cob && cob.n_vence_hoje || 0}</b></div>
+    <div class="kpi"><small>Vence em até 2 dias</small><b>${cob && cob.n_vence_breve || 0}</b></div>
+    <div class="kpi"><small>Sem vencimento</small><b>${cob && cob.n_sem_vencimento || 0}</b></div></div>
+    <p class="muted">Só aparecem clientes de notas que você fez e que ainda têm saldo Paga Depois em aberto. Você não vê notas de outros vendedores, caixa, custo nem o extrato financeiro completo. Nota quitada não entra. Notas antigas sem prazo cadastrado aparecem como sem vencimento.</p>
+    <table class="stk"><tr><th>Cliente</th><th>Nota</th><th class="n">Em aberto</th><th>Vencimento</th><th>Dias em atraso</th><th>Situação</th></tr>
+    ${rows || '<tr><td colspan="6" class="muted">Nenhum cliente com nota sua em aberto.</td></tr>'}</table></div>`;
+  refreshVencimentosBadge();
+  document.querySelectorAll(".cob-nota").forEach(a => a.onclick = ev => { ev.preventDefault(); viewRecibo(+a.dataset.n, () => viewVencimentos()); });
+  document.querySelectorAll(".cob-cli").forEach(a => a.onclick = ev => { ev.preventDefault(); viewVencimentosCliente(+a.dataset.c, cob); });
+}
+async function viewVencimentosCliente(cid, cob) {
+  if (!me || me.role !== "vendedor") return go("nota");
+  if (!cob) cob = api.vencimentosVendedor ? await api.vencimentosVendedor().catch(() => null) : null;
+  const PZ = globalThis.BAGDA_PRAZO;
+  const c = ((cob && cob.clientes) || []).find(x => +x.cliente_id === +cid);
+  if (!c) { toast("Cliente não encontrado nas suas notas em aberto"); return viewVencimentos(); }
+  const one = { clientes: [c], n_clientes: 1, n_vencidas: c.tem_vencida ? 1 : 0, n_vence_hoje: c.tem_vence_hoje ? 1 : 0, n_vence_breve: c.tem_vence_breve ? 1 : 0, n_sem_vencimento: c.tem_sem_vencimento ? 1 : 0 };
+  const rows = vencimentosRowsHtml(one, "#vencimentos", PZ);
+  app.innerHTML = `<div class="card cobranca-panel" id="vencimentos-cli"><style>#vencimentos-cli a.cob-nota,#vencimentos-cli a.cob-cli{text-decoration:underline;text-underline-offset:2px}</style>
+    <p class="noprint"><button class="btn ghost" id="bk">Voltar</button></p>
+    <h2>${esc(c.nome)} <small class="muted">somente as suas notas em aberto</small></h2>
+    <div class="grid"><div class="kpi"><small>Em aberto (suas notas)</small><b>${brl(c.saldo_aberto)}</b></div>
+    <div class="kpi"><small>Notas</small><b>${(c.notas || []).length}</b></div></div>
+    <p class="muted">Esta lista não é o extrato financeiro do cliente: só as notas que você fez e que ainda não foram pagas.</p>
+    <table class="stk"><tr><th>Cliente</th><th>Nota</th><th class="n">Em aberto</th><th>Vencimento</th><th>Dias em atraso</th><th>Situação</th></tr>
+    ${rows}</table></div>`;
+  $("#bk").onclick = () => viewVencimentos();
+  document.querySelectorAll(".cob-nota").forEach(a => a.onclick = ev => { ev.preventDefault(); viewRecibo(+a.dataset.n, () => viewVencimentosCliente(cid, cob)); });
 }
 async function viewReceber(rfSel = "") {
   const [C, RC, CX, CRD, cob] = await Promise.all([api.clientes(), api.recebimentos(), api.caixasLista(), api.creditos().catch(() => []), api.cobrancaAlertas ? api.cobrancaAlertas().catch(() => null) : Promise.resolve(null)]);

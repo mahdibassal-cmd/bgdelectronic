@@ -9,7 +9,7 @@ const html = readFileSync(join(dir, "index.html"), "utf8");
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261114c") && !html.includes("app.js?v=20261114b"), "cache bumped past 20261114b");
+ok(html.includes("app.js?v=20261114d") && !html.includes("app.js?v=20261114c"), "cache bumped past 20261114c");
 
 const receber = app.slice(app.indexOf("async function viewReceber"), app.indexOf("async function exportCSV"));
 ok(receber.includes('class="cob-nota"') && receber.includes("data-n=") && receber.includes("viewRecibo(+a.dataset.n"), "each Cobrança nota number opens the existing nota viewer");

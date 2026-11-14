@@ -15,7 +15,7 @@ ok(nav, "nav block present");
 const groups = [...nav[0].matchAll(/<div class="navg" data-g="([^"]+)" role="group" aria-labelledby="([^"]+)">([\s\S]*?)<\/div>\s*<\/div>/g)].map(m => {
   const buttons = [...m[3].matchAll(/<button([^>]*)>([^<]+)<\/button>/g)].map(b => {
     const attr = name => (b[1].match(new RegExp(`\\b${name}="([^"]*)"`)) || [])[1] || "";
-    return { v: attr("data-v"), p: attr("data-p"), id: attr("id"), type: attr("type"), label: b[2].replace(/&amp;/g, "&") };
+    return { v: attr("data-v"), p: attr("data-p"), role: attr("data-role"), id: attr("id"), type: attr("type"), label: b[2].replace(/&amp;/g, "&") };
   });
   const heading = (m[3].match(/<span class="ngh" id="([^"]+)">([^<]+)<\/span>/) || [])[2];
   return { g: m[1], labelledby: m[2], heading, buttons };
@@ -26,7 +26,7 @@ ok(groups.map(g => g.heading).join("|") === "Notas|Financeiro|Compras e estoque|
 ok(groups.every(g => g.labelledby && html.includes(`id="${g.labelledby}"`)), "aria-labelledby targets exist");
 
 const expected = {
-  notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["lancar", "financas", "Notas a lançar"], ["clientes", "financas", "Clientes"]],
+  notas: [["nota", "vendas", "Nova nota"], ["notas", "vendas", "Notas"], ["vencimentos", "vendas", "Vencimentos"], ["lancar", "financas", "Notas a lançar"], ["clientes", "financas", "Clientes"]],
   financas: [["caixa", "caixa", "Caixa"], ["caixageral", "financas", "Caixa Geral"], ["cxesp", "admin", "Caixa Especial"], ["receber", "financas", "Contas a receber"], ["pagar", "financas", "Contas a pagar"], ["cpend", "admin", "Compras pendentes"], ["fornecedores", "financas", "Fornecedores"], ["resumo", "financas", "Resumo do dia"], ["relatorio", "admin", "Relatório"], ["hxdia", "admin", "HX por dia"]],
   compras: [["compras", "admin", "Compras"], ["imei", "financas|estoque", "Compras & IMEI"], ["estoque", "vendas|estoque", "Estoque"], ["produtos", "admin", "Produtos"], ["depesp", "admin|estoque", "Depósito Especial"]],
   sistema: [["ponto", "", "Ponto"], ["usuarios", "admin", "Usuários"], ["seguranca", "", "Segurança"], ["", "", "Sair"]],
@@ -42,13 +42,13 @@ ok(sair && sair.label === "Sair" && sair.p === "" && sair.v === "", "Sair stays 
 const seg = groups.flatMap(g => g.buttons).find(b => b.v === "seguranca");
 ok(seg && seg.p === "", "Segurança has no data-p");
 const views = groups.flatMap(g => g.buttons).map(b => b.v).filter(Boolean);
-ok(new Set(views).size === views.length && views.length === 22, "each route once, no extras");
+ok(new Set(views).size === views.length && views.length === 23, "each route once, no extras");
 
 const perms = JSON.parse(js.match(/const PERMS = (\{[^}]+\})/)[1].replace(/(\w+):/g, '"$1":'));
 const can = (role, p) => role === "admin" || p.split("|").some(x => (perms[role] || []).includes(x));
 function visible(role) {
   return groups.map(g => {
-    const buttons = g.buttons.filter(b => !b.p || can(role, b.p)).map(b => b.label);
+    const buttons = g.buttons.filter(b => (!b.p || can(role, b.p)) && (!b.role || b.role === role)).map(b => b.label);
     return { heading: g.heading, buttons, hidden: buttons.length === 0 };
   }).filter(g => !g.hidden);
 }
@@ -56,7 +56,7 @@ const labels = role => visible(role).flatMap(g => g.buttons);
 const expectRole = {
   admin: ["Nova nota", "Notas", "Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Caixa Especial", "Contas a receber", "Contas a pagar", "Compras pendentes", "Fornecedores", "Resumo do dia", "Relatório", "HX por dia", "Compras", "Compras & IMEI", "Estoque", "Produtos", "Depósito Especial", "Ponto", "Usuários", "Segurança", "Sair"],
   financeiro: ["Notas a lançar", "Clientes", "Caixa", "Caixa Geral", "Contas a receber", "Contas a pagar", "Fornecedores", "Resumo do dia", "Compras & IMEI", "Ponto", "Segurança", "Sair"],
-  vendedor: ["Nova nota", "Notas", "Estoque", "Ponto", "Segurança", "Sair"],
+  vendedor: ["Nova nota", "Notas", "Vencimentos", "Estoque", "Ponto", "Segurança", "Sair"],
   estoque: ["Compras & IMEI", "Estoque", "Depósito Especial", "Ponto", "Segurança", "Sair"],
 };
 for (const [role, want] of Object.entries(expectRole)) {
@@ -78,7 +78,17 @@ ok(labels("financeiro").includes("Sair") && !labels("financeiro").includes("Usu�
 ok(/nav \.navg[\s\S]*g\.hidden = bs\.length > 0 && bs\.every\(b => b\.hidden\)/.test(js), "app hides empty groups");
 ok(/function navMark\(/.test(js) && /aria-current/.test(js) && /navMark\(v\)/.test(js) && /navMark\("imei"\)/.test(js), "active page mark kept");
 ok(css.includes(".ngh") && css.includes("@media(max-width:720px)") && css.includes("nav button.on") && /@media print[\s\S]*nav,button,header\{display:none!important\}/.test(css), "compact, responsive, active, print hide");
-ok(html.includes("loja.css?v=20261114a") && html.includes("estoque-categorias.js?v=20261114b") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("prazo-vencimento.js?v=20261111e") && html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261114c") && html.includes("ponto.css?v=20261111d"), "script cache for the client statement");
+
+const vencBtn = groups.find(g => g.g === "notas").buttons.find(b => b.v === "vencimentos");
+ok(vencBtn && vencBtn.p === "vendas" && vencBtn.role === "vendedor" && vencBtn.label === "Vencimentos", "Vencimentos is vendas + data-role vendedor in Notas");
+ok(!labels("admin").includes("Vencimentos") && !labels("financeiro").includes("Vencimentos") && !labels("estoque").includes("Vencimentos"), "only the vendedor role sees Vencimentos");
+ok(labels("vendedor").includes("Vencimentos") && !labels("vendedor").includes("Contas a receber") && !labels("vendedor").includes("Clientes"), "vendedor sees Vencimentos and still not Cobrança or Clientes");
+ok(js.includes('vencimentos: "vendas"') && js.includes('me.role !== "vendedor"') && js.includes("viewVencimentos") && js.includes("refreshVencimentosBadge"), "vencimentos route is vendas and role-gated to vendedor");
+ok(js.includes("api.vencimentosVendedor") && js.includes('rpc("vencimentos_vendedor")') && !js.includes("apply_migration"), "vendedor list is read from vencimentos_vendedor; no write path");
+ok(js.includes("viewVencimentosCliente") && js.includes("viewRecibo(+a.dataset.n") && js.includes("() => viewVencimentos()"), "nota opens the recibo and cliente opens the scoped list, Voltar returns to Vencimentos");
+ok(js.includes("viewVencimentosCliente(+a.dataset.c") && js.includes("viewClienteExtrato(+a.dataset.c, () => viewReceber(rfSel)"), "vendedor client click is scoped; Cobrança still opens the finance statement");
+
+ok(html.includes("loja.css?v=20261114a") && html.includes("estoque-categorias.js?v=20261114b") && html.includes("custo-valor.js?v=20261109e") && html.includes("venda-origem.js?v=20261109e") && html.includes("prazo-vencimento.js?v=20261114a") && html.includes("ponto.js?v=20261111d") && html.includes("app.js?v=20261114d") && html.includes("ponto.css?v=20261111d"), "script cache for the client statement");
 ok(!html.includes("data-v=\"comprovante\""), "no invented comprovante button");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
