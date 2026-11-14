@@ -1435,7 +1435,7 @@ async function viewCompras(o = {}) {
     return `<b>${esc(p.marca)} ${esc(p.produto)}</b>${usdBadge(p)}${v.raw ? ` <span class="vt">${esc(v.raw)}</span>` : ' <span class="vt off">sem variante cadastrada</span>'}<small>${esc(p.sku)}${tags ? " · " + esc(tags) : ""} · estoque <b>${+p.estoque || 0}</b>${p.ativo === false ? " · inativo" : ""}${adm ? ` · custo ${cm[p.sku] != null ? brl(cm[p.sku]) : "—"}` : ""}</small>`; };
   const fk = x => norm(x).replace(/\s+/g, " ").trim(), sp = x => String(x ?? "").replace(/\s+/g, " ").trim(), FN = new Map();
   [...FT.filter(f => f.ativo !== false).map(f => f.nome), ...PU.map(p => p.fornecedor), ...P.map(p => p.fornecedor)].forEach(n => { n = sp(n); if (n.length >= 2 && !FN.has(fk(n))) FN.set(fk(n), n); });
-  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", origem: "Nacional", custo_usd: "" }], busy = false, cot = null;
+  const inTab = new Set(FT.map(f => fk(f.nome))); let L = [{ sku: "", qtd: 1, custo: "", custo_usd: "" }], busy = false, cot = null;
   let CXS = [], pagSql = !emb;
   if (!emb && api.comprasCaixas) { try { CXS = await api.comprasCaixas() || []; } catch (e) { if (/migration-compras-pagamento|PGRST202|schema cache|does not exist|compras_caixas/i.test(e.message || "")) pagSql = false; else throw e; } }
   else if (!emb) pagSql = false;
@@ -1444,8 +1444,9 @@ async function viewCompras(o = {}) {
   ${emb ? '<p class="muted">Vários itens de uma vez · NÃO soma ao estoque da loja.</p>' : adm ? `<label>Destino</label><select id="dst"><option value="loja">Loja (soma ao estoque da loja)</option><option value="esp" ${o.dest === "esp" ? "selected" : ""}>Depósito Especial (só admin · não aparece na loja)</option></select>` : ""}
   <div class="grid"><div><label>Fornecedor${emb ? " (opcional)" : ""}</label><input id="fo" type="search" autocomplete="off" maxlength="120" placeholder="Buscar ou digitar novo…"><ul id="fsug" class="sug" role="listbox"></ul></div>
   <div><label>Data</label><input id="cdt" type="date" value="${today()}" max="${today()}"></div><div><label>Observação</label><input id="ob" maxlength="200"></div></div>
+  ${emb ? "" : `<div class="grid" id="origembox"><div><label for="corigem">Origem</label><select id="corigem"><option value="Nacional">Nacional</option><option value="Importado">Importado</option></select></div>
+  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. Pagar agora trava o custo em R$ nesta taxa. Pagar depois ou dívida segue a cotação do dia até o pagamento.</p></div></div>`}
   <h3>Itens</h3><div id="lns"></div><button type="button" class="btn ghost" id="add">+ Adicionar item</button>
-  <div id="taxabox" hidden><label for="taxa">Taxa do dólar desta compra</label><input id="taxa" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,42"><p class="muted" id="taxah">Uma taxa para a compra inteira, preenchida com a cotação atual. Pagar agora trava o custo em R$ nesta taxa. Pagar depois ou dívida segue a cotação do dia até o pagamento.</p></div>
   <p style="font-size:1.15em">Total da compra: <b id="gt">R$ 0,00</b> <span class="muted" id="gq"></span></p>
   ${emb ? "" : `<div id="fpbox"><h3>Forma de pagamento</h3>${pagSql ? `<label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fp" id="fp-agora" value="agora" checked style="width:auto"> Pagar agora de um caixa</label>
   <div id="fp-agora-box"><label for="fpcx">Caixa</label><select id="fpcx">${CXS.map(c => `<option value="${c.caixa_id}" ${c.caixa_id === prefCx ? "selected" : ""}>${esc(c.nome)}${c.somente_admin ? " (só admin)" : ""}</option>`).join("")}</select><p id="fpsaldo"></p></div>
@@ -1463,11 +1464,12 @@ async function viewCompras(o = {}) {
   const sb0 = () => { $("#sv").textContent = dest() === "esp" ? "Salvar entrada no Depósito Especial" : "Salvar compra (soma ao estoque)"; };
   const OP = globalThis.BAGDA_ORIGEM;
   const num = v => Math.round(+String(v).replace(",", ".") * 100) / 100;
-  const blank = () => ({ sku: "", qtd: 1, custo: "", origem: "Nacional", custo_usd: "" });
+  const blank = () => ({ sku: "", qtd: 1, custo: "", custo_usd: "" });
+  const origemCompra = () => loja() ? (($("#corigem") || {}).value || "Nacional") : null;
   const taxaAgora = () => { const raw = ($("#taxa") && $("#taxa").value) || ""; if (!String(raw).trim()) return { error: "Informe a taxa do dólar desta compra." }; return OP.parseCotacao(raw); };
-  const custoReaisLinha = l => { if (!(loja() && l.origem === "Importado")) return num(l.custo) || 0; const taxa = taxaAgora(); if (taxa.error) return 0; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return 0; const cr = OP.custoReaisDeUsd(cu.value, taxa.value); return cr.error ? 0 : cr.value; };
+  const custoReaisLinha = l => { if (!(loja() && origemCompra() === "Importado")) return num(l.custo) || 0; const taxa = taxaAgora(); if (taxa.error) return 0; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return 0; const cr = OP.custoReaisDeUsd(cu.value, taxa.value); return cr.error ? 0 : cr.value; };
   const prevTxt = l => {
-    if (!loja() || l.origem !== "Importado") return "";
+    if (!loja() || origemCompra() !== "Importado") return "";
     if (!String(l.custo_usd || "").trim()) return `<p class="muted lprev">Informe o custo em US$. O R$ da linha é esse valor × a taxa da compra.</p>`;
     const cu = OP.parseCustoUsd(l.custo_usd);
     if (cu.error || cu.value == null) return `<p class="warn lprev">${esc(cu.error || "Informe o custo em US$.")}</p>`;
@@ -1477,8 +1479,8 @@ async function viewCompras(o = {}) {
     if (cr.error) return `<p class="warn lprev">${esc(cr.error)}</p>`;
     return `<p class="muted lprev">Custo em R$: <b>${brl(cr.value)}</b> (${OP.formatUsd(cu.value)} × taxa ${OP.formatCotacao(taxa.value)})</p>`;
   };
-  const syncTaxa = () => { const box = $("#taxabox"); if (!box) return; const show = loja() && L.some(l => l.origem === "Importado"); box.hidden = !show; const inp = $("#taxa"); if (show && inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } };
-  const linhaConta = l => !!(l.sku || (loja() && l.origem === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
+  const syncTaxa = () => { const box = $("#taxabox"), obox = $("#origembox"); if (obox) obox.hidden = !loja(); if (!box) return; const show = loja() && origemCompra() === "Importado"; box.hidden = !show; const inp = $("#taxa"); if (show && inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } };
+  const linhaConta = l => !!(l.sku || (loja() && origemCompra() === "Importado" ? String(l.custo_usd || "").trim() : String(l.custo || "").trim()));
   const totalAgora = () => Math.round(L.filter(linhaConta).reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0) * 100) / 100;
   const modoPag = () => ((document.querySelector('input[name="fp"]:checked') || {}).value) || "agora";
   const syncPag = () => { const box = $("#fpbox"); if (!box) return; box.hidden = !loja(); const modo = modoPag(); const a = $("#fp-agora-box"), d = $("#fp-depois-box"), z = $("#fp-divida-box"), q = $("#fp-quando-box"); if (a) a.hidden = modo !== "agora"; if (d) d.hidden = modo !== "depois"; if (z) z.hidden = modo !== "divida"; if (q) q.hidden = modo === "agora";
@@ -1490,31 +1492,31 @@ async function viewCompras(o = {}) {
     else if (modo === "agora") paint($("#fpsaldo"), CXS.find(c => String(c.caixa_id) === String(($("#fpcx") || {}).value || "")), false); };
   const tot = () => { const okL = L.filter(linhaConta); $("#gt").textContent = brl(okL.reduce((a, l) => a + (+l.qtd || 0) * custoReaisLinha(l), 0)); $("#gq").textContent = `${okL.length} item(ns) · ${okL.reduce((a, l) => a + (+l.qtd || 0), 0)} un.`;
     document.querySelectorAll("#lns .lt").forEach(td => { const l = L[+td.dataset.i]; td.textContent = brl((+l.qtd || 0) * custoReaisLinha(l)); }); syncPag(); };
-  const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && l.origem === "Importado"; return `<div class="cl" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>
-    ${loja() ? `<div class="clu"><div><label>Origem</label><select class="lo"><option value="Nacional" ${l.origem !== "Importado" ? "selected" : ""}>Nacional</option><option value="Importado" ${l.origem === "Importado" ? "selected" : ""}>Importado</option></select></div>${imp ? `<div><label>Custo (US$)</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}" placeholder="Ex.: 80,00"></div>` : ""}</div>${prevTxt(l)}` : ""}</div>
-    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div><div><label>${imp ? "Custo (R$)" : "Custo un. (R$)"}</label>${imp ? `<div class="lcro n">${String(l.custo_usd || "").trim() && !taxaAgora().error ? brl(custoReaisLinha(l)) : "—"}</div>` : `<input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}">`}</div>
+  const drawL = focus => { $("#lns").innerHTML = L.map((l, i) => { const p = PS[l.sku]; const imp = loja() && origemCompra() === "Importado"; return `<div class="cl${imp ? " imp" : ""}" data-i="${i}"><div class="clp"><label>Produto ${i + 1}</label><input class="pq" type="search" autocomplete="off" enterkeyhint="search" placeholder="Nome, marca, cor, GB ou SKU… (↑↓ Enter)" value="${p ? esc(nome(p)) : ""}"><ul class="sug" role="listbox"></ul><div class="muted ps">${p ? line(p) : ""}</div>${imp ? prevTxt(l) : ""}</div>
+    <div><label>Qtd</label><input class="lq" type="number" min="1" inputmode="numeric" value="${esc(l.qtd)}"></div>${imp ? `<div><label>Custo (US$)</label><input class="lcu" inputmode="decimal" autocomplete="off" value="${esc(l.custo_usd ?? "")}" placeholder="Ex.: 80,00"></div>` : ""}<div><label>${imp ? "Custo (R$)" : "Custo un. (R$)"}</label>${imp ? `<div class="lcro n">${String(l.custo_usd || "").trim() && !taxaAgora().error ? brl(custoReaisLinha(l)) : "—"}</div>` : `<input class="lc" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.custo)}" placeholder="${p && cm[p.sku] != null ? cm[p.sku] : ""}">`}</div>
     <div><label>Total</label><div class="lt n" data-i="${i}"></div></div><div><button type="button" class="btn ghost rm" title="Remover linha" ${L.length < 2 ? "disabled" : ""}>✕</button></div></div>`; }).join("");
     document.querySelectorAll("#lns .cl").forEach(r => { const i = +r.dataset.i, l = L[i], pq = r.querySelector(".pq");
       const paint = () => { const html = prevTxt(l); const box = r.querySelector(".lprev"); if (!html) { if (box) box.remove(); return; } if (box) box.outerHTML = html; else { const host = r.querySelector(".clu"); if (host) host.insertAdjacentHTML("afterend", html); } };
       combo(pq, r.querySelector(".sug"), q => (q ? P.filter(p => match({ sku: hay(p) }, q)) : P).slice(0, 40).map(p => ({ k: p.sku, html: line(p) + (L.some((x, j) => j !== i && x.sku === p.sku) ? '<small class="warn">já está em outra linha</small>' : "") })),
-        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); if (loja() && p.origem === "Importado") l.origem = "Importado"; drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
+        sku => { l.sku = sku; const p = PS[sku]; if (p.fornecedor && !$("#fo").value.trim()) $("#fo").value = sp(p.fornecedor); drawL(); const n = document.querySelectorAll("#lns .cl")[i]; n.querySelector(".lq").focus(); n.querySelector(".lq").select(); });
       pq.addEventListener("typed", () => { if (l.sku) { l.sku = ""; r.querySelector(".ps").innerHTML = ""; tot(); } });
-      const lo = r.querySelector(".lo"); if (lo) lo.onchange = e => { l.origem = e.target.value; if (l.origem !== "Importado") { l.custo_usd = ""; } else l.custo = ""; drawL(); };
       const lcu = r.querySelector(".lcu"); if (lcu) lcu.oninput = e => { l.custo_usd = e.target.value; const cu = OP.parseCustoUsd(e.target.value); const taxa = taxaAgora(); const cell = r.querySelector(".lcro"); if (!cu.error && cu.value != null && !taxa.error) { const cr = OP.custoReaisDeUsd(cu.value, taxa.value); if (!cr.error) { l.custo = cr.value; if (cell) cell.textContent = brl(cr.value); tot(); } } else if (cell) cell.textContent = "—"; paint(); };
       r.querySelector(".lq").oninput = e => { l.qtd = e.target.value; tot(); };
       const lc = r.querySelector(".lc"); if (lc) { lc.oninput = e => { l.custo = e.target.value; tot(); }; lc.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#add").click(); } }; }
       r.querySelector(".rm").onclick = () => { L.splice(i, 1); drawL(); }; });
     tot(); syncTaxa(); if (focus) { const all = document.querySelectorAll("#lns .pq"); all[all.length - 1].focus(); } };
-  if ($("#dst")) $("#dst").onchange = () => { sb0(); drawL(); }; sb0();
+  if ($("#dst")) $("#dst").onchange = () => { sb0(); syncTaxa(); drawL(); }; sb0();
+  if ($("#corigem")) $("#corigem").onchange = () => { if (origemCompra() !== "Importado") L.forEach(l => { l.custo_usd = ""; }); else L.forEach(l => { l.custo = ""; }); syncTaxa(); drawL(); };
   document.querySelectorAll('input[name="fp"]').forEach(r => r.onchange = syncPag); if ($("#fpcx")) $("#fpcx").onchange = syncPag; if ($("#fpdx")) $("#fpdx").onchange = syncPag;
   combo($("#fo"), $("#fsug"), q => { const R = [...FN.values()].filter(n => match({ sku: n }, q)).sort(coll.compare).slice(0, 30).map(n => ({ k: n, html: esc(n) })); if (sp(q).length >= 2 && !FN.has(fk(q))) R.push({ k: null, html: `<b>+ novo fornecedor:</b> ${esc(sp(q))}` }); return R; },
     k => { $("#fo").value = k == null ? sp($("#fo").value) : k; });
   $("#add").onclick = () => { L.push(blank()); drawL(true); };
   const onCot = async saved => { cot = saved || cot; if (api.costs) { try { (await api.costs() || []).forEach(r => { cm[r.sku] = Number(r.custo); }); } catch {} } if (cot && cot.valor) P.forEach(p => { if (p.origem !== "Importado" || !(Number(p.preco_usd) > 0)) return; const calc = OP.precoReaisImportado(p.preco_usd, cot.valor, cm[p.sku] != null ? cm[p.sku] : null); if (!calc.error) p.preco_venda = calc.preco; }); const inp = $("#taxa"); if (inp && inp.dataset.auto !== "0" && cot && cot.valor) { inp.value = String(cot.valor).replace(".", ","); inp.dataset.auto = "1"; } if ($("#cotacao")) cot = await mountCotacao($("#cotacao"), onCot) || cot; drawL(); };
   if ($("#cotacao")) cot = await mountCotacao($("#cotacao"), onCot);
-  const taxaInp = $("#taxa"); if (taxaInp) taxaInp.oninput = () => { taxaInp.dataset.auto = "0"; const t = OP.parseCotacao(taxaInp.value); if (!t.error) L.forEach(l => { if (l.origem !== "Importado" || !String(l.custo_usd || "").trim()) return; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return; const cr = OP.custoReaisDeUsd(cu.value, t.value); if (!cr.error) l.custo = cr.value; }); drawL(); };
+  const taxaInp = $("#taxa"); if (taxaInp) taxaInp.oninput = () => { taxaInp.dataset.auto = "0"; const t = OP.parseCotacao(taxaInp.value); if (!t.error) L.forEach(l => { if (origemCompra() !== "Importado" || !String(l.custo_usd || "").trim()) return; const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return; const cr = OP.custoReaisDeUsd(cu.value, t.value); if (!cr.error) l.custo = cr.value; }); drawL(); };
   drawL();
   $("#sv").onclick = async () => { if (busy) return; const it = L.filter(l => l.sku || l.custo !== "" || String(l.custo_usd || "") !== ""), w = $("#pw");
+    if (loja()) it.forEach(l => { l.origem = origemCompra() === "Importado" ? "Importado" : "Nacional"; });
     for (const l of it) { const n = L.indexOf(l) + 1; if (!l.sku) return w.textContent = `Linha ${n}: escolha o produto na lista`; if (!(Number.isInteger(+l.qtd) && +l.qtd > 0)) return w.textContent = `Linha ${n}: quantidade inválida`;
       if (loja() && l.origem === "Importado") { const taxa = taxaAgora(); if (taxa.error) return w.textContent = taxa.error; l.taxa_dolar = taxa.value;
           const cu = OP.parseCustoUsd(l.custo_usd); if (cu.error || cu.value == null) return w.textContent = `Linha ${n}: informe o custo em US$`; l.custo_usd = cu.value;
@@ -1533,7 +1535,7 @@ async function viewCompras(o = {}) {
       catch (e) { if (!pendente(e)) { busy = false; $("#sv").disabled = false; w.textContent = e.message; return; } }
       const fl = []; for (const [i, x] of semOrigem(itens).entries()) { w.textContent = `Salvando item ${i + 1}/${itens.length} no Depósito Especial…`; try { await api.depEspEntrada(x.sku, x.qtd, x.custo_unit, mot); } catch (er) { fl.push({ ...x, erro: er.message }); } }
       busy = false; $("#sv").disabled = false; if (!fl.length) { toast(`Entrada salva ✓ ${itens.length} item(ns) no Depósito Especial`); return again(itens); }
-      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, origem: "Nacional", custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
+      L = fl.map(f => ({ sku: f.sku, qtd: f.qtd, custo: f.custo_unit, custo_usd: "" })); drawL(); w.innerHTML = `${itens.length - fl.length} de ${itens.length} salvos. <b>Falharam ${fl.length}</b> (ficaram no carrinho):<br>` + fl.map(f => `• ${esc(f.sku)} × ${f.qtd}: ${esc(f.erro)}`).join("<br>"); return; }
     const hd = { fornecedor: fx || null, data: dt, observacao: ob }; if (itens.some(x => x.origem === "Importado")) hd.taxa_dolar = itens.find(x => x.origem === "Importado").taxa_dolar;
     const okCompra = rs => { toast(`Compra ${rs && rs.numero ? rs.numero + " " : ""}salva ✓ ${itens.length} item(ns)`); if (!emb && rs && rs.numero && api.compraDetalhe) return viewComprovante(rs.numero, true); return again(); };
     const totalCompra = Math.round(itens.reduce((a, l) => a + l.qtd * l.custo_unit, 0) * 100) / 100;

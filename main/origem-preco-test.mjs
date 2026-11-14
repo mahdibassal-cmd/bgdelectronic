@@ -73,12 +73,12 @@ ok(cents(soAberto.costs.IMP.custo) === 43200, "an open lot follows the daily rat
 
 const app = read("app.js");
 const html = read("index.html");
-ok(html.includes("origem-preco.js?v=20261113g") && html.includes("app.js?v=20261114a") && html.includes("loja.css?v=20261113d"), "cache tags bumped for the new script and app");
+ok(html.includes("origem-preco.js?v=20261113g") && html.includes("app.js?v=20261114b") && html.includes("loja.css?v=20261114a"), "cache tags bumped for the new script and app");
 const compras = app.slice(app.indexOf("async function viewCompras"), app.indexOf("// ---------- Compras numeradas"));
-ok(compras.includes('class="lo"') && compras.includes(">Nacional<") && compras.includes(">Importado<") && compras.includes("Custo (US$)") && compras.includes("Custo un. (R$)"), "compra lines ask only for cost, in R$ or US$");
+ok(compras.includes('id="corigem"') && compras.includes(">Nacional<") && compras.includes(">Importado<") && !compras.includes('class="lo"') && compras.includes("Custo (US$)") && compras.includes("Custo un. (R$)"), "origem is chosen once in the header; lines ask only for cost, in R$ or US$");
 ok(!compras.includes("Preço venda") && !compras.includes('class="lu"') && !compras.includes("Preço (US$)"), "Compras has no selling-price input");
-ok(compras.includes('id="taxa"') && compras.includes("Taxa do dólar desta compra") && compras.indexOf('id="lns"') < compras.indexOf('id="taxabox"'), "one dollar rate sits after the lines");
-ok(compras.includes("Custo em R$") && compras.includes("custo_usd"), "an Importado line previews custo_usd times the compra rate");
+ok(compras.includes('id="taxa"') && compras.includes("Taxa do dólar desta compra") && compras.indexOf('id="corigem"') < compras.indexOf('id="taxabox"') && compras.indexOf('id="taxabox"') < compras.indexOf('id="lns"'), "one dollar rate sits in the header next to origem, before the lines");
+ok(compras.includes("Custo em R$") && compras.includes("custo_usd") && compras.includes("origemCompra()") && compras.includes('l.origem = origemCompra() === "Importado" ? "Importado" : "Nacional"'), "every saved loja line gets the header origem; Importado previews custo_usd times the compra rate");
 const telaProdutos = app.slice(app.indexOf("async function viewProdutos"), app.indexOf("async function viewSeguranca"));
 ok(telaProdutos.includes('id="pu"') && telaProdutos.includes("Preço (US$)"), "the US$ selling price stays on the product screen");
 ok(app.includes('id="cotacao"') && app.includes("Cotação do dólar") && app.includes("cotacaoSalvar") && app.includes("última atualização"), "admin can edit the rate and sees when it last changed");
