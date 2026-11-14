@@ -29,8 +29,7 @@ window.BAGDA_BEAUTY = [
   { sku: "MED-005", name: "Deep Vita C Capsule Cream, 55 g", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-005-deep-vita-c-capsule-cream", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-006", name: "Zero Pore One Day Peptide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-006-zero-pore-one-day-peptide-serum", price: "R$ 119,99", novo: false, chegou: true },
   { sku: "MED-007", name: "PDRN Pink Collagen Bubble Serum, 95 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-007-pdrn-pink-collagen-bubble-serum", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: "R$ 119,99", novo: false, chegou: true },
-  { sku: "PERF-109", name: "Premium Hair Oil Serum", brand: "Fino", category: "Cabelo", desc: "", img: "fino-premium-hair-oil-serum-perf-109", price: "R$ 89,99", novo: false }
+  { sku: "MED-008", name: "Kojic Acid Turmeric Niacinamide Serum, 30 ml", brand: "Medicube", origin: "Coreia", category: "Pele/Skincare", desc: "", img: "medicube-med-008-kojic-acid-turmeric-niacinamide-serum", price: "R$ 119,99", novo: false, chegou: true }
 ];
 (function(){
   var L=window.BAGDA_BEAUTY, IMG='/perfumes/img/beauty/', CATS=['Cabelo','Pele/Skincare','Maquiagem','Corpo'];

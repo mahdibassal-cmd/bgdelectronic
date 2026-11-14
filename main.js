@@ -56,7 +56,24 @@
       onPick(b.dataset.f);
     });
   }
-  function buyMsg(p) { return C.storesProduct.replace('{produto}', p.name).replace('{preco}', p.price); }
+  function pricedIndex(p) {
+    if (!p.variants || !p.variants.length) return 0;
+    for (var i = 0; i < p.variants.length; i++) if (p.variants[i].price && p.variants[i].price !== 'Consulte') return i;
+    return 0;
+  }
+  function variantAt(p, idx) { return p.variants && p.variants.length ? p.variants[idx] || p.variants[0] : null; }
+  function buyMsg(p, v) {
+    var name = v ? p.name + ' (' + v.label + ')' : p.name;
+    var price = v ? v.price : p.price;
+    return C.storesProduct.replace('{produto}', name).replace('{preco}', price);
+  }
+  function variantSelect(p, i, selected) {
+    if (!p.variants || p.variants.length < 2) return '';
+    return '<label class="vsel"><span class="mono vsel-l">Variação</span><select data-vsel="' + i + '" aria-label="Variação de ' + esc(p.name) + '">' +
+      p.variants.map(function (v, vi) {
+        return '<option value="' + vi + '"' + (vi === selected ? ' selected' : '') + '>' + esc(v.label) + ' · ' + esc(v.price) + '</option>';
+      }).join('') + '</select></label>';
+  }
   function count(list, key) { var o = {}; list.forEach(function (p) { o[p[key]] = (o[p[key]] || 0) + 1; }); return o; }
 
   // Eletrônicos
@@ -66,13 +83,17 @@
       var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="' + LOAD + '" decoding="async">'
         : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
       var i = PRODUCTS.indexOf(p);
+      var vi = pricedIndex(p);
+      var v = variantAt(p, vi);
+      var price = v ? v.price : p.price;
       return '<article class="pcard">' +
         '<button class="pvisual pv-open' + (p.image ? '' : ' is-ph') + '" type="button" data-pv="' + i + '" aria-label="Ver ' + esc(p.name) + ' e calcular frete">' + vis + '</button>' +
         '<p class="label mono">' + esc(p.category) + '</p>' +
         (p.promo ? '<span class="fire-promo">🔥 ' + esc(p.promo) + '</span>' : '') +
         '<h3><button class="pv-open pv-name" type="button" data-pv="' + i + '">' + esc(p.name) + '</button></h3>' +
-        '<div class="prow"><span class="price">' + esc(p.price) + '</span>' +
-        '<a class="btn btn-sm mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '">Pedir no WhatsApp</a></div>' +
+        variantSelect(p, i, vi) +
+        '<div class="prow"><span class="price" data-vprice>' + esc(price) + '</span>' +
+        '<a class="btn btn-sm mono" data-vwa target="_blank" rel="noopener" href="' + wa(buyMsg(p, v)) + '">Pedir no WhatsApp</a></div>' +
         '<button class="pv-open pv-frete mono" type="button" data-pv="' + i + '">Frete e entrega →</button>' +
         '</article>';
     }).join('');
@@ -114,20 +135,36 @@
     var u = (typeof PAY_LINKS !== 'undefined' && k) ? PAY_LINKS[k] : '';
     return /^https:\/\//.test(u || '') ? u : '';
   }
+  function priceNumOf(s) {
+    var n = parseFloat(String(s).replace(/[^\d,]/g, '').replace(',', '.'));
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+  function cartHTML(p, v) {
+    var price = v ? v.price : p.price;
+    var n = priceNumOf(price);
+    if (!n || !window.BagdaCart) return '';
+    var key = 'el:' + ((v && v.sku) || (((p.image || '').match(/eletronicos\/([^\/]+)\.\w+$/) || [])[1] || p.name));
+    return BagdaCart.button({ key: key, name: v ? p.name + ' (' + v.label + ')' : p.name, variant: v ? v.label : '', price: n, payLink: payLink(p), img: p.image ? (/^(\/|https?:)/.test(p.image) ? p.image : '/' + p.image) : '' });
+  }
   function openPV(i) {
     var p = PRODUCTS[i]; if (!p || !pv) return;
+    var gridSel = document.querySelector('#el-grid select[data-vsel="' + i + '"]');
+    var vi = gridSel ? +gridSel.value : pricedIndex(p);
+    var v = variantAt(p, vi);
+    var price = v ? v.price : p.price;
     var pay = payLink(p);
-    var priceNum = parseFloat(String(p.price).replace(/[^\d,]/g, '').replace(',', '.'));
-    var priced = isFinite(priceNum) && priceNum > 0;
+    var priced = priceNumOf(price) > 0;
     var vis = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" decoding="async">' : '<div class="ph">' + svg(p.icon) + '<span class="mono">Foto em breve</span></div>';
     $('pv-body').innerHTML = '<div class="pv-grid"><div class="pv-pic' + (p.image ? '' : ' is-ph') + '">' + vis + '</div><div class="pv-txt">' +
       '<p class="label mono">' + esc(p.category) + '</p><h3 class="pv-h">' + esc(p.name) + '</h3>' +
-      (p.promo ? '<span class="fire-promo">🔥 ' + esc(p.promo) + '</span>' : '') + '<p class="pv-price">' + esc(p.price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
-      '<a class="btn btn-wa mono" target="_blank" rel="noopener" href="' + wa(buyMsg(p)) + '"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg>Pedir no WhatsApp</a>' +
-      (priced && window.BagdaCart ? BagdaCart.button({ key: 'el:' + (((p.image || '').match(/eletronicos\/([^\/]+)\.\w+$/) || [])[1] || p.name), name: p.name, variant: '', price: priceNum, payLink: pay, img: p.image ? (/^(\/|https?:)/.test(p.image) ? p.image : '/' + p.image) : '' }) : '') +
-      (priced && pay ? '<a class="btn btn-gold btn-pay mono" target="_blank" rel="noopener" href="' + esc(pay) + '">Pagar · PIX ou cartão</a><p class="pv-paynote mono">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</p>' : '') +
+      (p.promo ? '<span class="fire-promo">🔥 ' + esc(p.promo) + '</span>' : '') +
+      variantSelect(p, i, vi) +
+      '<p class="pv-price" data-vprice>' + esc(price) + '</p><p class="pv-pay muted">' + esc(C.payment) + '. Loja física no Brás · 08:00–17:30.</p>' +
+      '<a class="btn btn-wa mono" data-vwa target="_blank" rel="noopener" href="' + wa(buyMsg(p, v)) + '"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wa"/></svg>Pedir no WhatsApp</a>' +
+      '<div data-vcart>' + (priced ? cartHTML(p, v) : '') + '</div>' +
+      (priced && pay ? '<a class="btn btn-gold btn-pay mono" data-vpay target="_blank" rel="noopener" href="' + esc(pay) + '">Pagar · PIX ou cartão</a><p class="pv-paynote mono">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</p>' : '') +
       '<ul class="pv-dlv"><li><b>Fast Entrega</b> · moto no mesmo dia em São Paulo</li><li><b>Retire grátis</b> na loja · Brás · 08:00–17:30</li><li><b>SEDEX para SP e todo o Brasil</b> · frete calculado no WhatsApp</li></ul>' +
-      (F ? F.box({ id: 'p' + i, item: p.name, price: p.price }) : '') +
+      (F ? F.box({ id: 'p' + i, item: v ? p.name + ' (' + v.label + ')' : p.name, price: price }) : '') +
       '<p class="pv-note mono">Preço de varejo do site. Estoque confirmado no WhatsApp.</p></div></div>';
     lastFocus = document.activeElement;
     pv.classList.add('open'); pv.setAttribute('aria-hidden', 'false'); document.body.classList.add('pv-lock');
@@ -138,7 +175,20 @@
     pv.classList.remove('open'); pv.setAttribute('aria-hidden', 'true'); document.body.classList.remove('pv-lock');
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
+  document.addEventListener('change', function (e) {
+    var sel = e.target.closest('select[data-vsel]'); if (!sel) return;
+    var i = +sel.dataset.vsel, p = PRODUCTS[i], v = variantAt(p, +sel.value); if (!p || !v) return;
+    var root = sel.closest('.pcard, .pv-txt'); if (!root) return;
+    var priceEl = root.querySelector('[data-vprice]'); if (priceEl) priceEl.textContent = v.price;
+    var a = root.querySelector('[data-vwa]'); if (a) a.href = wa(buyMsg(p, v));
+    var cart = root.querySelector('[data-vcart]');
+    if (cart) cart.innerHTML = priceNumOf(v.price) ? cartHTML(p, v) : '';
+    var form = root.querySelector('.bf-frete');
+    if (form) { form.dataset.item = p.name + ' (' + v.label + ')'; form.dataset.price = v.price; }
+    var payBtn = root.querySelector('[data-vpay]'); if (payBtn) payBtn.hidden = !priceNumOf(v.price);
+  });
   document.addEventListener('click', function (e) {
+    if (e.target.closest('select[data-vsel]')) return;
     var o = e.target.closest('[data-pv]'); if (o) { openPV(+o.dataset.pv); return; }
     if (e.target.closest('[data-pvclose]')) closePV();
   });
