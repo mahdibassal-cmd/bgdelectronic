@@ -26,6 +26,8 @@
   function svg(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.tag) + '</svg>'; }
 
   document.querySelectorAll('.js-wa').forEach(function (a) { a.href = wa(C.storesMessage); });
+  var gtaWa = $('gta-wa');
+  if (gtaWa) gtaWa.href = wa('Olá! Quero reservar o GTA VI (PS5) na pré-venda por R$ 319,99.');
   document.querySelectorAll('.js-wa-pf').forEach(function (a) { a.href = wa(C.perfumesMessage); });
 
   // Loja / contato
