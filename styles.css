@@ -118,16 +118,30 @@ h2{font-weight:500;font-size:clamp(34px,8.5vw,56px);line-height:1.04;letter-spac
 .ph span{font-size:9px}
 .pcard .label{color:rgba(255,255,255,.55)}
 .pcard h3{font-size:15px;font-weight:500;line-height:1.3;margin:4px 0 0;flex:1}
-.gta-pre{display:grid;grid-template-columns:112px 1fr;gap:16px;align-items:center;margin:6px 0 28px;padding:16px;background:linear-gradient(135deg,#18284a,#0b1530);border:1px solid rgba(214,180,106,.5);border-radius:4px}
-.gta-pre-pic{background:#0b1530;border-radius:2px;overflow:hidden}
-.gta-pre img{width:100%;height:auto;object-fit:contain}
-.gta-pre,.gta-pre h2,.gta-price{color:#fff}
-.gta-kicker{color:var(--gold);font-size:12px;letter-spacing:.16em}
-.gta-pre h2{font-family:var(--cond);font-weight:700;font-size:clamp(34px,8vw,58px);line-height:.92;letter-spacing:-.01em;text-transform:uppercase;margin:4px 0 6px;color:#fff}
-.gta-price{font-weight:700;font-size:clamp(26px,4vw,34px);letter-spacing:-.03em;color:#fff}
-.gta-sub{color:rgba(255,255,255,.78);margin:2px 0 14px}
-@media (min-width:720px){
-  .gta-pre{grid-template-columns:168px 1fr;gap:28px;padding:22px 28px}
+.gta-hero{margin:8px -20px 8px;padding:22px 20px 26px;background:radial-gradient(90% 80% at 90% 0%,#24386a 0%,#0b1530 42%,#070d1c 100%);color:#fff;border-top:1px solid rgba(214,180,106,.45);border-bottom:1px solid rgba(214,180,106,.45)}
+.gta-hero-grid{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:center}
+.gta-hero-pic{background:#070d1c;border-radius:4px;overflow:hidden;border:1px solid rgba(214,180,106,.35)}
+.gta-hero img{width:100%;height:auto;max-height:280px;object-fit:contain;margin:0 auto}
+.gta-kicker{color:#f3dc9c;font-size:13px;letter-spacing:.18em}
+.gta-hero h2{font-family:var(--cond);font-weight:700;font-size:clamp(52px,14vw,108px);line-height:.86;letter-spacing:-.02em;text-transform:uppercase;margin:2px 0 6px;color:#fff}
+.gta-price{font-weight:700;font-size:clamp(28px,5vw,44px);letter-spacing:-.03em;color:#fff;line-height:1}
+.gta-sub{color:rgba(255,255,255,.8);margin:6px 0 0;font-size:16px}
+.gta-count{margin:14px 0 16px}
+.gta-count[hidden],.gta-digits[hidden],.gta-open[hidden],.gta-count-label[hidden]{display:none !important}
+.gta-count-label{color:#f3dc9c;font-size:11px;letter-spacing:.14em;margin-bottom:8px}
+.gta-digits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;max-width:520px}
+.gta-cell{background:rgba(255,255,255,.06);border:1px solid rgba(214,180,106,.4);border-radius:4px;padding:8px 4px 6px;text-align:center}
+.gta-cell b{display:block;font-family:var(--cond);font-weight:700;font-size:clamp(34px,8vw,62px);line-height:.9;color:#fff}
+.gta-cell span{display:block;margin-top:4px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#f3dc9c}
+.gta-open{font-family:var(--cond);font-weight:700;font-size:clamp(28px,5vw,42px);line-height:1;color:#f3dc9c;margin:4px 0 2px}
+.gta-hero .btn-gold{margin-top:4px;background:linear-gradient(180deg,#f3dc9c,#d6b46a);color:#1a1407;font-weight:700}
+html[data-theme=dark] .gta-hero{background:radial-gradient(90% 80% at 90% 0%,#2a1c0c 0%,#120e09 46%,#070604 100%);border-color:rgba(214,180,106,.55)}
+html[data-theme=dark] .gta-hero h2,html[data-theme=dark] .gta-price,html[data-theme=dark] .gta-cell b{color:#fff}
+html[data-theme=dark] .gta-hero .btn-gold{background:linear-gradient(180deg,#f3dc9c,#d6b46a);color:#1a1407}
+@media (min-width:800px){
+  .gta-hero{margin:14px 0 18px;padding:36px 36px;border:1px solid rgba(214,180,106,.5);border-radius:6px}
+  .gta-hero-grid{grid-template-columns:minmax(240px,380px) 1fr;gap:48px}
+  .gta-hero img{max-height:520px}
 }
 .vsel{display:flex;flex-direction:column;gap:4px;margin-top:10px}
 .vsel-l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)}

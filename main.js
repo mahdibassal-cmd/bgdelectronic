@@ -28,6 +28,39 @@
   document.querySelectorAll('.js-wa').forEach(function (a) { a.href = wa(C.storesMessage); });
   var gtaWa = $('gta-wa');
   if (gtaWa) gtaWa.href = wa('Olá! Quero reservar o GTA VI (PS5) na pré-venda por R$ 319,99.');
+  (function gtaCountdown() {
+    var TARGET = new Date('2026-11-16T00:00:00-03:00').getTime();
+    var root = $('gta-count'), digits = $('gta-digits'), open = $('gta-open'), label = $('gta-count-label');
+    if (!root || !digits || !open) return;
+    var units = [['dias', 86400], ['horas', 3600], ['min', 60], ['seg', 1]];
+    function cell(n, name) {
+      return '<div class="gta-cell"><b>' + (n < 10 ? '0' + n : n) + '</b><span>' + name + '</span></div>';
+    }
+    function tick() {
+      var left = TARGET - Date.now();
+      if (left <= 0) {
+        digits.hidden = true;
+        if (label) label.hidden = true;
+        open.hidden = false;
+        root.hidden = false;
+        return;
+      }
+      var s = Math.floor(left / 1000), html = '', rest = s;
+      for (var i = 0; i < units.length; i++) {
+        var size = units[i][1];
+        var n = Math.floor(rest / size);
+        rest -= n * size;
+        html += cell(n, units[i][0]);
+      }
+      digits.innerHTML = html;
+      digits.hidden = false;
+      open.hidden = true;
+      if (label) label.hidden = false;
+      root.hidden = false;
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
   document.querySelectorAll('.js-wa-pf').forEach(function (a) { a.href = wa(C.perfumesMessage); });
 
   // Loja / contato
