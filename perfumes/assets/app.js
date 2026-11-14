@@ -16,10 +16,10 @@ var ICON={
 var DATA=window.BAGDA_DATA, P=[], META={};
 var X=window.BAGDA_EXTRAS||{}; X.installments=X.installments||{max:12,noInterest:false}; X.products=X.products||{}; X.decants=X.decants||[]; X.bestSellers=X.bestSellers||[]; X.lowStockAt=X.lowStockAt||3;
 function ext(p){ return X.products[p.id]||{}; }
-function payLink(p){ var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
+function payLink(p){ if(p.waOnly) return ""; var u=ext(p).payLink||ext(p).mpLink||p.payLink||""; return /^https:\/\//.test(u)?u:""; }
 function lowStock(p){ var st=ext(p).stock; if(st==null) st=p.stock; return !p.soldOut&&typeof st==="number"&&st>0&&st<=X.lowStockAt; }
 function instText(p,long){ var n=X.installments.max||12; if(X.installments.noInterest) return (long?'ou ':'')+n+'x de '+money(p.price/n)+' sem juros'; return long?'ou em até '+n+'x no cartão':'em até '+n+'x no cartão'; }
-var OFFB='<span class="offb">✦ Distribuidor oficial</span>';
+var OFFB='';
 function boot(d){
   DATA=d; META=d.meta; P=d.perfumes;
   P.forEach(function(p,i){
@@ -121,7 +121,8 @@ function inspTag(p){
 }
 function priceHTML(p){
   if(p.soldOut) return '<div class="price">Esgotado</div>';
-  return '<div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div>';
+  if(p.proposed&&p.priceFromLabel) return '<div class="price"><span class="ref-lab">Referência proposta '+esc(p.priceFromLabel)+'</span><span class="por-lab">Por </span>'+esc(p.priceLabel)+'</div>';
+  return '<div class="price">'+esc(p.priceLabel)+'</div>';
 }
 function soldWA(p,cls){ return '<a class="soldwa'+(cls?' '+cls:'')+'" href="'+waSold(p)+'" target="_blank" rel="noopener">'+ICON.wa+'<span>Esgotado · avise-me no WhatsApp</span></a>'; }
 function card(p,extra,cls){
@@ -170,7 +171,7 @@ function detail(p){
   var hasNotes=p.notes&&((p.notes.top||[]).length+(p.notes.heart||[]).length+(p.notes.base||[]).length)>0;
   var acc=(p.accords||[]).slice(0,6);
   var h='<div class="pd"><div class="pic"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'">'+(p.soldOut?'<span class="sold-tag">ESGOTADO</span>':'')+'</div><div class="txt">';
-  h+='<span class="kicker">'+esc(p.brand)+'</span>'+(OFFICIAL[p.brand]?'<span class="offb inl">✦ Distribuidor oficial</span>':'')+'<h2>'+esc(p.name)+'</h2>';
+  h+='<span class="kicker">'+esc(p.brand)+'</span>'+'<h2>'+esc(p.name)+'</h2>';
   h+='<div class="tags">'+(p.familyGroup?'<span class="tag g">'+esc(p.familyGroup)+'</span>':'')+(p.gender?'<span class="tag">'+esc(p.gender)+'</span>':'')+'<span class="tag">'+p.ml+' ml</span>'+(p.soldOut?'<span class="tag">Esgotado</span>':'')+'</div>';
   if(p.inspiredBy) h+='<div class="inspbox"><div class="k">Inspiração olfativa</div><div class="v">'+esc(p.inspiredBy)+'</div></div>';
   else if(p.originalCreation) h+='<div class="inspbox"><div class="k">Assinatura própria</div><div class="v">Criação original '+esc(p.brand)+'</div></div>';
@@ -178,7 +179,7 @@ function detail(p){
     h+='<div class="buy"><div class="price" style="color:var(--dim)">Esgotado</div>'+soldWA(p,'big')+'</div>';
   } else {
     var mp=payLink(p);
-    h+='<div class="buy"><div><div class="price">'+(p.priceFromLabel?'<s>De '+esc(p.priceFromLabel)+'</s>':'')+esc(p.priceLabel)+'</div><div class="inst lg">'+instText(p,true)+'</div>'+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
+    h+='<div class="buy"><div>'+priceHTML(p)+'<div class="inst lg">'+instText(p,true)+'</div>'+(p.proposed?'<div class="bf-block">Referência proposta, não é um preço anterior comprovado.</div>':'')+(lowStock(p)?'<div class="lowline">Últimas unidades em estoque</div>':'')+'</div>'+
        '<div class="buybtns"><a class="btn wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+ICON.wa+'Comprar pelo WhatsApp</a>'+
        (window.BagdaCart?BagdaCart.button({key:"pf:"+p.id,name:p.brand+" "+p.name,variant:p.ml+" ml",price:p.price,payLink:mp,img:/^(\/|https?:)/.test(p.photo)?p.photo:"/perfumes/"+p.photo},"pill"):"")+
        (mp?'<a class="btn gold mp" href="'+esc(mp)+'" target="_blank" rel="noopener">Pagar · PIX ou cartão</a>':'')+'</div>'+(mp?'<div class="paynote">PIX, débito ou crédito em até 12x · Frete combinado no WhatsApp</div>':'')+'</div>';
@@ -228,7 +229,7 @@ function compareView(){
   var nl=function(a){return a&&a.length?'<span class="nl">'+a.map(esc).join(", ")+'</span>':''};
   var h='<div class="txt" style="padding:28px 20px 30px"><span class="kicker">Comparar</span><h2 style="font-family:var(--serif);font-weight:500;font-size:34px;margin:6px 0 20px">Lado a lado</h2><div class="ctable"><div class="ccols" style="--n:'+n+'">';
   h+='<div class="rh"></div>'+L.map(function(p){return '<div class="hd"><img src="'+p.photo+'" alt="'+esc(p.brand+' '+p.name)+'"><span class="kicker" style="font-size:9.5px">'+esc(p.brand)+'</span><h3>'+esc(p.name)+'</h3></div>'}).join("");
-  h+=row("Preço",function(p){return p.soldOut?'Esgotado':'<b style="color:var(--gold2);font-family:var(--serif);font-size:20px">'+esc(p.priceLabel)+'</b>'});
+  h+=row("Preço",function(p){return p.soldOut?'Esgotado':(p.proposed&&p.priceFromLabel?'<small>Referência proposta '+esc(p.priceFromLabel)+'</small> ':'')+'<b style="color:var(--gold2);font-family:var(--serif);font-size:20px">'+esc(p.priceLabel)+'</b>'});
   h+=row("Volume",function(p){return esc(p.size)},true);
   h+=row("Inspiração",function(p){return p.inspiredBy?esc(p.inspiredBy):(p.originalCreation?'Criação original':'')});
   h+=row("Família",function(p){return esc(p.familyGroup||"")},true);
