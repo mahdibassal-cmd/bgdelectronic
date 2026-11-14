@@ -48,7 +48,7 @@ const PRODUCTS = [
  {
   "name": "JBL Boombox 4 Black",
   "category": "Áudio & Som",
-  "price": "R$ 2.169,99",
+  "price": "Consulte",
   "promo": "SUPER PROMO",
   "icon": "speaker",
   "image": "img/eletronicos/jbl-boombox-4-black.webp",
@@ -65,7 +65,7 @@ const PRODUCTS = [
  {
   "name": "JOOG Hi-Lite",
   "category": "Áudio & Som",
-  "price": "R$ 715,00",
+  "price": "Consulte",
   "icon": "speaker",
   "image": "img/eletronicos/joog-hi-lite.webp",
   "imageSource": "Varejo — comprasparaguai.com.br (anúncio JOOG Hi-Lite JHL-02)"
@@ -265,9 +265,7 @@ const PAY_LINKS = {
   "hori-split-pad-pro-ergon-mico-para-nintendo-switch": "https://pag.getnet.com.br/Q2vl-YKEJ",
   "kit-gamer-teclado-mouse": "https://pag.getnet.com.br/jCw9eJ4uS",
   "mouse-pad-gamer-rgb": "https://pag.getnet.com.br/4UgOzRO3t",
-  "jbl-boombox-4-black": "https://pag.getnet.com.br/3_i_Wu6Sc",
   "hopestar-a60-450w-2-microfones": "https://pag.getnet.com.br/fSenl2bPf",
-  "joog-hi-lite": "https://pag.getnet.com.br/Xn3-TbpD7",
   "rastreador-compat-vel-com-iphone-buscador": "https://pag.getnet.com.br/BjY3ZZIvs",
   "oura-ring-5-tamanho-7-gold": "https://pag.getnet.com.br/17_4VU2r2",
   "oura-ring-5-tamanho-7-rose": "https://pag.getnet.com.br/X04bcbUKL",

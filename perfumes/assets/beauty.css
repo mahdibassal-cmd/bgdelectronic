@@ -1,5 +1,8 @@
 .beauty .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px}
 .bcard{display:flex;flex-direction:column;border:1px solid var(--line2,rgba(212,175,95,.25));border-radius:18px;overflow:hidden;background:rgba(255,255,255,.03)}
+.bcard.chegou{border:2px solid #d4af5f;box-shadow:0 0 0 1px rgba(212,175,95,.45),0 10px 28px rgba(0,0,0,.28)}
+.bcard.chegou .bimg{position:relative}
+.bcard.chegou .bimg:after{content:"CHEGOU!";position:absolute;top:12px;left:12px;padding:5px 10px;border-radius:99px;background:#d4af5f;color:#1a1206;font:700 11px/1 system-ui,sans-serif;letter-spacing:.14em}
 .bimg{aspect-ratio:3/4;overflow:hidden;background:#140e06}
 .bimg img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s}
 .bcard:hover .bimg img{transform:scale(1.04)}
