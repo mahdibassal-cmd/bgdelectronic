@@ -58,7 +58,7 @@ ok(app.includes('const LOCAIS_ADMIN = ["BITLOG CONTAINER", "CAIXA ESPECIAL"]') &
 ok(app.includes("PX.soPix(pgs) ? PX.opcoes(caixasPix, me.role === \"admin\")") && app.includes("async caixasPix()"), "the sale screen swaps the dropdown only for PIX and loads nomes by id");
 ok(app.includes("migration-pix-locais-caixas.sql"), "a rejected new local names the SQL file and saves nothing");
 ok(app.includes("MV[MV.length - 1].forma = g.metodo") && app.includes("if (forma) MV[MV.length - 1].forma = forma"), "demo lançar stores forma pix and cancel copies it onto the estorno");
-ok(html.includes("pix-locais.js?v=20261114a") && html.includes("app.js?v=20261114c") && html.indexOf("pix-locais.js") < html.indexOf("app.js?v=20261114c"), "cache tag 20261113d and the helper loads first");
+ok(html.includes("pix-locais.js?v=20261114a") && html.includes("app.js?v=20261114d") && html.indexOf("pix-locais.js") < html.indexOf("app.js?v=20261114d"), "cache tag 20261113d and the helper loads first");
 
 ok(sql.includes("c.id in (15, 2, 3, 14, 13)") && sql.includes("'Caixa PIX (HX)'") && sql.includes("'Máquina Loja'") && sql.includes("'PRIME'") && sql.includes("'PRESTIGE ROSA'") && sql.includes("'CAIXA S2'"), "SQL accepts the five current names and any future nome of those ids");
 ok(sql.includes("'PRESTIGE AURA'") && sql.includes("if p_local = 'PRESTIGE AURA' then p_local := 'PRESTIGE ROSA'; end if;"), "old AURA label is still accepted and stored as PRESTIGE ROSA");

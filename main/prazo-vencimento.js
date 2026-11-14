@@ -35,7 +35,7 @@
     }
     return s;
   };
-  const montar = ({ hoje, notas, clientes }) => {
+  const montar = ({ hoje, notas, clientes, todos }) => {
     const byCli = new Map();
     const cliOf = id => (clientes || []).find(c => +c.id === +id || +c.cliente_id === +id) || {};
     for (const n of notas || []) {
@@ -77,7 +77,7 @@
     const clientesOut = [];
     for (const row of byCli.values()) {
       if (row.limite_prazo != null && Number.isFinite(row.limite_prazo) && row.saldo_aberto + 0.001 >= row.limite_prazo) row.no_limite = true;
-      if (row.tem_vencida || row.tem_vence_hoje || row.tem_vence_breve || row.no_limite) {
+      if (todos || row.tem_vencida || row.tem_vence_hoje || row.tem_vence_breve || row.no_limite) {
         row.notas.sort((a, b) => {
           const ord = { vencida: 0, vence_hoje: 1, vence_breve: 2 };
           const ao = a.classe in ord ? ord[a.classe] : 3, bo = b.classe in ord ? ord[b.classe] : 3;
@@ -110,6 +110,13 @@
       .cobranca-panel .badge.vence_breve{background:#fef3c7;color:#92400e}
       .cobranca-panel .badge.limite{background:#e0e7ff;color:#3730a3}
       .cobranca-panel tr.vencida td:first-child{box-shadow:inset 3px 0 0 #b91c1c}
+      html[data-theme=dark] .nav-alert{background:#ef4444;color:#fff}
+      html[data-theme=dark] .cobranca-panel .badge.vencida{background:#7f1d1d;color:#fecaca}
+      html[data-theme=dark] .cobranca-panel .badge.vence_hoje{background:#7c2d12;color:#fed7aa}
+      html[data-theme=dark] .cobranca-panel .badge.vence_breve{background:#713f12;color:#fde68a}
+      html[data-theme=dark] .cobranca-panel .badge.limite{background:#312e81;color:#c7d2fe}
+      html[data-theme=dark] .cobranca-panel tr.vencida td:first-child{box-shadow:inset 3px 0 0 #ef4444}
+      html[data-theme=dark] .cobranca-panel a.cob-nota,html[data-theme=dark] .cobranca-panel a.cob-cli{color:#e8c979}
     `;
     document.head.appendChild(s);
   };
