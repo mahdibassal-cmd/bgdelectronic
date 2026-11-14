@@ -1,5 +1,5 @@
 /* Estoque da loja principal: família e tipo só para filtrar a tela.
-   Usa marca, produto, tamanho e SKU. Não grava produto e não lê custo.
+   Usa marca, produto, tamanho, SKU e, se vier, notas. Não grava produto e não lê custo.
    A família olfativa do catálogo público não está na linha de estoque
    (e parte dos perfumes nem tem família), então perfume agrupa pela marca. */
 (function (root) {
@@ -9,6 +9,7 @@
     { id: "apple", label: "Apple" },
     { id: "xiaomi", label: "Xiaomi" },
     { id: "perfume", label: "Perfumes" },
+    { id: "beauty", label: "Beauty & Beleza" },
     { id: "outros", label: "Outros" }
   ];
   const APPLE_SUBS = [
@@ -32,6 +33,12 @@
     { id: "acessorios", label: "Acessórios" },
     { id: "outros", label: "Outros" }
   ];
+  const BEAUTY_SUBS = [
+    { id: "medicube", label: "Medicube" },
+    { id: "celimax", label: "Celimax" },
+    { id: "fino", label: "Fino" },
+    { id: "outros", label: "Outros" }
+  ];
   /* Marcas do catálogo público (perfumes/assets/app.js BRAND_ORDER + data.json)
      e das que só entram no estoque da loja (Hamidi, Al Haramain, prefixo do seed). */
   const PERFUME_BRANDS = [
@@ -53,7 +60,7 @@
     PCN: "paris-corner", IBQ: "ibq", WAT: "wataniah", RAY: "rayhaan", HAM: "hamidi", HAR: "haramain"
   };
   const PLACEHOLDER = new Set(["sem marca", "outros", "outras", "diversos", "diversas", "generico", "generica", "n a", "na", "s n", "sn", "original", "importado", "marca", "nenhuma", "nenhum", "nd", "sem", "nao informado", "nao informada"]);
-  const SUBS = { apple: APPLE_SUBS, games: GAME_SUBS, xiaomi: XIAOMI_SUBS };
+  const SUBS = { apple: APPLE_SUBS, games: GAME_SUBS, xiaomi: XIAOMI_SUBS, beauty: BEAUTY_SUBS };
 
   const fold = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -95,13 +102,24 @@
     if (!isAppleMarca(marcaF) && /\bcompativ/.test(h)) return true;
     return false;
   }
-  function isBeauty(marcaF, text, sku) {
-    if (/^HSC-/.test(sku)) return true;
+  function isBeauty(marcaF, text, sku, notas) {
+    if (/^(?:MED|CEL|HSC)-/.test(sku)) return true;
     const h = `${marcaF} ${text}`;
-    if (/\b(?:hair|skin care|skincare|celimax)\b/.test(h)) return true;
-    if (/\bfino\b/.test(marcaF) && /\b(?:hair|oil|oleo|smooth|premium)\b/.test(text)) return true;
+    if (/\b(?:medicube|celimax|shiseido|fine today)\b/.test(h)) return true;
+    if (/\b(?:hair skin care|hair and skin care|hair care|skincare|skin care)\b/.test(h)) return true;
+    if (/\bfino\b/.test(marcaF)) return true;
+    const notes = fold(notas);
+    if (/\bcategoria\b/.test(notes) && /\b(?:skincare|skin care|beauty|beleza|cabelo)\b/.test(notes) && !/\bperfumes?\b/.test(notes)) return true;
+    if (/\bbody mist\b/.test(text)) return false;
     if (/\b(?:hair oil|serum|toner|ampoule|ampola|shampoo|condicionador)\b/.test(text)) return true;
     return false;
+  }
+  function beautySub(marcaF, text, sku) {
+    const h = `${marcaF} ${text}`;
+    if (/^MED-/.test(sku) || /\bmedicube\b/.test(h)) return pack("beauty", "medicube", "Medicube");
+    if (/^CEL-/.test(sku) || /\bcelimax\b/.test(h)) return pack("beauty", "celimax", "Celimax");
+    if (/\b(?:fino|shiseido|fine today)\b/.test(h)) return pack("beauty", "fino", "Fino");
+    return pack("beauty", "outros", "Outros");
   }
   function isAppleAccessory(text) {
     return /\b(?:capa|capinha|case|pelicula|cabo|carregador|fonte|adaptador|adapter|suporte|pocket|pulseira|pencil|airtag|air tag|earpods|magsafe|power bank|protetor|fone|fones|teclado|mouse)\b/.test(text);
@@ -174,7 +192,7 @@
     return pack("games", "outros", "Outros");
   }
   function isPerfumeText(text) {
-    return /\b(?:perfume|perfumes|parfum|parfums|fragrancia|fragrancias|extrait|decant|decants|attar|oud)\b/.test(text) || /\beau de\b/.test(text);
+    return /\b(?:perfume|perfumes|parfum|parfums|fragrancia|fragrancias|extrait|decant|decants|attar|oud)\b/.test(text) || /\beau de\b/.test(text) || /\bbody (?:mist|spray)\b/.test(text);
   }
 
   function classify(p) {
@@ -185,7 +203,7 @@
     const text = `${name} ${size}`.trim();
     const sku = skuOf(p);
     const marcaKnown = !!(marcaF && !PLACEHOLDER.has(marcaF));
-    if (isBeauty(marcaF, text, sku)) return outros();
+    if (isBeauty(marcaF, text, sku, p.notas)) return beautySub(marcaF, text, sku);
     if (isAppleMarca(marcaF) && !blocksApple(marcaF, text)) return appleSub(text);
     if (isXiaomiMarca(marcaF)) return xiaomiSub(text);
     const pb = perfumeBrandOf(marcaF);
@@ -349,12 +367,14 @@
       row("FX-GEN-TG", "", "Rastreador compatível com iPhone FIXTURE", null, 2, 55),
       row("FX-GEN-AT", "X-Cell", "Airtag nossa marca FIXTURE", null, 7, 33),
       row("FX-BEA-FN", "Hair & Skin Care", "Fino Hair Oil FIXTURE", "70ml", 3, 99),
+      row("FX-BEA-MD", "Medicube", "Zero Pore Pads FIXTURE", "70 pads", 5, 89),
+      row("FX-BEA-CX", "Celimax", "Pore Dark Spot Serum FIXTURE", "30 ml", 4, 99),
       row("FX-AUD-JB", "JBL", "Flip 6 FIXTURE", "Azul", 0, 799)
     ];
   }
 
   root.BAGDA_ESTOQUE_CATS = {
     fold, norm, classify, matchProduct, filterList, tally, countsOf, orderForSale, saleSections, navHtml, summaryText, nextChipIndex, onToolbarKey, previewFixtures,
-    CATS, APPLE_SUBS, GAME_SUBS, XIAOMI_SUBS, PERFUME_BRANDS
+    CATS, APPLE_SUBS, GAME_SUBS, XIAOMI_SUBS, BEAUTY_SUBS, PERFUME_BRANDS
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
