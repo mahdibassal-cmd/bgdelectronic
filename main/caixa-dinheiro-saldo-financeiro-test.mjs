@@ -10,7 +10,7 @@ const sql = readFileSync(join(dir, "../supabase-loja/migration-caixa-dinheiro-sa
 let failed = 0;
 const ok = (c, m) => { if (!c) { failed++; console.error("FAIL", m); } else console.log("ok", m); };
 
-ok(html.includes("app.js?v=20261114a") && !html.includes("app.js?v=20261113l"), "live cache is 20261113l");
+ok(html.includes("app.js?v=20261114b") && !html.includes("app.js?v=20261113l"), "live cache is 20261113l");
 
 const caixa = app.slice(app.indexOf("const valorCard = c =>"), app.indexOf("const card = c =>"));
 ok(caixa.includes("if (c.saldo != null)") && caixa.includes("Saldo total · hoje:") && caixa.includes("sem saldo acumulado"), "valorCard shows saldo total when the view returns a saldo, otherwise the 3-day movimento");

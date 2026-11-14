@@ -138,8 +138,8 @@ html[data-theme=dark] .ext tr.exi>td{background:#1f1c15}html[data-theme=dark] .o
 .lanc td.cli{max-width:220px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.lanc tr.pz td{border-top:0;padding-top:2px;background:rgba(201,162,39,.06)}
 .lacts{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}.lacts .btn{font-size:12px;padding:4px 10px}.btn.danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
 .sug .vt{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:6px;background:#f3ead0;font-size:.9em}.sug .vt.off,.ps .vt.off{background:none;color:var(--dim);font-style:italic}.ps .vt{padding:1px 6px;border-radius:6px;background:#f3ead0}html[data-theme=dark] .sug .vt,html[data-theme=dark] .ps .vt{background:#3a2f14}
-.cl{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 120px 44px;gap:8px;align-items:start;padding:8px 0;border-bottom:1px dashed var(--ln)}.cl .lt{padding:9px 0;font-weight:600}.cl .rm{margin-top:22px}
-@media(max-width:600px){.sug li{padding:12px 10px}.sug{max-height:60vh}.cl{grid-template-columns:1fr 1fr 44px}.cl .clp{grid-column:1/-1}.cl>div:nth-child(4){grid-column:1/3}}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 120px 44px;gap:8px;align-items:start;padding:8px 0;border-bottom:1px dashed var(--ln)}.cl.imp{grid-template-columns:minmax(0,1fr) 80px 120px 120px 120px 44px}.cl .lt,.cl .lcro{padding:9px 0;font-weight:600}.cl .rm{margin-top:22px}
+@media(max-width:600px){.sug li{padding:12px 10px}.sug{max-height:60vh}.cl{grid-template-columns:1fr 1fr 44px}.cl .clp{grid-column:1/-1}.cl>div:nth-child(4){grid-column:1/3}.cl.imp>div:nth-child(5){grid-column:1/3}}
 /* IMEI por unidade */
 .ii input.i1,.ii input.i2{width:100%;min-width:16ch;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .ii small.w{display:block}
