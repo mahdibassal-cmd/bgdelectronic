@@ -46,8 +46,16 @@ const catalog = [
   ["RAY-002", "Rayhaan", "Pacific Tropical Vibe", "100ml", "perfume", "rayhaan"],
   ["HAM-001", "Hamidi", "Sundown", "100ml", "perfume", "hamidi"],
   ["HAR-001", "Al Haramain", "Amber Oud Gold Extreme", "100ml", "perfume", "haramain"],
-  ["HSC-001", "Hair & Skin Care", "Fino Hair Oil", "70ml", "outros", ""],
-  ["HSC-003", "Hair & Skin Care", "Celimax Retinal Shot", "15ml", "outros", ""],
+  ["HSC-001", "Hair & Skin Care", "Fino Hair Oil", "70ml", "beauty", "fino"],
+  ["HSC-003", "Hair & Skin Care", "Celimax Retinal Shot", "15ml", "beauty", "celimax"],
+  ["MED-001", "Medicube", "Zero Pore Pads", "70 pads", "beauty", "medicube"],
+  ["MED-003", "Medicube", "Collagen Jelly Cream", "110 ml", "beauty", "medicube"],
+  ["CEL-001", "Celimax", "Ji Woo Gae Cica BHA Blemish Toner Pad", "60 pads", "beauty", "celimax"],
+  ["PERF-104", "Celimax", "Dual Barrier Skin Cream", null, "beauty", "celimax"],
+  ["PERF-109", "Fino", "Premium Hair Oil Serum", null, "beauty", "fino"],
+  ["PERF-110", "Fino", "Premium Touch Hair Oil", null, "beauty", "fino"],
+  ["PERF-179", "Al Wataniah", "Bareq Al Dahab Body Mist", null, "perfume", "wataniah"],
+  ["PERF-152", "Lattafa", "Yara Body Mist", "250 ml", "perfume", "m-lattafa"],
   ["ARM-ACC", "Ármaf", "Club de Nuit", "100ml", "perfume", "armaf"],
   ["FER-SKU", "", "Sem nome de marca", "100ml", "perfume", "ferassa"],
   ["LAT-001", "Lattafa", "Parfum Yara", "100ml", "perfume", "m-lattafa"],
@@ -87,6 +95,11 @@ function expectRow(p) {
 for (const p of demo) expectRow(p);
 for (const p of catalog) expectRow(p);
 
+ok(EC.classify({ sku: "GEN-SK", marca: "Outra", produto: "Creme hidratante", notas: "Categoria: Skincare Coreano" }).cat === "beauty", "notas Categoria: Skincare Coreano goes to Beauty & Beleza");
+ok(EC.classify({ sku: "PERF-179", marca: "Al Wataniah", produto: "Bareq Al Dahab Body Mist", notas: "Categoria: Perfumes" }).cat === "perfume", "body mist with Categoria: Perfumes stays in Perfumes");
+ok(EC.BEAUTY_SUBS.map(s => s.label).join("|") === "Medicube|Celimax|Fino|Outros", "Beauty & Beleza types");
+
+
 const fx = EC.previewFixtures();
 ok(fx.length > 0 && fx.every(p => String(p.produto).includes("FIXTURE")), "fixtures are labeled FIXTURE");
 ok(fx.every(p => !Object.prototype.hasOwnProperty.call(p, "custo")), "fixtures have no cost field");
@@ -99,7 +112,7 @@ const fxExpect = {
   "FX-XIA-CR": ["xiaomi", "acessorios"], "FX-GAM-SW": ["games", "consoles"], "FX-GAM-HR": ["games", "acessorios"],
   "FX-GAM-JW": ["games", "jogos"], "FX-PF-AR": ["perfume", "armaf"], "FX-PF-RY": ["perfume", "rayhaan"],
   "FX-PF-LT": ["perfume", "m-lattafa"], "FX-PF-OD": ["perfume", "outros"], "FX-GEN-CB": ["outros", ""],
-  "FX-GEN-TG": ["outros", ""], "FX-GEN-AT": ["outros", ""], "FX-BEA-FN": ["outros", ""], "FX-AUD-JB": ["outros", ""]
+  "FX-GEN-TG": ["outros", ""], "FX-GEN-AT": ["outros", ""], "FX-BEA-FN": ["beauty", "fino"], "FX-BEA-MD": ["beauty", "medicube"], "FX-BEA-CX": ["beauty", "celimax"], "FX-AUD-JB": ["outros", ""]
 };
 for (const p of fx) {
   const c = EC.classify(p);
@@ -129,7 +142,7 @@ for (const p of all) {
   seen.set(p.sku + "|" + p.produto, (seen.get(p.sku + "|" + p.produto) || 0) + 1);
 }
 ok([...seen.values()].every(n => n === 1), "no duplicate assignment while scanning");
-for (const cat of ["games", "apple", "xiaomi", "perfume"]) {
+for (const cat of ["games", "apple", "xiaomi", "perfume", "beauty"]) {
   const bucket = tall.cats[cat];
   if (!bucket) continue;
   const subN = Object.values(bucket.subs).reduce((a, s) => a + s.n, 0);
@@ -137,12 +150,12 @@ for (const cat of ["games", "apple", "xiaomi", "perfume"]) {
 }
 ok(EC.filterList(all, {}).length === all.length, "Todos returns every product");
 ok(EC.filterList(all, { cat: "outros" }).length === (tall.cats.outros ? tall.cats.outros.n : 0), "Outros is the only leftover bucket");
-const parts = ["games", "apple", "xiaomi", "perfume", "outros"].flatMap(cat => EC.filterList(all, { cat }));
+const parts = ["games", "apple", "xiaomi", "perfume", "beauty", "outros"].flatMap(cat => EC.filterList(all, { cat }));
 ok(parts.length === all.length, "category partitions cover the list");
 
 const q = "cabo";
 const matched = all.filter(p => EC.matchProduct(p, q));
-const searched = ["games", "apple", "xiaomi", "perfume", "outros"].flatMap(cat => EC.filterList(all, { cat, q }));
+const searched = ["games", "apple", "xiaomi", "perfume", "beauty", "outros"].flatMap(cat => EC.filterList(all, { cat, q }));
 ok(searched.length === matched.length && matched.length >= 2, `search partitions reconcile ${searched.length} = ${matched.length}`);
 const appleCabo = EC.filterList(all, { cat: "apple", q });
 const resetCabo = EC.filterList(all, { cat: "", sub: "", q });
@@ -187,7 +200,7 @@ ok(EC.filterList(onlyOut, { cat: "", q: "" }).length === 1, "reset still returns
 const html = EC.navHtml(fx, { cat: "apple", sub: "iphones" });
 ok(html.includes('role="toolbar"') && html.includes('aria-label="Categorias do estoque"') && html.includes('aria-label="Tipos em Apple"'), "toolbars named");
 ok(html.includes('type="button"') && html.includes('aria-pressed="true"') && html.includes('data-cat="apple"') && html.includes('data-sub="iphones"'), "pressed state and buttons");
-for (const label of ["Todos", "Games", "Apple", "Xiaomi", "Perfumes", "Outros", "iPhones", "MacBooks", "Apple Watch", "AirPods", "Acessórios"]) ok(html.includes(label), `label ${label}`);
+for (const label of ["Todos", "Games", "Apple", "Xiaomi", "Perfumes", "Beauty &amp; Beleza", "Outros", "iPhones", "MacBooks", "Apple Watch", "AirPods", "Acessórios"]) ok(html.includes(label), `label ${label}`);
 ok(!/xaiomi/i.test(html), "Xiaomi is spelled correctly");
 const fxAvail = fx.filter(p => Number(p.estoque) > 0).length;
 const catNs = [...html.matchAll(/data-cat="([^"]*)" data-n="(\d+)"/g)].map(m => [m[1], +m[2]]);
@@ -248,9 +261,9 @@ const kioskHtml = readFileSync(join(dir, "../kiosk/index.html"), "utf8");
 ok(!kioskJs.includes("BAGDA_ESTOQUE_CATS") && !kioskJs.includes("est-nav") && !kioskHtml.includes("estoque-categorias"), "kiosk estoque is untouched");
 
 const labels = EC.CATS.map(c => c.label).join("|");
-ok(labels === "Games|Apple|Xiaomi|Perfumes|Outros", "family order");
+ok(labels === "Games|Apple|Xiaomi|Perfumes|Beauty & Beleza|Outros", "family order");
 ok(same(EC.APPLE_SUBS.map(s => s.label), ["iPhones", "MacBooks", "Apple Watch", "AirPods", "Acessórios", "Outros"]), "Apple types");
-ok(tall.avail === ["games", "apple", "xiaomi", "perfume", "outros"].reduce((a, cat) => a + ((tall.cats[cat] && tall.cats[cat].avail) || 0), 0), "available family counts reconcile");
+ok(tall.avail === ["games", "apple", "xiaomi", "perfume", "beauty", "outros"].reduce((a, cat) => a + ((tall.cats[cat] && tall.cats[cat].avail) || 0), 0), "available family counts reconcile");
 ok(tall.avail + tall.missing === all.length, "available plus missing is the whole catalog");
 
 if (failed) { console.error(failed + " failed"); process.exit(1); }
